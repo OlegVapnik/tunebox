@@ -55,7 +55,7 @@ use crate::{
 };
 
 /// Cover art size in the player bar, in cells (roughly square in most fonts).
-pub const COVER_SIZE: Size = Size { width: 6, height: 3 };
+pub const COVER_SIZE: Size = Size { width: 8, height: 4 };
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(250);
 const STATUS_TTL: Duration = Duration::from_secs(4);
 /// How long after the start tunebox waits before it asks for a star, so the first screen is up.

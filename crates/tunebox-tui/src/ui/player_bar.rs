@@ -27,6 +27,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     if area.height < 4 || area.width < 40 {
         return compact(frame.buffer_mut(), app, area);
     }
+    // A hairline above the bar: the player is its own panel, not more of the page.
+    frame.buffer_mut().set_style(Rect::new(area.x, area.y, area.width, 1), Style::new().bg(p.raised));
     let cover = Rect::new(area.x + 2, area.y + 1, COVER_SIZE.width, COVER_SIZE.height);
     let placed = app.now.cover.as_ref().map(|c| super::picture_at(frame, &c.picture, cover));
     match placed {

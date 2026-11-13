@@ -55,6 +55,8 @@ pub struct Icons {
     pub spotify: &'static str,
     pub youtube: &'static str,
     pub soundcloud: &'static str,
+    /// The settings page.
+    pub settings: &'static str,
 }
 
 const NERD: Icons = Icons {
@@ -97,6 +99,7 @@ const NERD: Icons = Icons {
     spotify: "\u{F04C7}",
     youtube: "\u{F05C3}",
     soundcloud: "\u{F1BE}",
+    settings: "\u{F042A}",
 };
 
 const TEXT: Icons = Icons {
@@ -139,6 +142,7 @@ const TEXT: Icons = Icons {
     spotify: "",
     youtube: "",
     soundcloud: "",
+    settings: "⚙",
 };
 
 static NERD_ICONS: AtomicBool = AtomicBool::new(false);

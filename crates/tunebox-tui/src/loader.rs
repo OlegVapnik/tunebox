@@ -1039,11 +1039,13 @@ impl Picture {
     }
 }
 
-/// Masks artist portraits to a circle; other images stay as they are.
+/// Masks artist portraits to a circle and gives the other covers rounded corners.
 fn mask(round: bool) -> impl FnOnce(&mut image::DynamicImage) + Send + 'static {
     move |image| {
         if round {
             *image = circle(image);
+        } else {
+            *image = rounded(image);
         }
     }
 }
@@ -1062,9 +1064,34 @@ fn circle(image: &image::DynamicImage) -> image::DynamicImage {
     rgba.into()
 }
 
+/// Softens a cover's corners to transparency, so cards read as cards at every size.
+fn rounded(image: &image::DynamicImage) -> image::DynamicImage {
+    let mut rgba = image.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    let radius = (width.min(height) as f32 / 8.0).max(2.0);
+    let (cx, cy) = (width as f32 / 2.0, height as f32 / 2.0);
+    for (x, y, pixel) in rgba.enumerate_pixels_mut() {
+        // How far past the straight edges of the rounded rectangle this pixel is; only corners are.
+        let dx = ((x as f32 + 0.5 - cx).abs() - (cx - radius)).max(0.0);
+        let dy = ((y as f32 + 0.5 - cy).abs() - (cy - radius)).max(0.0);
+        let coverage = (radius - dx.hypot(dy) + 0.5).clamp(0.0, 1.0);
+        pixel.0[3] = (pixel.0[3] as f32 * coverage) as u8;
+    }
+    rgba.into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn covers_get_rounded_corners() {
+        let opaque = image::RgbaImage::from_pixel(64, 64, image::Rgba([255, 255, 255, 255])).into();
+        let masked = rounded(&opaque).into_rgba8();
+        assert_eq!(masked.get_pixel(0, 0).0[3], 0, "the corner is cut away");
+        assert_eq!(masked.get_pixel(32, 32).0[3], 255, "the middle is untouched");
+        assert_eq!(masked.get_pixel(2, 32).0[3], 255, "so is an edge that is not a corner");
+    }
 
     #[test]
     fn requests_go_to_the_service_of_each_uri() {

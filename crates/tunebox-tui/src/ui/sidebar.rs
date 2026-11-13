@@ -22,8 +22,56 @@ use crate::{
 const THUMB: Size = Size { width: 4, height: 2 };
 /// Two text lines next to the thumbnail, plus a gap.
 const ENTRY_ROWS: u16 = 3;
-/// Rows above the list: title and filter tabs.
-const LIST_TOP: u16 = 5;
+/// Rows above the list: the navigation, the title and the filter tabs.
+const LIST_TOP: u16 = 7;
+/// The gap between two navigation entries.
+const NAV_GAP: u16 = 2;
+
+/// Where the sidebar's navigation goes, and how to tell it is there already.
+fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
+    let (home, search, queue, settings) = (
+        matches!(app.view, View::Home(_)),
+        matches!(app.view, View::Search(_)),
+        matches!(app.view, View::Queue(_)),
+        matches!(app.view, View::Settings(_)),
+    );
+    vec![
+        (Command::Home, icons().home, "Home", home),
+        (Command::Search, icons().search, "Search", search),
+        (Command::ShowQueue, icons().queue, "Queue", queue),
+        (Command::Settings, icons().settings, "Settings", settings),
+    ]
+}
+
+/// A row of places to go: Home, Search, Queue and Settings, above the library. Returns their
+/// click areas.
+fn navigation(
+    buf: &mut ratatui::buffer::Buffer,
+    x: u16,
+    y: u16,
+    right: u16,
+    app: &App,
+    accent: Color,
+) -> Vec<(Rect, Command)> {
+    let p = theme::palette();
+    let mut hits = Vec::new();
+    let mut x = x;
+    for (command, icon, label, open) in nav(app) {
+        let width = icon.chars().count() as u16 + 1 + label.len() as u16;
+        if x + width > right {
+            break;
+        }
+        let style = if open {
+            Style::new().fg(accent).bold()
+        } else {
+            Style::new().fg(p.muted)
+        };
+        buf.set_string(x, y, format!("{icon} {label}"), style);
+        hits.push((Rect::new(x, y, width, 1), command));
+        x += width + NAV_GAP;
+    }
+    hits
+}
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let p = theme::palette();
@@ -35,13 +83,17 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let accent = app.accent.color();
     let page_open = matches!(app.view, View::Library(_));
 
+    // Home, Search, Queue and Settings, so the sidebar is where the mouse goes for a place to be.
+    let places = navigation(frame.buffer_mut(), area.x + 3, area.y + 1, area.right().saturating_sub(2), app, accent);
+    app.hits.extend(places.into_iter().map(|(rect, command)| (rect, Hit::Command(command))));
+
     let mut title = vec![Span::styled(format!("{}  Your Library", icons().library), Style::new().fg(p.text).bold())];
     if app.playlists_loading || app.library_loading {
         title.push(Span::styled(format!("  {}", text::spinner(app.frame())), p.faint));
     }
     let buf = frame.buffer_mut();
-    buf.set_line(area.x + 3, area.y + 1, &Line::from(title), area.width.saturating_sub(8));
-    let expand = Rect::new(area.right().saturating_sub(4), area.y + 1, 2, 1);
+    buf.set_line(area.x + 3, area.y + 3, &Line::from(title), area.width.saturating_sub(8));
+    let expand = Rect::new(area.right().saturating_sub(4), area.y + 3, 2, 1);
     let expand_style = if page_open { Style::new().fg(accent) } else { Style::new().fg(p.muted) };
     buf.set_string(expand.x, expand.y, icons().expand, expand_style);
     app.hits.push((expand, Hit::Command(Command::Library)));
@@ -49,7 +101,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let filters = app.library_filters();
     let active = app.library_filter;
     let chips =
-        tabs(frame.buffer_mut(), area.x + 3, area.y + 3, area.right().saturating_sub(2), &filters, active, accent);
+        tabs(frame.buffer_mut(), area.x + 3, area.y + 5, area.right().saturating_sub(2), &filters, active, accent);
     app.hits.extend(chips.into_iter().map(|(rect, filter)| (rect, Hit::Chip(filter))));
 
     let entries = app.library_entries();
