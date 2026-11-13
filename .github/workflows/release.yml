@@ -38,7 +38,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libpulse-dev
       # One build per service set, one after another in the same target folder: the three
-      # share their dependencies, so the second and third compile little but cloofy itself.
+      # share their dependencies, so the second and third compile little but tunebox itself.
       - name: Build spotify, ytmusic and full
         env:
           TARGET: ${{ matrix.target }}
@@ -49,10 +49,10 @@ jobs:
               ytmusic) features=ytmusic ;;
               full) features=spotify,ytmusic ;;
             esac
-            cargo build --release --locked --package cloofy --target "$TARGET" \
+            cargo build --release --locked --package tunebox --target "$TARGET" \
               --no-default-features --features "$features"
             mkdir -p "dist/$variant"
-            cp "target/$TARGET/release/cloofy" "dist/$variant/"
+            cp "target/$TARGET/release/tunebox" "dist/$variant/"
           done
       # A build that runs here says which services it has; the Linux ones also show what they
       # link. The YouTube Music build must not need ALSA or PulseAudio, which only Spotify uses.
@@ -62,7 +62,7 @@ jobs:
         run: |
           host=$(rustc -vV | sed -n 's/^host: //p')
           for variant in spotify ytmusic full; do
-            binary="dist/$variant/cloofy"
+            binary="dist/$variant/tunebox"
             if [ "$host" = "$TARGET" ]; then
               version=$("$binary" --version)
               echo "$variant: $version"
@@ -90,19 +90,19 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           for variant in spotify ytmusic full; do
-            archive="cloofy-$variant-$TARGET.tar.gz"
+            archive="tunebox-$variant-$TARGET.tar.gz"
             cp LICENSE README.md "dist/$variant/"
-            tar -czf "$archive" -C "dist/$variant" cloofy LICENSE README.md
+            tar -czf "$archive" -C "dist/$variant" tunebox LICENSE README.md
             shasum -a 256 "$archive" > "$archive.sha256"
           done
-          # cloofy 0.4 and older update themselves from this name, and play Spotify.
-          cp "cloofy-spotify-$TARGET.tar.gz" "cloofy-$TARGET.tar.gz"
-          shasum -a 256 "cloofy-$TARGET.tar.gz" > "cloofy-$TARGET.tar.gz.sha256"
-          ls -l cloofy-*.tar.gz*
+          # tunebox 0.4 and older update themselves from this name, and play Spotify.
+          cp "tunebox-spotify-$TARGET.tar.gz" "tunebox-$TARGET.tar.gz"
+          shasum -a 256 "tunebox-$TARGET.tar.gz" > "tunebox-$TARGET.tar.gz.sha256"
+          ls -l tunebox-*.tar.gz*
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.target }}
-          path: cloofy-*.tar.gz*
+          path: tunebox-*.tar.gz*
           if-no-files-found: error
 
   publish:
@@ -134,7 +134,7 @@ jobs:
             echo "CHANGELOG.md has no section for $version" >&2
             exit 1
           fi
-          gh release create "$TAG" dist/* --verify-tag --title "cloofy $version" --notes-file notes.md
+          gh release create "$TAG" dist/* --verify-tag --title "tunebox $version" --notes-file notes.md
 
   packages:
     name: Homebrew and AUR
@@ -155,18 +155,18 @@ jobs:
         run: |
           gh release download "$TAG" --pattern '*.sha256' --dir checksums
           packaging/render.sh "${TAG#v}" checksums packages
-      # Until cloofy is in the AUR: `curl -L -o PKGBUILD …/releases/latest/download/cloofy-bin.PKGBUILD
+      # Until tunebox is in the AUR: `curl -L -o PKGBUILD …/releases/latest/download/tunebox-bin.PKGBUILD
       # && makepkg -si`. Plain `PKGBUILD` stays Spotify's, the name 0.4's instructions download.
       - name: Attach the PKGBUILDs to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          for package in cloofy-bin cloofy-ytmusic-bin cloofy-full-bin; do
+          for package in tunebox-bin tunebox-ytmusic-bin tunebox-full-bin; do
             cp "packages/aur/$package/PKGBUILD" "$package.PKGBUILD"
           done
-          cp packages/aur/cloofy-bin/PKGBUILD PKGBUILD
-          gh release upload "$TAG" PKGBUILD cloofy-bin.PKGBUILD cloofy-ytmusic-bin.PKGBUILD cloofy-full-bin.PKGBUILD --clobber
+          cp packages/aur/tunebox-bin/PKGBUILD PKGBUILD
+          gh release upload "$TAG" PKGBUILD tunebox-bin.PKGBUILD tunebox-ytmusic-bin.PKGBUILD tunebox-full-bin.PKGBUILD --clobber
       # Each skips with a notice until its secret is set, see packaging/README.md.
       - name: Push them to the tap and the AUR
         env:

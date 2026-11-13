@@ -435,160 +435,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
-name = "cloofy"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "clap",
- "cloofy-core",
- "cloofy-os",
- "cloofy-player",
- "cloofy-spotify",
- "cloofy-tui",
- "cloofy-ytmusic",
- "crossterm",
- "libc",
- "librespot",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "unicode-width",
-]
-
-[[package]]
-name = "cloofy-core"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "cloofy-os",
- "etcetera",
- "flate2",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tar",
- "tokio",
- "toml",
- "toml_edit",
- "tracing",
-]
-
-[[package]]
-name = "cloofy-os"
-version = "0.5.2"
-dependencies = [
- "block2",
- "dispatch2",
- "futures",
- "objc2",
- "objc2-app-kit",
- "objc2-core-audio",
- "objc2-core-foundation",
- "objc2-foundation",
- "objc2-io-kit",
- "objc2-media-player",
- "security-framework",
- "tokio",
- "tracing",
- "url",
- "zbus",
-]
-
-[[package]]
-name = "cloofy-player"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "cloofy-core",
- "cloofy-os",
- "cloofy-spotify",
- "librespot",
- "rodio",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "cloofy-spotify"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "base64 0.23.1",
- "cloofy-core",
- "futures",
- "iana-time-zone",
- "librespot",
- "open",
- "protobuf",
- "protobuf-json-mapping",
- "rand 0.10.3",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "cloofy-tui"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "base64 0.23.1",
- "cloofy-core",
- "cloofy-os",
- "cloofy-player",
- "cloofy-spotify",
- "cloofy-ytmusic",
- "crossterm",
- "futures",
- "icy_sixel",
- "image",
- "libc",
- "librespot",
- "nucleo-matcher",
- "open",
- "ratatui",
- "ratatui-image",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "skrifa",
- "tokio",
- "toml",
- "toml_edit",
- "tracing",
- "unicode-width",
- "zeno",
-]
-
-[[package]]
-name = "cloofy-ytmusic"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "cloofy-core",
- "futures",
- "libc",
- "open",
- "reqwest",
- "serde_json",
- "sha1",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4734,6 +4580,197 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "tunebox"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm",
+ "libc",
+ "librespot",
+ "open",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tunebox-core",
+ "tunebox-os",
+ "tunebox-player",
+ "tunebox-soundcloud",
+ "tunebox-spotify",
+ "tunebox-tui",
+ "tunebox-ytmusic",
+ "unicode-width",
+]
+
+[[package]]
+name = "tunebox-core"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "etcetera",
+ "flate2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tokio",
+ "toml",
+ "toml_edit",
+ "tracing",
+ "tunebox-os",
+]
+
+[[package]]
+name = "tunebox-mpv"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "libc",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tunebox-core",
+ "url",
+]
+
+[[package]]
+name = "tunebox-os"
+version = "0.5.2"
+dependencies = [
+ "block2",
+ "dispatch2",
+ "futures",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-audio",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "objc2-io-kit",
+ "objc2-media-player",
+ "security-framework",
+ "tokio",
+ "tracing",
+ "url",
+ "zbus",
+]
+
+[[package]]
+name = "tunebox-player"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "librespot",
+ "rodio",
+ "tokio",
+ "tracing",
+ "tunebox-core",
+ "tunebox-os",
+ "tunebox-spotify",
+]
+
+[[package]]
+name = "tunebox-soundcloud"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tunebox-core",
+ "tunebox-mpv",
+]
+
+[[package]]
+name = "tunebox-spotify"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.23.1",
+ "futures",
+ "iana-time-zone",
+ "librespot",
+ "open",
+ "protobuf",
+ "protobuf-json-mapping",
+ "rand 0.10.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "tunebox-core",
+ "tunebox-mpv",
+ "url",
+]
+
+[[package]]
+name = "tunebox-tui"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "base64 0.23.1",
+ "crossterm",
+ "futures",
+ "icy_sixel",
+ "image",
+ "libc",
+ "librespot",
+ "nucleo-matcher",
+ "open",
+ "ratatui",
+ "ratatui-image",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "skrifa",
+ "tokio",
+ "toml",
+ "toml_edit",
+ "tracing",
+ "tunebox-core",
+ "tunebox-os",
+ "tunebox-player",
+ "tunebox-soundcloud",
+ "tunebox-spotify",
+ "tunebox-ytmusic",
+ "unicode-width",
+ "zeno",
+]
+
+[[package]]
+name = "tunebox-ytmusic"
+version = "0.5.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "libc",
+ "open",
+ "reqwest",
+ "serde_json",
+ "sha1",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tunebox-core",
+ "tunebox-mpv",
+ "url",
+]
 
 [[package]]
 name = "tungstenite"

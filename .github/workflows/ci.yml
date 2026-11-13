@@ -42,14 +42,14 @@ jobs:
       - run: dbus-run-session -- cargo test --workspace --locked
         if: runner.os == 'Linux'
         env:
-          CLOOFY_REQUIRE_DBUS: 1
-          CLOOFY_REQUIRE_MPV: 1
+          TUNEBOX_REQUIRE_DBUS: 1
+          TUNEBOX_REQUIRE_MPV: 1
       - name: Lint install.sh
         if: runner.os == 'Linux'
         run: shellcheck install.sh
 
-  # The other builds: each service on its own, and none, where only `cloofy demo` works. The
-  # features go to every crate that has them, cloofy and cloofy-tui among them.
+  # The other builds: each service on its own, and none, where only `tunebox demo` works. The
+  # features go to every crate that has them, tunebox and tunebox-tui among them.
   features:
     name: ${{ matrix.name }}
     strategy:
@@ -69,7 +69,7 @@ jobs:
         with:
           toolchain: stable
           components: clippy
-      # Every workspace crate builds, cloofy-player too, whatever the features.
+      # Every workspace crate builds, tunebox-player too, whatever the features.
       - name: Install audio headers
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libpulse-dev
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
@@ -104,7 +104,7 @@ jobs:
           key: ${{ matrix.id }}
       - run: cargo clippy --workspace --all-targets --locked ${{ matrix.features }} -- -D warnings
 
-  # The oldest Rust that builds cloofy from source, as Cargo.toml's rust-version says.
+  # The oldest Rust that builds tunebox from source, as Cargo.toml's rust-version says.
   msrv:
     name: rust-version
     runs-on: ubuntu-latest
@@ -125,7 +125,7 @@ jobs:
           key: msrv
       - run: cargo check --workspace --all-targets --locked
 
-  # Installs must not carry the service they weren't made for: what cloofy depends on with
+  # Installs must not carry the service they weren't made for: what tunebox depends on with
   # each set of features, on every platform.
   no-bloat:
     name: no bloat
@@ -141,33 +141,33 @@ jobs:
           toolchain: stable
       - name: Each build depends only on its services
         run: |
-          # Fails when cloofy with `features` depends on a crate matching `unwanted`, or when
-          # cloofy-tui doesn't have exactly `features` on. cloofy depends on a service's crate
-          # itself too, so only cloofy-tui's features show that the interface has the service.
+          # Fails when tunebox with `features` depends on a crate matching `unwanted`, or when
+          # tunebox-tui doesn't have exactly `features` on. tunebox depends on a service's crate
+          # itself too, so only tunebox-tui's features show that the interface has the service.
           only() {
             local features=$1 unwanted=$2 deps found tui
-            deps=$(cargo tree --package cloofy --locked --edges normal --target all --prefix none \
+            deps=$(cargo tree --package tunebox --locked --edges normal --target all --prefix none \
               --no-default-features ${features:+--features "$features"}) || return 1
             found=$(grep -E "$unwanted" <<<"$deps" | sort -u || true)
             if [ -n "$found" ]; then
-              echo "::error::With features '${features:-none}', cloofy depends on:"
+              echo "::error::With features '${features:-none}', tunebox depends on:"
               echo "$found"
               return 1
             fi
-            tui=$(cargo tree --package cloofy --locked --edges features --invert cloofy-tui --target all \
+            tui=$(cargo tree --package tunebox --locked --edges features --invert tunebox-tui --target all \
               --prefix none --no-default-features ${features:+--features "$features"}) || return 1
-            tui=$(sed -n 's/^cloofy-tui feature "\(.*\)"$/\1/p' <<<"$tui" | sort -u | paste -sd , -)
+            tui=$(sed -n 's/^tunebox-tui feature "\(.*\)"$/\1/p' <<<"$tui" | sort -u | paste -sd , -)
             if [ "$tui" != "$features" ]; then
-              echo "::error::With features '${features:-none}', cloofy-tui has '${tui:-none}' on"
+              echo "::error::With features '${features:-none}', tunebox-tui has '${tui:-none}' on"
               return 1
             fi
-            echo "Features '${features:-none}': cloofy-tui has the same, and nothing matches $unwanted"
+            echo "Features '${features:-none}': tunebox-tui has the same, and nothing matches $unwanted"
           }
           status=0
           # Spotify's player is the only thing that plays through ALSA or PulseAudio.
-          only ytmusic '^(librespot|cloofy-spotify|cloofy-player|alsa-sys|libpulse)' || status=1
-          only spotify '^cloofy-ytmusic ' || status=1
-          only "" '^(librespot|cloofy-spotify|cloofy-player|cloofy-ytmusic )' || status=1
+          only ytmusic '^(librespot|tunebox-spotify|tunebox-player|alsa-sys|libpulse)' || status=1
+          only spotify '^tunebox-ytmusic ' || status=1
+          only "" '^(librespot|tunebox-spotify|tunebox-player|tunebox-ytmusic )' || status=1
           exit $status
 
   # Known advisories, crate sources and bans, per deny.toml.

@@ -9,22 +9,25 @@ version = "0.5.2"
 edition = "2024"
 rust-version = "1.90"
 license = "MIT"
-repository = "https://github.com/parda21/cloofy"
+repository = "https://github.com/OlegVapnik/tunebox"
 
 [workspace.dependencies]
-cloofy-core = { path = "crates/cloofy-core" }
-cloofy-spotify = { path = "crates/cloofy-spotify" }
-cloofy-ytmusic = { path = "crates/cloofy-ytmusic" }
-cloofy-player = { path = "crates/cloofy-player" }
+tunebox-core = { path = "crates/tunebox-core" }
+tunebox-spotify = { path = "crates/tunebox-spotify" }
+tunebox-ytmusic = { path = "crates/tunebox-ytmusic" }
+tunebox-player = { path = "crates/tunebox-player" }
+tunebox-mpv = { path = "crates/tunebox-mpv" }
+tunebox-soundcloud = { path = "crates/tunebox-soundcloud" }
 # Its services are features; the binary picks them.
-cloofy-tui = { path = "crates/cloofy-tui", default-features = false }
-cloofy-os = { path = "crates/cloofy-os" }
+tunebox-tui = { path = "crates/tunebox-tui", default-features = false }
+tunebox-os = { path = "crates/tunebox-os" }
 
 # librespot-core 0.8 fails to build with vergen 9.1, so Cargo.lock pins vergen 9.0.6.
 # Keep that pin when running `cargo update` (`cargo update -p vergen --precise 9.0.6`).
 librespot = { version = "0.8", default-features = false, features = ["rustls-tls-native-roots", "rodio-backend"] }
 
 anyhow = "1"
+async-trait = "0.1"
 base64 = "0.23"
 block2 = "0.6"
 clap = { version = "4.6", features = ["derive"] }
@@ -37,7 +40,7 @@ iana-time-zone = "0.1"
 # Sixel images; ratatui-image encodes with it too.
 icy_sixel = "0.5"
 # Covers come as JPEG, some as WebP; PNG is for F12 snapshots. The default formats would
-# also link an AV1 encoder, EXR and TIFF, which cloofy never decodes.
+# also link an AV1 encoder, EXR and TIFF, which tunebox never decodes.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 libc = "0.2"
 nucleo-matcher = "0.3"
@@ -79,10 +82,10 @@ zeno = "0.3"
 # unixexec: zbus 5 always had it, for session buses reached through a command.
 zbus = { version = "6", default-features = false, features = ["proxy", "service", "tokio", "unixexec"] }
 
-# vendor/ holds forks as git submodules, both on branch `cloofy`:
-# - librespot (github.com/parda21/librespot) with two open upstream PRs merged, DJ with
+# vendor/ holds forks as git submodules, both on branch `tunebox`:
+# - librespot (github.com/OlegVapnik/librespot) with two open upstream PRs merged, DJ with
 #   narration (librespot-org/librespot#1797) and crossfade (#1756), plus fixes on top.
-# - ratatui-image (github.com/parda21/ratatui-image), which frees Kitty image uploads once sent.
+# - ratatui-image (github.com/OlegVapnik/ratatui-image), which frees Kitty image uploads once sent.
 [patch.crates-io]
 librespot = { path = "vendor/librespot" }
 librespot-audio = { path = "vendor/librespot/audio" }

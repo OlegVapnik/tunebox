@@ -1,6 +1,6 @@
 ---
 title: Keys and mouse
-description: Every shortcut in cloofy, the command palette, and what the mouse does.
+description: Every shortcut in tunebox, the command palette, and what the mouse does.
 ---
 
 <kbd>Ctrl</kbd> <kbd>K</kbd> opens a command palette for every action and playlist, <kbd>?</kbd> lists all keys, and the hint bar at the bottom shows what works on the current page.
@@ -30,7 +30,7 @@ description: Every shortcut in cloofy, the command palette, and what the mouse d
 | <kbd>D</kbd> | Start the DJ on Spotify; while it plays, ask it for something |
 | <kbd>X</kbd> | Crossfade, on Spotify |
 | <kbd>,</kbd> | Settings |
-| <kbd>U</kbd> | Update cloofy |
+| <kbd>U</kbd> | Update tunebox |
 | <kbd>Ctrl</kbd> <kbd>K</kbd> | Command palette |
 | <kbd>?</kbd> | All shortcuts |
 | <kbd>Ctrl</kbd> <kbd>C</kbd> | Quit |

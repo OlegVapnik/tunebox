@@ -9,15 +9,15 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$here/../Cargo.toml" | head -n 1)
-formulas=(cloofy cloofy-ytmusic cloofy-full)
-aur_packages=(cloofy-bin cloofy-ytmusic-bin cloofy-full-bin cloofy)
+formulas=(tunebox tunebox-ytmusic tunebox-full)
+aur_packages=(tunebox-bin tunebox-ytmusic-bin tunebox-full-bin tunebox)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 mkdir "$tmp/checksums"
 for variant in spotify ytmusic full; do
 	for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin; do
-		archive="cloofy-$variant-$target.tar.gz"
+		archive="tunebox-$variant-$target.tar.gz"
 		printf '%064d  %s\n' 0 "$archive" >"$tmp/checksums/$archive.sha256"
 	done
 done
@@ -33,14 +33,14 @@ variant_of() {
 }
 for formula in "${formulas[@]}"; do
 	file="$tmp/out/homebrew/$formula.rb"
-	if grep -n 'releases/download/' "$file" | grep -v "/cloofy-$(variant_of "$formula")-" >&2; then
+	if grep -n 'releases/download/' "$file" | grep -v "/tunebox-$(variant_of "$formula")-" >&2; then
 		echo "packaging/homebrew/$formula.rb downloads another build than $(variant_of "$formula")'s" >&2
 		exit 1
 	fi
 done
-for package in cloofy-bin cloofy-ytmusic-bin cloofy-full-bin; do
+for package in tunebox-bin tunebox-ytmusic-bin tunebox-full-bin; do
 	file="$tmp/out/aur/$package/PKGBUILD"
-	if grep -n 'releases/download/' "$file" | grep -v "/cloofy-$(variant_of "$package")-" >&2; then
+	if grep -n 'releases/download/' "$file" | grep -v "/tunebox-$(variant_of "$package")-" >&2; then
 		echo "packaging/aur/$package/PKGBUILD downloads another build than $(variant_of "$package")'s" >&2
 		exit 1
 	fi

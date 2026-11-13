@@ -1,0 +1,19 @@
+[package]
+name = "tunebox-soundcloud"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "SoundCloud for tunebox: its public API, a cookie sign-in, and playback through mpv"
+
+[dependencies]
+tunebox-core.workspace = true
+tunebox-mpv.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true

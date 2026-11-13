@@ -4,7 +4,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const base = 'https://raw.githubusercontent.com/parda21/cloofy/assets/';
+const base = 'https://raw.githubusercontent.com/OlegVapnik/tunebox/assets/';
 const files = {
 	'screenshots/hero.webp': 'hero.webp',
 	'screenshots/home.webp': 'home.webp',

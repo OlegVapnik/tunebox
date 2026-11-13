@@ -7,7 +7,7 @@
 # The release workflow runs it for each new tag before publish.sh pushes the output. To check
 # the output for a published release:
 #
-#   gh release download v0.5.0 --repo parda21/cloofy --pattern '*.sha256' --dir /tmp/sums
+#   gh release download v0.5.0 --repo OlegVapnik/tunebox --pattern '*.sha256' --dir /tmp/sums
 #   packaging/render.sh 0.5.0 /tmp/sums /tmp/packages
 
 set -euo pipefail
@@ -21,21 +21,21 @@ checksums=$2
 out=$3
 here=$(cd "$(dirname "$0")" && pwd)
 
-# The builds, as the release archives name them: cloofy-<variant>-<target>.tar.gz.
+# The builds, as the release archives name them: tunebox-<variant>-<target>.tar.gz.
 variants=(spotify ytmusic full)
 targets=(x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin)
 templates=(
-	homebrew/cloofy.rb
-	homebrew/cloofy-ytmusic.rb
-	homebrew/cloofy-full.rb
-	aur/cloofy-bin/PKGBUILD
-	aur/cloofy-bin/.SRCINFO
-	aur/cloofy-ytmusic-bin/PKGBUILD
-	aur/cloofy-ytmusic-bin/.SRCINFO
-	aur/cloofy-full-bin/PKGBUILD
-	aur/cloofy-full-bin/.SRCINFO
-	aur/cloofy/PKGBUILD
-	aur/cloofy/.SRCINFO
+	homebrew/tunebox.rb
+	homebrew/tunebox-ytmusic.rb
+	homebrew/tunebox-full.rb
+	aur/tunebox-bin/PKGBUILD
+	aur/tunebox-bin/.SRCINFO
+	aur/tunebox-ytmusic-bin/PKGBUILD
+	aur/tunebox-ytmusic-bin/.SRCINFO
+	aur/tunebox-full-bin/PKGBUILD
+	aur/tunebox-full-bin/.SRCINFO
+	aur/tunebox/PKGBUILD
+	aur/tunebox/.SRCINFO
 )
 
 # pacman's versions can't hold a dash, and package managers get releases, not previews.
@@ -48,7 +48,7 @@ fi
 substitutions=(-e "s/@VERSION@/$version/g")
 for variant in "${variants[@]}"; do
 	for target in "${targets[@]}"; do
-		file="$checksums/cloofy-$variant-$target.tar.gz.sha256"
+		file="$checksums/tunebox-$variant-$target.tar.gz.sha256"
 		if [ ! -f "$file" ]; then
 			echo "Missing $file" >&2
 			exit 1

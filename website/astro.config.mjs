@@ -2,17 +2,17 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-const repo = 'https://github.com/parda21/cloofy';
+const repo = 'https://github.com/OlegVapnik/tunebox';
 
 // The landing page is `src/pages/index.astro`; Starlight serves the docs under /docs/.
 export default defineConfig({
-	site: 'https://cloofy.app',
+	site: 'https://tunebox.app',
 	trailingSlash: 'ignore',
 	// The changelog page reads CHANGELOG.md from the repository, above the site's folder.
 	vite: { server: { fs: { allow: ['..'] } } },
 	integrations: [
 		starlight({
-			title: 'cloofy',
+			title: 'tunebox',
 			description: 'Spotify and YouTube Music in your terminal.',
 			logo: { src: './src/assets/logo.svg', replacesTitle: true },
 			favicon: '/favicon.svg',
@@ -20,7 +20,7 @@ export default defineConfig({
 			editLink: { baseUrl: `${repo}/edit/main/website/` },
 			customCss: ['@fontsource-variable/jetbrains-mono', './src/styles/docs.css'],
 			head: [
-				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://cloofy.app/og.png' } },
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://tunebox.app/og.png' } },
 				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#0d0b14' } },
 			],
@@ -40,7 +40,7 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Using cloofy',
+					label: 'Using tunebox',
 					items: [
 						{ label: 'Keys and mouse', slug: 'docs/keys' },
 						{ label: 'Settings', slug: 'docs/settings' },

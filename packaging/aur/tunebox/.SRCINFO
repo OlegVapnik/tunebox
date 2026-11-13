@@ -1,0 +1,23 @@
+pkgbase = tunebox
+	pkgdesc = Spotify client for the terminal
+	pkgver = @VERSION@
+	pkgrel = 1
+	url = https://github.com/OlegVapnik/tunebox
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = cargo
+	makedepends = git
+	depends = alsa-lib
+	depends = glibc
+	depends = libgcc
+	depends = libpulse
+	options = !lto
+	source = git+https://github.com/OlegVapnik/tunebox.git#tag=v@VERSION@
+	source = git+https://github.com/OlegVapnik/librespot.git
+	source = git+https://github.com/OlegVapnik/ratatui-image.git
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+
+pkgname = tunebox

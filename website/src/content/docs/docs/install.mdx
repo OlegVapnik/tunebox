@@ -1,37 +1,37 @@
 ---
 title: Install
-description: Install cloofy with one command, with Homebrew, mise or on Arch Linux, or build it yourself.
+description: Install tunebox with one command, with Homebrew, mise or on Arch Linux, or build it yourself.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 ```sh
-curl -fsSL https://cloofy.app/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash
 ```
 
 The installer first asks what you listen to: Spotify, YouTube Music, or both. Each comes as a build of its own, so a YouTube Music install carries no Spotify code, and the other way around. Then it checks your system, puts the latest release in `~/.local/bin`, and walks you through the setup:
 
 - **Spotify:** your Spotify app, its client ID and signing in. See [Spotify](/docs/spotify/).
 - **YouTube Music:** mpv, yt-dlp and deno, which it offers to install with your package manager, and an optional sign-in. See [YouTube Music](/docs/youtube-music/).
-- **[Omarchy](https://omarchy.org):** cloofy's bar widget, theme, menu entries and launcher. See [Omarchy](/docs/omarchy/).
+- **[Omarchy](https://omarchy.org):** tunebox's bar widget, theme, menu entries and launcher. See [Omarchy](/docs/omarchy/).
 
-Run it again to switch between the builds; your settings and sign-ins stay. cloofy offers new releases itself, see [Updates](/docs/updates/).
+Run it again to switch between the builds; your settings and sign-ins stay. tunebox offers new releases itself, see [Updates](/docs/updates/).
 
 ## Installer options
 
 Options go after `bash -s --`:
 
 ```sh
-curl -fsSL https://cloofy.app/install.sh | bash -s -- --service ytmusic
+curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash -s -- --service ytmusic
 ```
 
 | Option | What it does |
 | --- | --- |
 | `--service S` | Installs `spotify`, `ytmusic` or `both` without asking about it |
 | `--yes` | Asks nothing: the services you have, or Spotify the first time; sign in later |
-| `--uninstall` | Removes cloofy and its Omarchy setup, and its settings and sign-ins if you want |
+| `--uninstall` | Removes tunebox and its Omarchy setup, and its settings and sign-ins if you want |
 
-`CLOOFY_INSTALL_DIR` puts the binary somewhere else than `~/.local/bin`, and `CLOOFY_VERSION` installs a release such as `v0.5.0` instead of the latest.
+`TUNEBOX_INSTALL_DIR` puts the binary somewhere else than `~/.local/bin`, and `TUNEBOX_VERSION` installs a release such as `v0.5.0` instead of the latest.
 
 ## Package managers
 
@@ -39,37 +39,37 @@ Package managers have the same three builds:
 
 | | Spotify | YouTube Music | Both |
 | --- | --- | --- | --- |
-| [Homebrew](https://brew.sh), macOS and Linux | `cloofy` | `cloofy-ytmusic` | `cloofy-full` |
+| [Homebrew](https://brew.sh), macOS and Linux | `tunebox` | `tunebox-ytmusic` | `tunebox-full` |
 | [mise](https://mise.jdx.dev), anywhere | `matching=spotify` | `matching=ytmusic` | `matching=full` |
-| Arch Linux | `cloofy-bin` | `cloofy-ytmusic-bin` | `cloofy-full-bin` |
+| Arch Linux | `tunebox-bin` | `tunebox-ytmusic-bin` | `tunebox-full-bin` |
 
 <Tabs>
 	<TabItem label="Homebrew">
 		```sh
-		brew install parda21/cloofy/cloofy-ytmusic
+		brew install OlegVapnik/tunebox/tunebox-ytmusic
 		```
 	</TabItem>
 	<TabItem label="mise">
 		```sh
-		mise use -g 'github:parda21/cloofy[matching=ytmusic]'
+		mise use -g 'github:OlegVapnik/tunebox[matching=ytmusic]'
 		```
 	</TabItem>
 	<TabItem label="Arch Linux">
 		As a package built from the PKGBUILD that comes with each release:
 		```sh
-		curl -L -o PKGBUILD https://github.com/parda21/cloofy/releases/latest/download/cloofy-ytmusic-bin.PKGBUILD && makepkg -si
+		curl -L -o PKGBUILD https://github.com/OlegVapnik/tunebox/releases/latest/download/tunebox-ytmusic-bin.PKGBUILD && makepkg -si
 		```
 	</TabItem>
 </Tabs>
 
-Homebrew's and Arch's YouTube Music packages bring mpv, yt-dlp and deno along; with mise, install those yourself. Each package replaces the others. Installed with a package manager, go through the setup of [Spotify](/docs/spotify/) or [YouTube Music](/docs/youtube-music/) yourself. The package manager keeps cloofy up to date.
+Homebrew's and Arch's YouTube Music packages bring mpv, yt-dlp and deno along; with mise, install those yourself. Each package replaces the others. Installed with a package manager, go through the setup of [Spotify](/docs/spotify/) or [YouTube Music](/docs/youtube-music/) yourself. The package manager keeps tunebox up to date.
 
 ## Building from source
 
-On platforms without a prebuilt binary, the installer builds cloofy with cargo, with only the services you picked. To do that yourself (Rust 1.88 or newer), name them as features; without any, you get both:
+On platforms without a prebuilt binary, the installer builds tunebox with cargo, with only the services you picked. To do that yourself (Rust 1.88 or newer), name them as features; without any, you get both:
 
 ```sh
-cargo install --git https://github.com/parda21/cloofy --locked cloofy --no-default-features --features ytmusic
+cargo install --git https://github.com/OlegVapnik/tunebox --locked tunebox --no-default-features --features ytmusic
 ```
 
 On Linux the Spotify build needs the ALSA and PulseAudio headers:
@@ -85,7 +85,7 @@ YouTube Music needs no headers to build, and [mpv](https://mpv.io), [yt-dlp](htt
 ## Uninstall
 
 ```sh
-curl -fsSL https://cloofy.app/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash -s -- --uninstall
 ```
 
-It takes out cloofy's Omarchy setup first, then the binary, and asks whether your settings, sign-ins and caches go too. Installed with a package manager, remove it there.
+It takes out tunebox's Omarchy setup first, then the binary, and asks whether your settings, sign-ins and caches go too. Installed with a package manager, remove it there.

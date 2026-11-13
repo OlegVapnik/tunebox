@@ -1,0 +1,29 @@
+[package]
+name = "tunebox-spotify"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Spotify Web API, librespot session and internal API clients for tunebox"
+
+[dependencies]
+tunebox-core.workspace = true
+tunebox-mpv.workspace = true
+librespot.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+futures.workspace = true
+iana-time-zone.workspace = true
+open.workspace = true
+protobuf.workspace = true
+protobuf-json-mapping.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true

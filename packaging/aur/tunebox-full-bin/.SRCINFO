@@ -1,0 +1,26 @@
+pkgbase = tunebox-full-bin
+	pkgdesc = Spotify and YouTube Music client for the terminal
+	pkgver = @VERSION@
+	pkgrel = 1
+	url = https://github.com/OlegVapnik/tunebox
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	depends = alsa-lib
+	depends = deno
+	depends = glibc
+	depends = libgcc
+	depends = libpulse
+	depends = mpv
+	depends = python-secretstorage
+	depends = yt-dlp
+	provides = tunebox=@VERSION@
+	conflicts = tunebox
+	options = !strip
+	options = !debug
+	source_x86_64 = tunebox-full-@VERSION@-x86_64.tar.gz::https://github.com/OlegVapnik/tunebox/releases/download/v@VERSION@/tunebox-full-x86_64-unknown-linux-gnu.tar.gz
+	sha256sums_x86_64 = @SHA256_FULL_X86_64_UNKNOWN_LINUX_GNU@
+	source_aarch64 = tunebox-full-@VERSION@-aarch64.tar.gz::https://github.com/OlegVapnik/tunebox/releases/download/v@VERSION@/tunebox-full-aarch64-unknown-linux-gnu.tar.gz
+	sha256sums_aarch64 = @SHA256_FULL_AARCH64_UNKNOWN_LINUX_GNU@
+
+pkgname = tunebox-full-bin

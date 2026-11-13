@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://cloofy.app/sitemap-index.xml
+Sitemap: https://tunebox.app/sitemap-index.xml

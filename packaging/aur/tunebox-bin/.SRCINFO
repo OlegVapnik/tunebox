@@ -1,0 +1,22 @@
+pkgbase = tunebox-bin
+	pkgdesc = Spotify client for the terminal
+	pkgver = @VERSION@
+	pkgrel = 1
+	url = https://github.com/OlegVapnik/tunebox
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	depends = alsa-lib
+	depends = glibc
+	depends = libgcc
+	depends = libpulse
+	provides = tunebox=@VERSION@
+	conflicts = tunebox
+	options = !strip
+	options = !debug
+	source_x86_64 = tunebox-spotify-@VERSION@-x86_64.tar.gz::https://github.com/OlegVapnik/tunebox/releases/download/v@VERSION@/tunebox-spotify-x86_64-unknown-linux-gnu.tar.gz
+	sha256sums_x86_64 = @SHA256_SPOTIFY_X86_64_UNKNOWN_LINUX_GNU@
+	source_aarch64 = tunebox-spotify-@VERSION@-aarch64.tar.gz::https://github.com/OlegVapnik/tunebox/releases/download/v@VERSION@/tunebox-spotify-aarch64-unknown-linux-gnu.tar.gz
+	sha256sums_aarch64 = @SHA256_SPOTIFY_AARCH64_UNKNOWN_LINUX_GNU@
+
+pkgname = tunebox-bin

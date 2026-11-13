@@ -1,13 +1,13 @@
-// cloofy.app: Workers static assets serve the site; this Worker only runs for the install
-// script, so `curl -fsSL https://cloofy.app/install.sh | bash` gets the installer on main,
+// tunebox.app: Workers static assets serve the site; this Worker only runs for the install
+// script, so `curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash` gets the installer on main,
 // and for the star count on the landing page.
 
 interface Env {
 	ASSETS: Fetcher;
 }
 
-const INSTALLER = 'https://raw.githubusercontent.com/parda21/cloofy/main/install.sh';
-const REPOSITORY = 'https://api.github.com/repos/parda21/cloofy';
+const INSTALLER = 'https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh';
+const REPOSITORY = 'https://api.github.com/repos/OlegVapnik/tunebox';
 
 export default {
 	async fetch(request, env): Promise<Response> {
@@ -47,7 +47,7 @@ async function stars(): Promise<Response> {
 	let count: number | null = null;
 	try {
 		const upstream = await fetch(REPOSITORY, {
-			headers: { 'user-agent': 'cloofy.app', accept: 'application/vnd.github+json' },
+			headers: { 'user-agent': 'tunebox.app', accept: 'application/vnd.github+json' },
 			cf: { cacheTtl: 3600, cacheEverything: true },
 		});
 		if (upstream.ok) count = ((await upstream.json()) as { stargazers_count?: number }).stargazers_count ?? null;

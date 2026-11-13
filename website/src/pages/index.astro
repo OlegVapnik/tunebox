@@ -3,16 +3,16 @@ import '@fontsource-variable/jetbrains-mono';
 import { Icon } from '@astrojs/starlight/components';
 import { siSpotify, siYoutubemusic } from 'simple-icons';
 
-const repo = 'https://github.com/parda21/cloofy';
-const install = 'curl -fsSL https://cloofy.app/install.sh | bash';
-const title = 'cloofy: Spotify and YouTube Music in your terminal';
+const repo = 'https://github.com/OlegVapnik/tunebox';
+const install = 'curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash';
+const title = 'tunebox: Spotify and YouTube Music in your terminal';
 const description =
-	'cloofy plays Spotify and YouTube Music in the terminal, one of them or both side by side, with Home, synced lyrics, real cover art and a mouse that works everywhere.';
+	'tunebox plays Spotify and YouTube Music in the terminal, one of them or both side by side, with Home, synced lyrics, real cover art and a mouse that works everywhere.';
 
-// The stars at build time; the page asks cloofy.app for the current count once it loads.
+// The stars at build time; the page asks tunebox.app for the current count once it loads.
 let stars: number | null = null;
 try {
-	const response = await fetch('https://api.github.com/repos/parda21/cloofy', { headers: { 'user-agent': 'cloofy.app' } });
+	const response = await fetch('https://api.github.com/repos/OlegVapnik/tunebox', { headers: { 'user-agent': 'tunebox.app' } });
 	if (response.ok) stars = (await response.json()).stargazers_count;
 } catch {
 	// Shown once the page has asked.
@@ -20,7 +20,7 @@ try {
 
 // The README's features, in its words.
 const features = [
-	{ title: 'Plays on its own', text: 'Spotify plays through librespot, and cloofy is a Spotify Connect device. It controls your other devices too, and follows them live. YouTube Music plays through mpv, with no gap between songs.' },
+	{ title: 'Plays on its own', text: 'Spotify plays through librespot, and tunebox is a Spotify Connect device. It controls your other devices too, and follows them live. YouTube Music plays through mpv, with no gap between songs.' },
 	{ title: 'Spotify, YouTube Music or both', text: 'Install one, or both side by side: S or the switch in the top bar shows the other\'s Home, library and pages, as you left them.' },
 	{ title: 'YouTube Music without an account', text: 'Home, search, every page, lyrics and song radios work signed out. Sign in with your browser for your library and likes.' },
 	{ title: 'YouTube Music\'s Home, as in its apps', text: 'Moods like Relax or Workout narrow it down, and Quick picks show as songs that play at once, or all in a row.' },
@@ -29,19 +29,19 @@ const features = [
 	{ title: 'Cover art', text: 'Real images in terminals that show pictures through the Kitty, Sixel or iTerm2 protocol, and block art everywhere else.' },
 	{ title: 'Mouse and keyboard', text: 'Click, hover, scroll, drag the seek and volume bars, right-click for actions. Every action also has a key, and Ctrl K finds the rest.' },
 	{ title: 'Instant', text: 'The last page, list and track are back the moment it starts, and the controls answer before Spotify does.' },
-	{ title: 'At home on macOS and Linux', text: 'Media keys and the system\'s media controls. cloofy pauses before the computer sleeps, reconnects when it wakes, and moves less when the system asks for less motion.' },
+	{ title: 'At home on macOS and Linux', text: 'Media keys and the system\'s media controls. tunebox pauses before the computer sleeps, reconnects when it wakes, and moves less when the system asks for less motion.' },
 ];
 
 const builds = {
-	spotify: { brew: 'cloofy', mise: 'spotify', aur: 'cloofy-bin', cargo: '--no-default-features --features spotify' },
-	ytmusic: { brew: 'cloofy-ytmusic', mise: 'ytmusic', aur: 'cloofy-ytmusic-bin', cargo: '--no-default-features --features ytmusic' },
-	both: { brew: 'cloofy-full', mise: 'full', aur: 'cloofy-full-bin', cargo: '' },
+	spotify: { brew: 'tunebox', mise: 'spotify', aur: 'tunebox-bin', cargo: '--no-default-features --features spotify' },
+	ytmusic: { brew: 'tunebox-ytmusic', mise: 'ytmusic', aur: 'tunebox-ytmusic-bin', cargo: '--no-default-features --features ytmusic' },
+	both: { brew: 'tunebox-full', mise: 'full', aur: 'tunebox-full-bin', cargo: '' },
 };
 const commands = (b: (typeof builds)['ytmusic']) => ({
-	brew: `brew install parda21/cloofy/${b.brew}`,
-	mise: `mise use -g 'github:parda21/cloofy[matching=${b.mise}]'`,
-	aur: `curl -L -o PKGBUILD https://github.com/parda21/cloofy/releases/latest/download/${b.aur}.PKGBUILD && makepkg -si`,
-	cargo: `cargo install --git https://github.com/parda21/cloofy --locked cloofy ${b.cargo}`.trim(),
+	brew: `brew install OlegVapnik/tunebox/${b.brew}`,
+	mise: `mise use -g 'github:OlegVapnik/tunebox[matching=${b.mise}]'`,
+	aur: `curl -L -o PKGBUILD https://github.com/OlegVapnik/tunebox/releases/latest/download/${b.aur}.PKGBUILD && makepkg -si`,
+	cargo: `cargo install --git https://github.com/OlegVapnik/tunebox --locked tunebox ${b.cargo}`.trim(),
 });
 const managers = [
 	{ id: 'brew', label: 'Homebrew' },
@@ -59,24 +59,24 @@ const initial = commands(builds.ytmusic);
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>{title}</title>
 		<meta name="description" content={description} />
-		<link rel="canonical" href="https://cloofy.app/" />
+		<link rel="canonical" href="https://tunebox.app/" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<meta name="theme-color" content="#0a0911" />
 		<meta property="og:type" content="website" />
-		<meta property="og:url" content="https://cloofy.app/" />
+		<meta property="og:url" content="https://tunebox.app/" />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
-		<meta property="og:image" content="https://cloofy.app/og.png" />
+		<meta property="og:image" content="https://tunebox.app/og.png" />
 		<meta name="twitter:card" content="summary_large_image" />
 		<link rel="preload" as="image" href="/screenshots/hero.webp" fetchpriority="high" />
 	</head>
 	<body>
 		<header class="nav">
-			<a class="nav-logo" href="/" aria-label="cloofy home"><img src="/logo.svg" alt="cloofy" width="84" height="20" /></a>
+			<a class="nav-logo" href="/" aria-label="tunebox home"><img src="/logo.svg" alt="tunebox" width="84" height="20" /></a>
 			<nav>
 				<a href="/docs/">Docs</a>
 				<a href="/changelog/">Changelog</a>
-				<a class="stars" href={repo} aria-label="cloofy on GitHub">
+				<a class="stars" href={repo} aria-label="tunebox on GitHub">
 					<span class="stars-repo"><Icon name="github" size="1rem" />Star</span>
 					<span class="stars-count"><svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12.00,2.50 14.59,9.43 21.99,9.76 16.19,14.37 18.17,21.50 12.00,17.41 5.83,21.50 7.81,14.37 2.01,9.76 9.41,9.43" /></svg><span class="star-count">{stars ?? ''}</span></span>
 				</a>
@@ -89,7 +89,7 @@ const initial = commands(builds.ytmusic);
 				<canvas id="field" aria-hidden="true"></canvas>
 				<div class="hero-inner">
 					<a class="pill" href="/changelog/">What's new in 0.5.2: YouTube Music's Home <span aria-hidden="true">→</span></a>
-					<h1 class="wordmark"><img src="/logo.svg" alt="cloofy" width="504" height="120" /></h1>
+					<h1 class="wordmark"><img src="/logo.svg" alt="tunebox" width="504" height="120" /></h1>
 					<p class="tagline">Spotify and YouTube Music in your terminal.</p>
 					<p class="sub">Plays on its own, with Home, Spotify's DJ, synced lyrics, real cover art and a mouse that works everywhere.</p>
 					<div class="command" data-copy={install}>
@@ -110,9 +110,9 @@ const initial = commands(builds.ytmusic);
 					src="/screenshots/hero.webp"
 					width="1400"
 					height="932"
-					alt="cloofy in a terminal: the Home page with cover art, a playlist with the playing song, and the now-playing view with synced lyrics"
+					alt="tunebox in a terminal: the Home page with cover art, a playlist with the playing song, and the now-playing view with synced lyrics"
 				/>
-				<p class="caption">Recorded from <code>cloofy demo</code>, which needs no account and plays nothing, so you can try it in your own terminal first.</p>
+				<p class="caption">Recorded from <code>tunebox demo</code>, which needs no account and plays nothing, so you can try it in your own terminal first.</p>
 			</section>
 
 			<section class="section">
@@ -202,26 +202,26 @@ const initial = commands(builds.ytmusic);
 			<section class="section split">
 				<div class="split-text">
 					<h2>At home on Omarchy</h2>
-					<p>On <a href="https://omarchy.org">Omarchy</a>, cloofy takes its colors from the theme and follows it when you switch, without a restart. <code>cloofy omarchy install</code> adds the rest:</p>
+					<p>On <a href="https://omarchy.org">Omarchy</a>, tunebox takes its colors from the theme and follows it when you switch, without a restart. <code>tunebox omarchy install</code> adds the rest:</p>
 					<ul class="checks">
 						<li>A widget in the bar next to the clock, with the song, a small equalizer and a card with the controls</li>
-						<li>Music in the Omarchy menu, and cloofy with its icon in the launcher</li>
-						<li>Super+Shift+M opens cloofy instead of Spotify, if you say yes</li>
+						<li>Music in the Omarchy menu, and tunebox with its icon in the launcher</li>
+						<li>Super+Shift+M opens tunebox instead of Spotify, if you say yes</li>
 						<li>Song notifications from the desktop, with the cover</li>
 					</ul>
-					<a class="more" href="/docs/omarchy/">cloofy on Omarchy →</a>
+					<a class="more" href="/docs/omarchy/">tunebox on Omarchy →</a>
 				</div>
-				<div class="terminal" aria-label="The output of cloofy omarchy status">
+				<div class="terminal" aria-label="The output of tunebox omarchy status">
 					<div class="terminal-bar"><span></span><span></span><span></span></div>
-					<pre><code><span class="dim">$</span> cloofy omarchy status
+					<pre><code><span class="dim">$</span> tunebox omarchy status
 
-  cloofy for Omarchy
+  tunebox for Omarchy
 
-  <span class="ok">✓</span>  Bar widget      cloofy.nowplaying, in the bar
+  <span class="ok">✓</span>  Bar widget      tunebox.nowplaying, in the bar
   <span class="ok">✓</span>  Theme           follows everforest
   <span class="ok">✓</span>  Menu            Music in the Omarchy menu
-  <span class="ok">✓</span>  Launcher        cloofy in the app launcher
-  <span class="ok">✓</span>  Super+Shift+M   opens cloofy</code></pre>
+  <span class="ok">✓</span>  Launcher        tunebox in the app launcher
+  <span class="ok">✓</span>  Super+Shift+M   opens tunebox</code></pre>
 				</div>
 			</section>
 
@@ -273,22 +273,22 @@ const initial = commands(builds.ytmusic);
 				</details>
 				<details>
 					<summary>Why do I need my own Spotify app?</summary>
-					<p>Spotify gives its Web API, which cloofy reads your library and searches through, only to registered apps. Apps in development mode are limited to a handful of users, so one shared app couldn't serve everyone. Yours is free and only yours, and the installer sets it up with you.</p>
+					<p>Spotify gives its Web API, which tunebox reads your library and searches through, only to registered apps. Apps in development mode are limited to a handful of users, so one shared app couldn't serve everyone. Yours is free and only yours, and the installer sets it up with you.</p>
 				</details>
 				<details>
 					<summary>Is signing in to YouTube Music with my browser's cookies safe?</summary>
-					<p>cloofy keeps only youtube.com's cookies, in a file only you can read or in the macOS Keychain, and sends them only to music.youtube.com. Streams, covers and lyrics load without them. <code>cloofy logout ytmusic</code> deletes them.</p>
+					<p>tunebox keeps only youtube.com's cookies, in a file only you can read or in the macOS Keychain, and sends them only to music.youtube.com. Streams, covers and lyrics load without them. <code>tunebox logout ytmusic</code> deletes them.</p>
 				</details>
 				<details>
-					<summary>What does cloofy send where?</summary>
-					<p>Requests to Spotify and YouTube Music, for the services you use, and to LRCLIB for lyrics they don't have. cloofy also asks GitHub for new releases. Nothing else: no telemetry, no server of its own.</p>
+					<summary>What does tunebox send where?</summary>
+					<p>Requests to Spotify and YouTube Music, for the services you use, and to LRCLIB for lyrics they don't have. tunebox also asks GitHub for new releases. Nothing else: no telemetry, no server of its own.</p>
 				</details>
 				<a class="more" href="/docs/faq/">All questions →</a>
 			</section>
 		</main>
 
 		<footer class="footer">
-			<img src="/logo.svg" alt="cloofy" width="84" height="20" />
+			<img src="/logo.svg" alt="tunebox" width="84" height="20" />
 			<nav>
 				<a href="/docs/">Docs</a>
 				<a href="/docs/install/">Install</a>
@@ -297,7 +297,7 @@ const initial = commands(builds.ytmusic);
 				<a href={repo}>GitHub</a>
 			</nav>
 			<p>
-				cloofy is not affiliated with Spotify or YouTube. It is <a href={`${repo}/blob/main/LICENSE`}>MIT</a> licensed, and built with{' '}
+				tunebox is not affiliated with Spotify or YouTube. It is <a href={`${repo}/blob/main/LICENSE`}>MIT</a> licensed, and built with{' '}
 				<a href="https://ratatui.rs">ratatui</a>, <a href="https://github.com/librespot-org/librespot">librespot</a>, <a href="https://mpv.io">mpv</a> and{' '}
 				<a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a>.
 			</p>
@@ -310,7 +310,7 @@ const initial = commands(builds.ytmusic);
 			const field = document.getElementById('field');
 			if (field instanceof HTMLCanvasElement) startField(field);
 
-			// The current star count, from cloofy.app, which asks GitHub at most once an hour.
+			// The current star count, from tunebox.app, which asks GitHub at most once an hour.
 			const count = document.querySelector<HTMLElement>('.star-count');
 			fetch('/stars.json')
 				.then((response) => (response.ok ? response.json() : null))

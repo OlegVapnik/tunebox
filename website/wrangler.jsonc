@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "cloofy-website",
-	// The account cloofy.app is in; a Worker's custom domain must be in the zone's account.
+	"name": "tunebox-website",
+	// The account tunebox.app is in; a Worker's custom domain must be in the zone's account.
 	"account_id": "3d72589aaa1696b876797d92926662f9",
 	"main": "worker/index.ts",
 	"compatibility_date": "2026-11-01",
@@ -12,11 +12,11 @@
 		// Everything else is static, served without running the Worker.
 		"run_worker_first": ["/install.sh", "/install", "/stars.json"]
 	},
-	// cloofy.app and www, with their DNS records and certificates made by Cloudflare. A redirect
-	// rule on the zone sends www to cloofy.app.
+	// tunebox.app and www, with their DNS records and certificates made by Cloudflare. A redirect
+	// rule on the zone sends www to tunebox.app.
 	"routes": [
-		{ "pattern": "cloofy.app", "custom_domain": true },
-		{ "pattern": "www.cloofy.app", "custom_domain": true }
+		{ "pattern": "tunebox.app", "custom_domain": true },
+		{ "pattern": "www.tunebox.app", "custom_domain": true }
 	],
 	"workers_dev": false,
 	"preview_urls": false,

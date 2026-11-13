@@ -1,6 +1,6 @@
 name: Nightly
 
-# YouTube Music as it answers today: cloofy-ytmusic's tests against the live catalog, which
+# YouTube Music as it answers today: tunebox-ytmusic's tests against the live catalog, which
 # ordinary runs leave out. A failure here means InnerTube changed, and the parsers need to catch up
 # before people notice. Streams aren't tested here: YouTube asks yt-dlp to sign in from GitHub's
 # addresses, so that test only runs from home (see CONTRIBUTING.md).
@@ -31,4 +31,4 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: nightly
-      - run: cargo test -p cloofy-ytmusic --locked --test live -- --ignored
+      - run: cargo test -p tunebox-ytmusic --locked --test live -- --ignored

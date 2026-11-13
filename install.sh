@@ -1,42 +1,42 @@
 #!/usr/bin/env bash
-# Installs cloofy, the music client for the terminal, and sets it up step by step. It asks what
+# Installs tunebox, the music client for the terminal, and sets it up step by step. It asks what
 # you listen to, Spotify, YouTube Music or both, and installs the build with just that:
 #
-#   curl -fsSL https://cloofy.app/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash
 #
 # Run it again to update, or to switch. Options, after `bash -s --` when piped:
 #
 #   --service S  spotify, ytmusic or both: install that without asking
 #   --yes        no questions: keep the services you have (or Spotify) and leave the sign-ins
 #                for later
-#   --uninstall  remove cloofy, and its settings and sign-ins if you want
+#   --uninstall  remove tunebox, and its settings and sign-ins if you want
 #
-#   CLOOFY_INSTALL_DIR  where the binary goes (default: ~/.local/bin)
-#   CLOOFY_VERSION      a release tag such as v0.1.0 (default: the latest release)
-#   CLOOFY_RELEASE_URL  for testing: a folder of release archives and checksums to download from,
-#                       in place of CLOOFY_VERSION's release on GitHub
+#   TUNEBOX_INSTALL_DIR  where the binary goes (default: ~/.local/bin)
+#   TUNEBOX_VERSION      a release tag such as v0.1.0 (default: the latest release)
+#   TUNEBOX_RELEASE_URL  for testing: a folder of release archives and checksums to download from,
+#                       in place of TUNEBOX_VERSION's release on GitHub
 #
 # Works with the bash 3.2 that ships with macOS.
 
 set -euo pipefail
 
-repo="parda21/cloofy"
+repo="OlegVapnik/tunebox"
 redirect_uri="http://127.0.0.1:8974/callback"
 dashboard="https://developer.spotify.com/dashboard"
-config_file="${XDG_CONFIG_HOME:-$HOME/.config}/cloofy/config.toml"
-data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/cloofy"
-cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/cloofy"
+config_file="${XDG_CONFIG_HOME:-$HOME/.config}/tunebox/config.toml"
+data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tunebox"
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/tunebox"
 
 usage() {
 	cat <<'USAGE'
-Installs cloofy, the music client for the terminal, and sets it up step by step.
+Installs tunebox, the music client for the terminal, and sets it up step by step.
 
   --service S  spotify, ytmusic or both: install that without asking
   --yes        no questions: keep the services you have (or Spotify), sign in later
-  --uninstall  remove cloofy, and its settings and sign-ins if you want
+  --uninstall  remove tunebox, and its settings and sign-ins if you want
 
-  CLOOFY_INSTALL_DIR  where the binary goes (default: ~/.local/bin)
-  CLOOFY_VERSION      a release tag such as v0.1.0 (default: the latest release)
+  TUNEBOX_INSTALL_DIR  where the binary goes (default: ~/.local/bin)
+  TUNEBOX_VERSION      a release tag such as v0.1.0 (default: the latest release)
 USAGE
 }
 
@@ -181,7 +181,7 @@ heading() {
 	printf '\n  %s●%s %s%s%s  %s%d/%d%s\n\n' "$green" "$reset" "$bold" "$1" "$reset" "$faint" "$step" "$steps" "$reset"
 }
 
-# The cloofy wordmark from the app's pixel font, two cells per pixel, lighter on the left.
+# The tunebox wordmark from the app's pixel font, two cells per pixel, lighter on the left.
 logo() {
 	local rows=(
 		".##.#..#...#...##.#.#"
@@ -332,7 +332,7 @@ download() {
 	elif has wget; then
 		wget -q -O "$2" "$1"
 	else
-		fail "curl or wget is needed to download cloofy"
+		fail "curl or wget is needed to download tunebox"
 	fi
 }
 
@@ -489,7 +489,7 @@ tool_source() {
 	esac
 }
 
-# `path` with its symlinks followed, as Homebrew links bin/cloofy to the file in its Cellar.
+# `path` with its symlinks followed, as Homebrew links bin/tunebox to the file in its Cellar.
 resolve() {
 	local path=$1 link hops=0
 	while [ -L "$path" ] && [ $hops -lt 20 ]; do
@@ -503,8 +503,8 @@ resolve() {
 	printf '%s' "$path"
 }
 
-# The package manager that installed the cloofy at `path`, told apart by where each puts its
-# files as cloofy's own updater does; nothing for a plain file such as this script installs.
+# The package manager that installed the tunebox at `path`, told apart by where each puts its
+# files as tunebox's own updater does; nothing for a plain file such as this script installs.
 manager_of() {
 	case "$1" in */mise/shims/*)
 		echo mise
@@ -539,14 +539,14 @@ variant_of_services() {
 	esac
 }
 
-# The build of the cloofy at `path`, from its version, such as "cloofy 0.5.0 (spotify, ytmusic)".
+# The build of the tunebox at `path`, from its version, such as "tunebox 0.5.0 (spotify, ytmusic)".
 # Releases before 0.5 play Spotify only and name no services.
 variant_of_binary() {
 	local version
 	version=$("$1" --version </dev/null 2>/dev/null) || return 0
 	case "$version" in
 	*"("*")"*) variant_of_services "${version#*(}" ;;
-	cloofy*) echo spotify ;;
+	tunebox*) echo spotify ;;
 	esac
 }
 
@@ -568,7 +568,7 @@ config_services() {
 config_set() {
 	mkdir -p "$(dirname "$config_file")"
 	if [ ! -f "$config_file" ]; then
-		printf '# cloofy settings. All options: https://github.com/%s#configuration\n\n' "$repo" >"$config_file"
+		printf '# tunebox settings. All options: https://github.com/%s#configuration\n\n' "$repo" >"$config_file"
 	fi
 	if grep -q "^[[:space:]]*$1[[:space:]]*=" "$config_file"; then
 		sed "s|^[[:space:]]*$1[[:space:]]*=.*|$1 = $2|" "$config_file" >"$tmp/config" && cat "$tmp/config" >"$config_file"
@@ -581,24 +581,24 @@ config_set() {
 
 if $uninstall; then
 	logo
-	bin=$(command -v cloofy || true)
-	[ -n "$bin" ] || bin="${CLOOFY_INSTALL_DIR:-$HOME/.local/bin}/cloofy"
-	[ -e "$bin" ] || fail "cloofy is not installed"
+	bin=$(command -v tunebox || true)
+	[ -n "$bin" ] || bin="${TUNEBOX_INSTALL_DIR:-$HOME/.local/bin}/tunebox"
+	[ -e "$bin" ] || fail "tunebox is not installed"
 	manager=$(manager_of "$bin")
-	[ -z "$manager" ] || fail "cloofy in $(pretty "$(dirname "$bin")") comes from $manager. Remove it there."
+	[ -z "$manager" ] || fail "tunebox in $(pretty "$(dirname "$bin")") comes from $manager. Remove it there."
 	printf '\n'
-	choose "Remove cloofy from $(pretty "$bin")?" \
+	choose "Remove tunebox from $(pretty "$bin")?" \
 		"Remove the program|keeps your settings and sign-ins" \
 		"Remove everything|also settings, sign-ins and caches" \
 		"Cancel"
 	[ "$choice" -eq 2 ] && exit 0
 	# While the binary is still there: it knows what it added to Omarchy. `status` fails where
-	# nothing is set up, as it does in a cloofy without Omarchy's setup.
+	# nothing is set up, as it does in a tunebox without Omarchy's setup.
 	if [ "$(uname -s)" = Linux ] && "$bin" omarchy status </dev/null >/dev/null 2>&1; then
-		if run "Removing cloofy from Omarchy" "$bin" omarchy remove; then
-			ok "Removed cloofy from Omarchy"
+		if run "Removing tunebox from Omarchy" "$bin" omarchy remove; then
+			ok "Removed tunebox from Omarchy"
 		else
-			warn "Some of cloofy may be left in Omarchy's settings"
+			warn "Some of tunebox may be left in Omarchy's settings"
 		fi
 	fi
 	sudo=""
@@ -615,8 +615,8 @@ fi
 
 # ── What to install ─────────────────────────────────────────────────────────────────────────
 
-existing=$(command -v cloofy || true)
-# The build of the cloofy found, else what config.toml says the last install turned on.
+existing=$(command -v tunebox || true)
+# The build of the tunebox found, else what config.toml says the last install turned on.
 installed_variant=""
 [ -z "$existing" ] || installed_variant=$(variant_of_binary "$existing")
 kept_variant=$installed_variant
@@ -636,7 +636,7 @@ if [ -z "$variant" ]; then
 	choose "What do you listen to?" \
 		"Spotify|needs Premium" \
 		"YouTube Music|free, no account needed" \
-		"Both|switch between them in cloofy"
+		"Both|switch between them in tunebox"
 	chosen=$interactive
 	case "$choice" in
 	0) variant=spotify ;;
@@ -672,7 +672,7 @@ heading "System"
 case "$(uname -m)" in
 x86_64 | amd64) arch=x86_64 ;;
 aarch64 | arm64) arch=aarch64 ;;
-*) fail "cloofy runs on x86_64 and arm64, not $(uname -m)" ;;
+*) fail "tunebox runs on x86_64 and arm64, not $(uname -m)" ;;
 esac
 case "$(uname -s)" in
 Linux)
@@ -686,7 +686,7 @@ Linux)
 		if pgrep -x pipewire >/dev/null 2>&1; then ok "Audio through PipeWire"; else ok "Audio through PulseAudio"; fi
 	elif $spotify; then
 		# mpv, which plays YouTube Music, gets by with ALSA.
-		warn "No PulseAudio or PipeWire running. cloofy needs one of them to play Spotify."
+		warn "No PulseAudio or PipeWire running. tunebox needs one of them to play Spotify."
 	fi
 	;;
 Darwin)
@@ -695,7 +695,7 @@ Darwin)
 	ok "macOS $(sw_vers -productVersion 2>/dev/null || true) · $arch"
 	ok "Audio through Core Audio"
 	;;
-*) fail "cloofy runs on Linux and macOS, not $(uname -s)" ;;
+*) fail "tunebox runs on Linux and macOS, not $(uname -s)" ;;
 esac
 
 terminal="${TERM_PROGRAM:-}"
@@ -711,17 +711,17 @@ ghostty* | WezTerm* | *kitty* | *:*:?*)
 esac
 
 if [ -n "$existing" ]; then
-	ok "Found $("$existing" --version 2>/dev/null || echo cloofy) in $(pretty "$(dirname "$existing")")"
+	ok "Found $("$existing" --version 2>/dev/null || echo tunebox) in $(pretty "$(dirname "$existing")")"
 fi
 
 # ── Install ─────────────────────────────────────────────────────────────────────────────────
 
 heading "Install"
 
-# A package manager's cloofy stays with it: it updates it, and owns the file. Without
-# CLOOFY_INSTALL_DIR, this script would put its build in that file's place.
+# A package manager's tunebox stays with it: it updates it, and owns the file. Without
+# TUNEBOX_INSTALL_DIR, this script would put its build in that file's place.
 manager=""
-if [ -z "${CLOOFY_INSTALL_DIR:-}" ] && [ -n "$existing" ]; then
+if [ -z "${TUNEBOX_INSTALL_DIR:-}" ] && [ -n "$existing" ]; then
 	manager=$(manager_of "$existing")
 fi
 
@@ -731,24 +731,24 @@ if [ -n "$manager" ]; then
 		if [ "$manager" = Homebrew ]; then
 			formula=$(resolve "$existing")
 			formula=${formula#*/Cellar/}
-			new_formula=cloofy
-			[ "$variant" = spotify ] || new_formula="cloofy-$variant"
+			new_formula=tunebox
+			[ "$variant" = spotify ] || new_formula="tunebox-$variant"
 			how="brew uninstall ${formula%%/*} && brew install $repo/$new_formula"
 		fi
-		fail "cloofy in $(pretty "$(dirname "$existing")") comes from $manager. Switch it to $(variant_name "$variant") there:
+		fail "tunebox in $(pretty "$(dirname "$existing")") comes from $manager. Switch it to $(variant_name "$variant") there:
       $how"
 	fi
 	bin_dir=$(dirname "$existing")
 	bin=$existing
 	ok "$("$bin" --version) comes from $manager, which keeps it up to date"
 else
-	if [ -n "${CLOOFY_INSTALL_DIR:-}" ]; then
-		bin_dir=$CLOOFY_INSTALL_DIR
+	if [ -n "${TUNEBOX_INSTALL_DIR:-}" ]; then
+		bin_dir=$TUNEBOX_INSTALL_DIR
 	elif [ -n "$existing" ]; then
 		bin_dir=$(dirname "$existing")
 	else
 		# shellcheck disable=SC2088 # a label, shown as typed
-		choose "Where should cloofy go?" \
+		choose "Where should tunebox go?" \
 			"~/.local/bin|recommended, no sudo needed" \
 			"/usr/local/bin|for every user on this machine, asks for sudo"
 		bin_dir="$HOME/.local/bin"
@@ -760,57 +760,57 @@ else
 		$sudo mkdir -p "$bin_dir"
 	fi
 
-	# A checkout of cloofy that has this script as a file installs itself, for trying out changes.
+	# A checkout of tunebox that has this script as a file installs itself, for trying out changes.
 	# Piped from curl the script is no file, and the folder it runs in is anyone's.
 	source_dir=""
 	script=${BASH_SOURCE[0]:-}
-	if [ -f "$script" ] && [ -f "$(dirname "$script")/crates/cloofy/Cargo.toml" ]; then
+	if [ -f "$script" ] && [ -f "$(dirname "$script")/crates/tunebox/Cargo.toml" ]; then
 		source_dir=$(cd "$(dirname "$script")" && pwd)
 	fi
 
 	tag=""
-	if [ -n "${CLOOFY_VERSION:-}" ]; then
-		tag=$CLOOFY_VERSION
+	if [ -n "${TUNEBOX_VERSION:-}" ]; then
+		tag=$TUNEBOX_VERSION
 	elif [ -z "$source_dir" ]; then
 		if download "https://api.github.com/repos/$repo/releases/latest" "$tmp/latest.json" 2>/dev/null; then
 			tag=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' "$tmp/latest.json" | head -n 1 || true)
 		fi
 		# Without a release, there would be nothing checked to download, and no code to build.
 		[ -n "$tag" ] || fail "Couldn't look up the latest release on GitHub, which may limit requests for a while.
-      Try again later, or pick one at https://github.com/$repo/releases and set CLOOFY_VERSION to its tag."
+      Try again later, or pick one at https://github.com/$repo/releases and set TUNEBOX_VERSION to its tag."
 	fi
 
-	# Copied next to the cloofy there, then moved over it in one step: one that is running keeps
+	# Copied next to the tunebox there, then moved over it in one step: one that is running keeps
 	# its file, and nothing ever starts half of the new one.
 	install_binary() {
-		$sudo install -m 755 "$1" "$bin_dir/.cloofy.new"
-		$sudo mv -f "$bin_dir/.cloofy.new" "$bin_dir/cloofy"
+		$sudo install -m 755 "$1" "$bin_dir/.tunebox.new"
+		$sudo mv -f "$bin_dir/.tunebox.new" "$bin_dir/tunebox"
 	}
 
 	installed=false
 	if [ -z "$source_dir" ]; then
-		base=${CLOOFY_RELEASE_URL:-https://github.com/$repo/releases/download/$tag}
-		archive="cloofy-$variant-$target.tar.gz"
+		base=${TUNEBOX_RELEASE_URL:-https://github.com/$repo/releases/download/$tag}
+		archive="tunebox-$variant-$target.tar.gz"
 		# Releases before 0.5 have Spotify's build only, named without the service.
 		if [ "$variant" = spotify ] && ! download "$base/$archive.sha256" "$tmp/probe" 2>/dev/null; then
-			archive="cloofy-$target.tar.gz"
+			archive="tunebox-$target.tar.gz"
 		fi
-		if run "Downloading cloofy $tag for $(variant_name "$variant")" download "$base/$archive" "$tmp/$archive"; then
+		if run "Downloading tunebox $tag for $(variant_name "$variant")" download "$base/$archive" "$tmp/$archive"; then
 			download "$base/$archive.sha256" "$tmp/$archive.sha256" || fail "No checksum published for $archive"
 			[ "$(sha256 "$tmp/$archive")" = "$(cut -d ' ' -f 1 <"$tmp/$archive.sha256")" ] ||
 				fail "$archive does not match its checksum"
 			tar -xzf "$tmp/$archive" -C "$tmp"
-			install_binary "$tmp/cloofy"
+			install_binary "$tmp/tunebox"
 			installed=true
 		else
-			warn "No prebuilt cloofy $tag for $target, building it instead"
+			warn "No prebuilt tunebox $tag for $target, building it instead"
 		fi
 	fi
 
 	if ! $installed; then
-		has cargo || fail "Building cloofy needs Rust. Install it from https://rustup.rs and run this again."
+		has cargo || fail "Building tunebox needs Rust. Install it from https://rustup.rs and run this again."
 		if $spotify && [ "$os" = linux ] && ! pkg-config --exists alsa libpulse 2>/dev/null; then
-			fail "Building cloofy for Spotify needs the ALSA and PulseAudio headers. Install them with:
+			fail "Building tunebox for Spotify needs the ALSA and PulseAudio headers. Install them with:
       $(packages 'libasound2-dev libpulse-dev pkg-config' 'alsa-lib-devel pulseaudio-libs-devel' 'alsa-lib libpulse' 'alsa-devel libpulse-devel pkg-config')"
 		fi
 		# Only the services picked go into the build.
@@ -820,15 +820,15 @@ else
 		full) features=(--no-default-features --features "spotify ytmusic") ;;
 		esac
 		if [ -n "$source_dir" ]; then
-			run "Building cloofy from $(pretty "$source_dir")" \
-				cargo install --locked --root "$tmp/build" --path "$source_dir/crates/cloofy" "${features[@]}" || exit 1
+			run "Building tunebox from $(pretty "$source_dir")" \
+				cargo install --locked --root "$tmp/build" --path "$source_dir/crates/tunebox" "${features[@]}" || exit 1
 		else
-			run "Building cloofy $tag from source, this takes a few minutes" \
-				cargo install --locked --root "$tmp/build" --git "https://github.com/$repo" --tag "$tag" "${features[@]}" cloofy || exit 1
+			run "Building tunebox $tag from source, this takes a few minutes" \
+				cargo install --locked --root "$tmp/build" --git "https://github.com/$repo" --tag "$tag" "${features[@]}" tunebox || exit 1
 		fi
-		install_binary "$tmp/build/bin/cloofy"
+		install_binary "$tmp/build/bin/tunebox"
 	fi
-	bin="$bin_dir/cloofy"
+	bin="$bin_dir/tunebox"
 	ok "Installed $("$bin" --version) to $(pretty "$bin_dir")"
 	if [ -n "$installed_variant" ] && [ "$installed_variant" != "$variant" ]; then
 		note "In place of the build for $(variant_name "$installed_variant"). Settings and sign-ins stay."
@@ -846,7 +846,7 @@ fi
 
 # Without -q grep reads all of it: quitting early would fail the pipe under pipefail.
 if $spotify && [ "$os" = linux ] && has ldconfig && ! ldconfig -p 2>/dev/null | grep 'libpulse\.so\.0' >/dev/null; then
-	warn "cloofy plays Spotify through PulseAudio. Install its library with:"
+	warn "tunebox plays Spotify through PulseAudio. Install its library with:"
 	note "$(packages 'libpulse0' 'pulseaudio-libs' 'libpulse' 'libpulse0')"
 fi
 
@@ -885,7 +885,7 @@ if $spotify; then
 	elif ! $interactive; then
 		warn "Set up your Spotify app later: run this script again, or see https://github.com/$repo#setup"
 	else
-		note "cloofy reads your library through a Spotify app of your own."
+		note "tunebox reads your library through a Spotify app of your own."
 		note "It's free and takes a minute. Playing music needs Premium."
 		printf '\n'
 		choose "How do you want to set it up?" \
@@ -953,7 +953,7 @@ if $ytmusic; then
 		done
 	fi
 	if [ ${#wanted[@]} -gt 0 ] && $interactive; then
-		note "cloofy plays YouTube Music with mpv, and yt-dlp and deno find the streams."
+		note "tunebox plays YouTube Music with mpv, and yt-dlp and deno find the streams."
 		printf '\n'
 		choose "Install $(listing "${wanted[@]}") now?" \
 			"Yes|$(pm_command "$pm") ${wanted[*]}" \
@@ -1032,7 +1032,7 @@ if $spotify; then
 		3) config_set crossfade 12 ;;
 		esac
 	else
-		ok "Defaults kept. Change them in cloofy's Settings: press ,"
+		ok "Defaults kept. Change them in tunebox's Settings: press ,"
 	fi
 fi
 
@@ -1040,11 +1040,11 @@ fi
 
 heading "Sign in"
 
-# Without YouTube Music, `cloofy login` is Spotify's, as it has been before 0.5.
+# Without YouTube Music, `tunebox login` is Spotify's, as it has been before 0.5.
 spotify_login=(login)
 if $ytmusic; then spotify_login=(login spotify); fi
 
-# Whether cloofy has the sign-in that `cloofy login` with these arguments makes. Asked rather than
+# Whether tunebox has the sign-in that `tunebox login` with these arguments makes. Asked rather than
 # looked for, as with credentials = "keychain" it isn't in a file.
 signed_in_with() {
 	"$bin" "$@" --check </dev/null >/dev/null 2>&1
@@ -1052,7 +1052,7 @@ signed_in_with() {
 
 signed_in=false
 if $spotify; then
-	# A package manager's cloofy from before 0.5 knows no --check; its files tell then.
+	# A package manager's tunebox from before 0.5 knows no --check; its files tell then.
 	if signed_in_with "${spotify_login[@]}" ||
 		{ [ -f "$data_dir/webapi-token.json" ] && [ -d "$data_dir/session" ]; }; then
 		signed_in=true
@@ -1062,17 +1062,17 @@ if $spotify; then
 	elif $interactive; then
 		choose "Sign in to Spotify now?" \
 			"Yes|your browser opens twice: for your app, then for playback" \
-			"Later|run cloofy ${spotify_login[*]}"
+			"Later|run tunebox ${spotify_login[*]}"
 		if [ "$choice" -eq 0 ]; then
 			printf '\n'
 			if "$bin" "${spotify_login[@]}" <&3; then
 				signed_in=true
 			else
-				warn "Sign-in did not finish. Try again with: cloofy ${spotify_login[*]}"
+				warn "Sign-in did not finish. Try again with: tunebox ${spotify_login[*]}"
 			fi
 		fi
 	else
-		note "Run cloofy ${spotify_login[*]} to sign in."
+		note "Run tunebox ${spotify_login[*]} to sign in."
 	fi
 fi
 
@@ -1082,17 +1082,17 @@ if $ytmusic; then
 		ok "Signed in to YouTube Music"
 	elif $interactive; then
 		note "YouTube Music plays without an account. Signing in adds your library and likes:"
-		note "cloofy reads your browser's YouTube cookies, and they stay on this computer."
+		note "tunebox reads your browser's YouTube cookies, and they stay on this computer."
 		printf '\n'
 		choose "Sign in to YouTube Music?" \
 			"Yes|takes the sign-in of your browser" \
 			"No|listen without an account"
 		if [ "$choice" -eq 0 ]; then
 			printf '\n'
-			"$bin" login ytmusic <&3 || warn "Sign-in did not finish. Try again with: cloofy login ytmusic"
+			"$bin" login ytmusic <&3 || warn "Sign-in did not finish. Try again with: tunebox login ytmusic"
 		fi
 	else
-		note "YouTube Music plays without an account. For your library: cloofy login ytmusic"
+		note "YouTube Music plays without an account. For your library: tunebox login ytmusic"
 	fi
 fi
 
@@ -1102,50 +1102,50 @@ if $omarchy; then
 	heading "Omarchy"
 
 	if ! "$bin" omarchy --help </dev/null >/dev/null 2>&1; then
-		note "This version of cloofy has no Omarchy setup yet."
+		note "This version of tunebox has no Omarchy setup yet."
 	elif "$bin" omarchy status </dev/null >/dev/null 2>&1; then
 		# Set up before, as `status` succeeds only then, so brought up to date: a release may
 		# change the bar widget.
-		if run "Updating cloofy in Omarchy" "$bin" omarchy install; then
+		if run "Updating tunebox in Omarchy" "$bin" omarchy install; then
 			ok "Bar widget, theme, menu and launcher are up to date"
 		fi
 	elif $interactive; then
-		choose "Set up cloofy for Omarchy?" \
+		choose "Set up tunebox for Omarchy?" \
 			"Yes|bar widget, theme colors, menu and launcher" \
-			"Not now|cloofy omarchy install, any time"
+			"Not now|tunebox omarchy install, any time"
 		if [ "$choice" -eq 0 ]; then
 			printf '\n'
-			"$bin" omarchy install <&3 || warn "That did not work. Try again with: cloofy omarchy install"
+			"$bin" omarchy install <&3 || warn "That did not work. Try again with: tunebox omarchy install"
 		fi
 	else
-		note "Set it up any time with: cloofy omarchy install"
+		note "Set it up any time with: tunebox omarchy install"
 	fi
 fi
 
 # ── Done ────────────────────────────────────────────────────────────────────────────────────
 
 # Each step is "what|command".
-title="cloofy is ready"
+title="tunebox is ready"
 next=()
 if $spotify && [ -z "$client_id" ]; then
-	title="cloofy is installed"
-	next=("Spotify app|run this installer again" "Then sign in|cloofy ${spotify_login[*]}")
+	title="tunebox is installed"
+	next=("Spotify app|run this installer again" "Then sign in|tunebox ${spotify_login[*]}")
 elif $spotify && ! $signed_in; then
 	title="Almost there"
-	next=("Sign in|cloofy ${spotify_login[*]}")
+	next=("Sign in|tunebox ${spotify_login[*]}")
 fi
 if [ ${#missing[@]} -gt 0 ]; then
-	[ "$title" = "cloofy is installed" ] || title="Almost there"
+	[ "$title" = "tunebox is installed" ] || title="Almost there"
 	next+=("Install|$(listing "${missing[@]}")")
 fi
 if $outdated; then
-	[ "$title" = "cloofy is installed" ] || title="Almost there"
+	[ "$title" = "tunebox is installed" ] || title="Almost there"
 	next+=("Update|yt-dlp")
 fi
 if [ ${#next[@]} -eq 0 ]; then
-	next=("Start it|cloofy" "All shortcuts|press ? inside")
+	next=("Start it|tunebox" "All shortcuts|press ? inside")
 elif [ "$title" = "Almost there" ]; then
-	next+=("Then start it|cloofy")
+	next+=("Then start it|tunebox")
 fi
 width=48
 border=$(printf '%*s' "$width" '' | sed 's/ /─/g')

@@ -6,16 +6,16 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// cloofy in the bar: what plays, with a card for the cover, the controls and the volume.
+// tunebox in the bar: what plays, with a card for the cover, the controls and the volume.
 //
-// It talks to cloofy over MPRIS, the way the media keys do, and tells Spotify from YouTube Music
-// by the link cloofy gives each track. Colors come from the theme, so they follow it live.
+// It talks to tunebox over MPRIS, the way the media keys do, and tells Spotify from YouTube Music
+// by the link tunebox gives each track. Colors come from the theme, so they follow it live.
 //
-// Left click opens the card, middle click plays or pauses, right click brings cloofy to the
+// Left click opens the card, middle click plays or pauses, right click brings tunebox to the
 // front, and scrolling skips, like Omarchy's own media widget.
 BarWidget {
   id: root
-  moduleName: "cloofy.nowplaying"
+  moduleName: "tunebox.nowplaying"
 
   readonly property int maxWidth: Math.max(80, Number(setting("maxWidth", 220)) || 220)
   readonly property string overflow: String(setting("overflow", "Scroll"))
@@ -23,13 +23,13 @@ BarWidget {
   readonly property bool showEqualizer: setting("equalizer", true) !== false
   readonly property bool launcher: setting("whenClosed", "Hide") === "Show a launcher"
 
-  // cloofy's player; a second cloofy adds its process ID to the name. One that plays wins.
+  // tunebox's player; a second tunebox adds its process ID to the name. One that plays wins.
   readonly property var player: {
     var players = Mpris.players ? Mpris.players.values : []
     var found = null
     for (var i = 0; i < players.length; i++) {
       var name = String(players[i].dbusName || "")
-      if (name !== "org.mpris.MediaPlayer2.cloofy" && name.indexOf("org.mpris.MediaPlayer2.cloofy.") !== 0) continue
+      if (name !== "org.mpris.MediaPlayer2.tunebox" && name.indexOf("org.mpris.MediaPlayer2.tunebox.") !== 0) continue
       if (players[i].isPlaying) return players[i]
       if (!found) found = players[i]
     }
@@ -56,7 +56,7 @@ BarWidget {
   property bool hovered: false
   property real wheelRemainder: 0
 
-  // The shape `omarchy-shell shell toggle cloofy.nowplaying` looks for.
+  // The shape `omarchy-shell shell toggle tunebox.nowplaying` looks for.
   readonly property bool opened: popupOpen
   function open() { if (running) popupOpen = true }
   function close() { popupOpen = false }
@@ -64,10 +64,10 @@ BarWidget {
   // The bar's open-card dot spans what the widget draws, not its padded slot.
   readonly property real openPanelIndicatorWidth: content.implicitWidth
 
-  function showCloofy() {
+  function showTunebox() {
     close()
     if (running && player.canRaise) player.raise()
-    else if (bar) bar.run("omarchy-launch-or-focus-tui cloofy")
+    else if (bar) bar.run("omarchy-launch-or-focus-tui tunebox")
   }
 
   function playPause() {
@@ -148,7 +148,7 @@ BarWidget {
 
     onClicked: function(mouse) {
       if (root.bar) root.bar.hideTooltip(root)
-      if (!root.running || mouse.button === Qt.RightButton) root.showCloofy()
+      if (!root.running || mouse.button === Qt.RightButton) root.showTunebox()
       else if (mouse.button === Qt.MiddleButton) root.playPause()
       else root.popupOpen = !root.popupOpen
     }
@@ -161,7 +161,7 @@ BarWidget {
     onEntered: {
       root.hovered = true
       if (!root.bar) return
-      if (!root.running) root.bar.showTooltip(root, "Open cloofy")
+      if (!root.running) root.bar.showTooltip(root, "Open tunebox")
       else if (root.hasTrack && !root.popupOpen) root.bar.showTooltip(root, root.title + (root.artist ? " — " + root.artist : ""))
     }
     onExited: {
@@ -292,7 +292,7 @@ BarWidget {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: root.hasTrack ? root.title : (root.running ? "Nothing playing" : "cloofy isn't open")
+          text: root.hasTrack ? root.title : (root.running ? "Nothing playing" : "tunebox isn't open")
           color: root.popupText
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.heading
@@ -306,7 +306,7 @@ BarWidget {
           width: parent.width
           visible: text !== ""
           textFormat: Text.PlainText
-          text: root.hasTrack ? root.artist : "Pick something in cloofy and it shows up here."
+          text: root.hasTrack ? root.artist : "Pick something in tunebox and it shows up here."
           color: Util.alpha(root.popupText, 0.75)
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.body
@@ -459,10 +459,10 @@ BarWidget {
       Button {
         width: parent.width
         iconText: "󰆍"
-        text: "Open cloofy"
+        text: "Open tunebox"
         foreground: root.popupText
         bordered: true
-        onClicked: root.showCloofy()
+        onClicked: root.showTunebox()
       }
     }
   }

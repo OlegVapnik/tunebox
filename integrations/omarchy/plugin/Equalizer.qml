@@ -2,7 +2,7 @@ import QtQuick
 import qs.Commons
 
 // A few blocky bars that bounce while a song plays and rest when it doesn't. They step a few
-// times a second rather than animate every frame, which suits cloofy's pixel look and keeps the
+// times a second rather than animate every frame, which suits tunebox's pixel look and keeps the
 // bar from redrawing all the time.
 Item {
   id: root

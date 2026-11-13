@@ -1,11 +1,11 @@
-/* Starlight in cloofy's colors: the dark of the app, its pink-to-violet wordmark, and
+/* Starlight in tunebox's colors: the dark of the app, its pink-to-violet wordmark, and
    JetBrains Mono for what reads like the terminal. */
 
 :root {
 	--sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 	--sl-text-h1: 2.25rem;
-	--cloofy-pink: #ff8fb1;
-	--cloofy-violet: #8b5cf6;
+	--tunebox-pink: #ff8fb1;
+	--tunebox-violet: #8b5cf6;
 }
 
 :root[data-theme='dark'] {

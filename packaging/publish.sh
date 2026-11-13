@@ -2,8 +2,8 @@
 # Pushes what render.sh wrote to the Homebrew tap and the AUR, each only when its secret is set,
 # so releases work the same before the setup in packaging/README.md:
 #
-#   HOMEBREW_TAP_TOKEN   a token that can push to parda21/homebrew-cloofy
-#   AUR_SSH_PRIVATE_KEY  the private SSH key of the AUR account that maintains cloofy
+#   HOMEBREW_TAP_TOKEN   a token that can push to OlegVapnik/homebrew-tunebox
+#   AUR_SSH_PRIVATE_KEY  the private SSH key of the AUR account that maintains tunebox
 #
 #   packaging/publish.sh <folder render.sh wrote>
 
@@ -14,11 +14,11 @@ if [ $# -ne 1 ]; then
 	exit 2
 fi
 packages=$1
-tap="parda21/homebrew-cloofy"
-# One per build: Spotify, YouTube Music, both. Each installs a cloofy binary and conflicts with
+tap="OlegVapnik/homebrew-tunebox"
+# One per build: Spotify, YouTube Music, both. Each installs a tunebox binary and conflicts with
 # the others.
-formulas=(cloofy cloofy-ytmusic cloofy-full)
-aur_packages=(cloofy-bin cloofy-ytmusic-bin cloofy-full-bin cloofy)
+formulas=(tunebox tunebox-ytmusic tunebox-full)
+aur_packages=(tunebox-bin tunebox-ytmusic-bin tunebox-full-bin tunebox)
 # aur.archlinux.org's key, SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4 as listed on the AUR's home page.
 aur_host_key="aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN"
 
@@ -35,7 +35,7 @@ for file in "${files[@]}"; do
 		exit 1
 	fi
 done
-version=$(sed -n 's/^pkgver=//p' "$packages/aur/cloofy-bin/PKGBUILD")
+version=$(sed -n 's/^pkgver=//p' "$packages/aur/tunebox-bin/PKGBUILD")
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -67,13 +67,13 @@ publish_homebrew() {
 	if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
 		notice "Homebrew" "HOMEBREW_TAP_TOKEN is not set, so $tap stays as it is"
 	else
-		git clone -q "https://x-access-token:$HOMEBREW_TAP_TOKEN@github.com/$tap.git" "$tmp/homebrew-cloofy"
-		mkdir -p "$tmp/homebrew-cloofy/Formula"
+		git clone -q "https://x-access-token:$HOMEBREW_TAP_TOKEN@github.com/$tap.git" "$tmp/homebrew-tunebox"
+		mkdir -p "$tmp/homebrew-tunebox/Formula"
 		for formula in "${formulas[@]}"; do
-			cp "$packages/homebrew/$formula.rb" "$tmp/homebrew-cloofy/Formula/$formula.rb"
+			cp "$packages/homebrew/$formula.rb" "$tmp/homebrew-tunebox/Formula/$formula.rb"
 		done
 		# The tap's default branch, also while the tap is still empty.
-		commit_and_push "$tmp/homebrew-cloofy" "cloofy $version" "$(git -C "$tmp/homebrew-cloofy" symbolic-ref --short HEAD)"
+		commit_and_push "$tmp/homebrew-tunebox" "tunebox $version" "$(git -C "$tmp/homebrew-tunebox" symbolic-ref --short HEAD)"
 	fi
 }
 
