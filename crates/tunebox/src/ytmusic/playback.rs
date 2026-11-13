@@ -4,10 +4,10 @@
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
+use tokio::sync::mpsc;
 use tunebox_core::{paths::Paths, player::PlayerEvent};
 use tunebox_os::media::Command;
 use tunebox_ytmusic::{Player, YtMusic, playable};
-use tokio::sync::mpsc;
 
 use crate::{
     headless::{Clock, describe, draw_progress},

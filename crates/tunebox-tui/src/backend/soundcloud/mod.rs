@@ -5,6 +5,11 @@
 use std::sync::{Arc, OnceLock};
 
 use anyhow::{Context, Result, bail};
+use futures::{
+    StreamExt,
+    stream::{self, BoxStream},
+};
+use tokio::sync::mpsc;
 use tunebox_core::{
     artist::ArtistPage,
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User},
@@ -14,11 +19,6 @@ use tunebox_core::{
     service::Service,
 };
 use tunebox_soundcloud::{SoundCloud, Source};
-use futures::{
-    StreamExt,
-    stream::{self, BoxStream},
-};
-use tokio::sync::mpsc;
 
 use super::{Found, Launch};
 use crate::{app::AppEvent, backend::Player, playback::Repeat, views::TrackSource};

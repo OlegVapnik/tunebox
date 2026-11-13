@@ -3,15 +3,15 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
-use tunebox_core::{paths::Paths, player::PlayerEvent};
-use tunebox_os::media::Command;
-use tunebox_player::{DEFAULT_VOLUME, Engine, events};
-use tunebox_spotify::session;
 use librespot::{
     connect::{LoadContextOptions, LoadRequest, LoadRequestOptions, Options, PlayingTrack, Spirc},
     core::SpotifyUri,
     metadata::{Metadata, Track},
 };
+use tunebox_core::{paths::Paths, player::PlayerEvent};
+use tunebox_os::media::Command;
+use tunebox_player::{DEFAULT_VOLUME, Engine, events};
+use tunebox_spotify::session;
 
 use crate::{
     headless::{Clock, describe, draw_progress},
@@ -97,7 +97,8 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
 /// Plays through mpv, the songs found on YouTube: no librespot and no Premium.
 async fn play_free(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     let config = tunebox_core::config::Config::load(paths)?;
-    let api = std::sync::Arc::new(tunebox_spotify::webapi::WebApi::new(config.client_id(paths)?, paths.webapi_token())?);
+    let api =
+        std::sync::Arc::new(tunebox_spotify::webapi::WebApi::new(config.client_id(paths)?, paths.webapi_token())?);
     if !api.is_logged_in().await {
         bail!("Not signed in to Spotify – run `tunebox login spotify` first.");
     }
@@ -258,7 +259,9 @@ fn parse_uri(input: &str) -> Result<SpotifyUri> {
 /// What `tunebox play` and `connect` print for a track that couldn't load.
 fn unavailable(refused: bool) -> String {
     if refused {
-        style::red("✗  Spotify refused the key to this song, so it was skipped: github.com/OlegVapnik/tunebox/blob/main/website/src/pages/troubleshooting")
+        style::red(
+            "✗  Spotify refused the key to this song, so it was skipped: github.com/OlegVapnik/tunebox/blob/main/website/src/pages/troubleshooting",
+        )
     } else {
         style::dim("✗  this song couldn't load, so it was skipped")
     }

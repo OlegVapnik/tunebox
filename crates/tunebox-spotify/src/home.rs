@@ -1,8 +1,8 @@
 //! The personalized Home feed, as the official clients show it.
 
 use anyhow::{Context, Result};
-use tunebox_core::home::{Home, HomeItem, ItemKind, Shelf};
 use serde_json::{Value, json};
+use tunebox_core::home::{Home, HomeItem, ItemKind, Shelf};
 
 use crate::{
     parse::{image, names, strip_html, text},

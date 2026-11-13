@@ -14,23 +14,23 @@ use std::{
 
 use anyhow::{Result, anyhow, bail};
 use async_trait::async_trait;
-use tunebox_core::{
-    catalog::Track,
-    player::{CurrentTrack, PlayerEvent, QueueTrack},
-};
 use futures::{StreamExt, stream::BoxStream};
 use serde_json::json;
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,
 };
+use tunebox_core::{
+    catalog::Track,
+    player::{CurrentTrack, PlayerEvent, QueueTrack},
+};
 
+pub use crate::ytdlp::BotCheck;
 use crate::{
     mpv::{Events, Mpv, MpvEvent},
     queue::Queue,
     ytdlp::Stream,
 };
-pub use crate::ytdlp::BotCheck;
 
 /// A service's catalog and streams, as the player needs them.
 #[async_trait]
@@ -94,11 +94,7 @@ enum Command {
 impl Player {
     /// Starts mpv at `volume` (0 to 65535). Fails when mpv isn't installed. `TUNEBOX_MPV_ARGS`
     /// adds arguments for mpv, separated by spaces, such as `--ao=null` for tests.
-    pub async fn spawn(
-        source: Arc<dyn Source>,
-        volume: u16,
-        events: UnboundedSender<PlayerEvent>,
-    ) -> Result<Player> {
+    pub async fn spawn(source: Arc<dyn Source>, volume: u16, events: UnboundedSender<PlayerEvent>) -> Result<Player> {
         let args = std::env::var("TUNEBOX_MPV_ARGS").unwrap_or_default();
         Self::spawn_with_args(source, volume, events, args.split_whitespace().map(str::to_owned).collect()).await
     }
@@ -114,11 +110,7 @@ impl Player {
         let mpv = Mpv::spawn(&with_volume(&mpv_args, volume), mpv_tx.clone()).await?;
         let (commands, commands_rx) = mpsc::unbounded_channel();
         let (jobs, jobs_rx) = mpsc::unbounded_channel();
-        let engine = Engine {
-            mpv: Some(mpv),
-            mpv_args,
-            ..Engine::new(source, events, mpv_tx, jobs, volume)
-        };
+        let engine = Engine { mpv: Some(mpv), mpv_args, ..Engine::new(source, events, mpv_tx, jobs, volume) };
         let _ = engine.events.send(PlayerEvent::VolumeChanged { volume });
         tokio::spawn(engine.run(commands_rx, mpv_rx, jobs_rx));
         Ok(Player { commands })
@@ -961,7 +953,8 @@ impl Engine {
         // YouTube has many songs under more than one video, and a song from search or an
         // artist's page may be in its album's list as another one. It plays on its own then,
         // with its radio after it, as on YouTube Music, rather than the album from the start.
-        if let Some(track) = starting.track.clone().filter(|t| !found && self.source.is_track(t) && *t != starting.context)
+        if let Some(track) =
+            starting.track.clone().filter(|t| !found && self.source.is_track(t) && *t != starting.context)
         {
             tracing::info!("{track} isn't in {}; playing it with its radio", starting.context);
             return self.play(track.clone(), Some(track), starting.position_ms, Some(starting.shuffle)).await;

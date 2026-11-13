@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use tunebox_core::catalog::Track;
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -8,6 +7,7 @@ use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
 };
+use tunebox_core::catalog::Track;
 
 use unicode_width::UnicodeWidthStr;
 

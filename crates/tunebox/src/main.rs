@@ -14,22 +14,22 @@ mod media;
 mod omarchy;
 #[cfg(any(feature = "ytmusic", feature = "soundcloud"))]
 mod prompt;
+#[cfg(feature = "soundcloud")]
+mod soundcloud;
 #[cfg(feature = "spotify")]
 mod spotify;
 mod style;
 mod update;
 #[cfg(feature = "ytmusic")]
 mod ytmusic;
-#[cfg(feature = "soundcloud")]
-mod soundcloud;
 
 use std::sync::LazyLock;
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, builder::PossibleValuesParser};
+use tracing_subscriber::{filter::Targets, fmt, prelude::*};
 use tunebox_core::{config::Config, paths::Paths, service::Service};
 use tunebox_tui::SERVICES;
-use tracing_subscriber::{filter::Targets, fmt, prelude::*};
 
 #[derive(Parser)]
 #[command(name = "tunebox", version = version(), about = about())]

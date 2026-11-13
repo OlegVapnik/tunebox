@@ -27,14 +27,14 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::{catalog::Track, lyrics::LyricsQuery, paths::Paths, player::PlayerEvent};
-use tunebox_ytmusic::{Player, Source, YtMusic, auth, doctor};
 use futures::StreamExt;
 use serde_json::{Value, json};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     sync::mpsc,
 };
+use tunebox_core::{catalog::Track, lyrics::LyricsQuery, paths::Paths, player::PlayerEvent};
+use tunebox_ytmusic::{Player, Source, YtMusic, auth, doctor};
 
 use tracing_subscriber::{filter::Targets, prelude::*};
 

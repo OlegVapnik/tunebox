@@ -4,8 +4,8 @@
 use std::{process::Stdio, time::Duration};
 
 use anyhow::{Result, bail};
-use tunebox_core::doctor::{Check, Expect, Outcome, Section, outcome};
 use tokio::process::Command;
+use tunebox_core::doctor::{Check, Expect, Outcome, Section, outcome};
 
 use crate::YtMusic;
 

@@ -7,8 +7,8 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use tunebox_core::doctor::{Check, Expect, Outcome, Section, outcome};
 use tokio::process::Command;
+use tunebox_core::doctor::{Check, Expect, Outcome, Section, outcome};
 
 use crate::{SoundCloud, uri_path};
 
@@ -58,6 +58,11 @@ pub async fn soundcloud(client: &SoundCloud) -> Section {
             Ok(format!("{} · {liked} liked songs", me.name))
         })
         .await
+    } else if client.sign_in_expired() {
+        // Browsing goes on without the sign-in, so this is not a broken install; it is the
+        // one thing the user has to fix by signing in again.
+        let reason = "SoundCloud won't take the saved sign-in any more – run `tunebox login soundcloud` again";
+        Check { name: "Signed in".into(), expect: Expect::Available, outcome: Outcome::Failed(reason.into()) }
     } else {
         let detail = "signed out: browsing and playing work; `tunebox login soundcloud` adds your library";
         Check { name: "Signed in".into(), expect: Expect::Optional, outcome: Outcome::Ok(detail.into()) }

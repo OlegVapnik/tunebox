@@ -16,6 +16,11 @@ use std::{
     time::Duration,
 };
 
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::{
+    buffer::Cell,
+    layout::{Position, Rect, Size},
+};
 use tunebox_core::{
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, ShowInfo, Track, User},
     connect::{Device, Playback},
@@ -26,11 +31,6 @@ use tunebox_core::{
     update::{PackageManager, Release},
 };
 use tunebox_os::settings::Settings;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::{
-    buffer::Cell,
-    layout::{Position, Rect, Size},
-};
 
 use crate::clock::Instant;
 use crate::{

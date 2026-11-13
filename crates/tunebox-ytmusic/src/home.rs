@@ -3,8 +3,8 @@
 //! Above the shelves are chips for moods like "Relax", which show a Home of their own.
 
 use anyhow::{Context, Result};
-use tunebox_core::home::{Chip, Home, Shelf};
 use serde_json::{Value, json};
+use tunebox_core::home::{Chip, Home, Shelf};
 
 use crate::{
     innertube::InnerTube,

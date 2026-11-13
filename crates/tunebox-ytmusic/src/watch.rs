@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use tunebox_core::catalog::Track;
 use futures::{StreamExt, TryStreamExt, stream};
 use serde_json::{Value, json};
+use tunebox_core::catalog::Track;
 
 use crate::{
     innertube::{self, InnerTube},

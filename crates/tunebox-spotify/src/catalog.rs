@@ -4,7 +4,6 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use tunebox_core::catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User};
 use futures::{StreamExt, TryStreamExt, stream};
 use librespot::{
     core::{SpotifyUri, session::Session},
@@ -19,6 +18,7 @@ use protobuf::{EnumOrUnknown, Message};
 use reqwest::Method;
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::json;
+use tunebox_core::catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User};
 
 use crate::webapi::WebApi;
 

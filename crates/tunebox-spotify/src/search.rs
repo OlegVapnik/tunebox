@@ -1,8 +1,8 @@
 //! Playlist search through the internal API, which also finds the user's mixes.
 
 use anyhow::{Context, Result};
-use tunebox_core::catalog::PlaylistInfo;
 use serde_json::{Value, json};
+use tunebox_core::catalog::PlaylistInfo;
 
 use crate::{parse, pathfinder::Pathfinder};
 

@@ -5,12 +5,12 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Result, bail};
 use async_trait::async_trait;
+use futures::{StreamExt, future::BoxFuture, stream, stream::BoxStream};
 use tunebox_core::{
     catalog::{Page, Track},
     paths::Paths,
 };
 use tunebox_mpv::{Source as PlaybackSource, Stream, ytdlp};
-use futures::{StreamExt, future::BoxFuture, stream, stream::BoxStream};
 
 use crate::{catalog, webapi::WebApi};
 
@@ -106,13 +106,12 @@ impl PlaybackSource for SpotifySource {
 
     fn context(&self, context: String) -> BoxStream<'static, Result<Vec<Track>>> {
         let this = self.clone();
-        Box::pin(
-            stream::once(async move { this.pages(&context).await })
-                .flat_map(|pages: Result<Vec<Vec<Track>>>| match pages {
-                    Ok(pages) => stream::iter(pages.into_iter().map(Ok).collect::<Vec<_>>()).boxed(),
-                    Err(err) => stream::iter(vec![Err(err)]).boxed(),
-                }),
-        )
+        Box::pin(stream::once(async move { this.pages(&context).await }).flat_map(|pages: Result<Vec<Vec<Track>>>| {
+            match pages {
+                Ok(pages) => stream::iter(pages.into_iter().map(Ok).collect::<Vec<_>>()).boxed(),
+                Err(err) => stream::iter(vec![Err(err)]).boxed(),
+            }
+        }))
     }
 
     async fn track(&self, uri: String) -> Result<Option<Track>> {

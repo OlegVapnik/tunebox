@@ -41,7 +41,6 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use tunebox_core::{config::Config, paths::Paths, service::Service};
 use crossterm::{
     event::{DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture, EventStream},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
@@ -52,6 +51,7 @@ use tokio::{
     sync::{Notify, mpsc},
     time::MissedTickBehavior,
 };
+use tunebox_core::{config::Config, paths::Paths, service::Service};
 
 use crate::clock::Instant;
 pub use crate::graphics::ImageProtocol;

@@ -7,13 +7,13 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tunebox_core::{
     catalog::{AlbumInfo, ArtistInfo, PlaylistInfo, ShowInfo, Track, User},
     home::Home,
     paths::write_private,
     service::Service,
 };
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// Raised whenever the format changes; files of another version are ignored.
 const VERSION: u32 = 1;

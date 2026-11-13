@@ -3,12 +3,12 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tunebox_core::{
     player::{CurrentTrack, PlayerEvent},
     service,
 };
 use tunebox_os::media::{Command, Controls, State, Track};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 pub enum Event {
     Command(Command),

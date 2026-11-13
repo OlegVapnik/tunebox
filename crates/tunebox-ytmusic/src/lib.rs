@@ -15,13 +15,15 @@ mod lyrics;
 mod pages;
 mod parse;
 mod player;
-mod source;
 mod search;
+mod source;
 mod watch;
 
 use std::sync::Arc;
 
 use anyhow::Result;
+use futures::Stream;
+use serde_json::Value;
 use tunebox_core::{
     artist::ArtistPage,
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, Track, User},
@@ -29,8 +31,6 @@ use tunebox_core::{
     lyrics::{Lyrics, LyricsQuery},
     paths::Paths,
 };
-use futures::Stream;
-use serde_json::Value;
 
 pub use crate::{
     account::{Account, Identity},

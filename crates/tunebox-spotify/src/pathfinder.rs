@@ -12,11 +12,11 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::paths::write_private;
 use futures::{StreamExt, stream};
 use librespot::core::session::Session;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
+use tunebox_core::paths::write_private;
 
 const ENDPOINT: &str = "https://api-partner.spotify.com/pathfinder/v2/query";
 const WEB_PLAYER: &str = "https://open.spotify.com/";

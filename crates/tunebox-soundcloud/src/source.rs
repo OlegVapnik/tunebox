@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use futures::{StreamExt, stream, stream::BoxStream};
 use tunebox_core::{catalog::Track, paths::Paths};
 use tunebox_mpv::{Source as PlaybackSource, Stream, ytdlp};
-use futures::{StreamExt, stream, stream::BoxStream};
 
 use crate::{SoundCloud, Source, uri_path};
 
@@ -30,11 +30,7 @@ impl SoundCloudSource {
             stream::once(async move {
                 let pages = client.pages(source).await?;
                 Ok::<_, anyhow::Error>(
-                    pages
-                        .into_iter()
-                        .map(|page| page.items)
-                        .chain(std::iter::once(Vec::new()))
-                        .collect::<Vec<_>>(),
+                    pages.into_iter().map(|page| page.items).chain(std::iter::once(Vec::new())).collect::<Vec<_>>(),
                 )
             })
             .flat_map(|pages: Result<Vec<Vec<Track>>>| match pages {
@@ -76,11 +72,7 @@ impl PlaybackSource for SoundCloudSource {
             let uris: Vec<String> = paths.split(',').filter(|p| !p.is_empty()).map(|p| format!("{TRACK}{p}")).collect();
             return Box::pin(stream::once(async move {
                 let tracks = client.tracks_by_uri(&uris).await?;
-                if tracks.is_empty() {
-                    Err(anyhow!("These songs aren't on SoundCloud any more"))
-                } else {
-                    Ok(tracks)
-                }
+                if tracks.is_empty() { Err(anyhow!("These songs aren't on SoundCloud any more")) } else { Ok(tracks) }
             }));
         }
         if context == "soundcloud:playlist:likes" {

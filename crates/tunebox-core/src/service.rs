@@ -105,14 +105,8 @@ mod tests {
         assert_eq!(web_link("ytmusic:album:MPREb_abc").unwrap(), "https://music.youtube.com/browse/MPREb_abc");
         assert_eq!(web_link("ytmusic:playlist:PL123").unwrap(), "https://music.youtube.com/playlist?list=PL123");
         assert_eq!(web_link("ytmusic:artist:UC123").unwrap(), "https://music.youtube.com/channel/UC123");
-        assert_eq!(
-            web_link("soundcloud:track:artist/song").unwrap(),
-            "https://soundcloud.com/artist/song"
-        );
-        assert_eq!(
-            web_link("soundcloud:playlist:artist/sets/mix").unwrap(),
-            "https://soundcloud.com/artist/sets/mix"
-        );
+        assert_eq!(web_link("soundcloud:track:artist/song").unwrap(), "https://soundcloud.com/artist/song");
+        assert_eq!(web_link("soundcloud:playlist:artist/sets/mix").unwrap(), "https://soundcloud.com/artist/sets/mix");
         assert_eq!(web_link("spotify:track:"), None);
         assert_eq!(web_link("spotify:user"), None);
         assert_eq!(web_link("file:track:1"), None);

@@ -12,6 +12,17 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use futures::{
+    StreamExt,
+    future::{self, BoxFuture},
+    stream::{self, BoxStream},
+};
+use librespot::core::{SpotifyUri, session::Session};
+use tokio::sync::{
+    OnceCell,
+    mpsc::{self, UnboundedSender},
+    watch,
+};
 use tunebox_core::{
     artist::{ArtistPage, TopTrack},
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User},
@@ -24,17 +35,6 @@ use tunebox_core::{
 };
 use tunebox_spotify::{
     artist, catalog, connect, home, library, lyrics, pathfinder::Pathfinder, search, session, webapi::WebApi,
-};
-use futures::{
-    StreamExt,
-    future::{self, BoxFuture},
-    stream::{self, BoxStream},
-};
-use librespot::core::{SpotifyUri, session::Session};
-use tokio::sync::{
-    OnceCell,
-    mpsc::{self, UnboundedSender},
-    watch,
 };
 
 use self::player::SessionState;
@@ -80,14 +80,7 @@ impl Account {
         if session::is_logged_in(&launch.paths).unwrap_or(false) {
             let state = Arc::new(watch::Sender::new(SessionState::Connecting));
             let volume = launch.volume.unwrap_or(tunebox_player::DEFAULT_VOLUME);
-            player::spawn(
-                launch.paths,
-                launch.crossfade,
-                volume,
-                launch.retry_now,
-                launch.tx.clone(),
-                state.clone(),
-            );
+            player::spawn(launch.paths, launch.crossfade, volume, launch.retry_now, launch.tx.clone(), state.clone());
             return Catalog::new(self.api, Some(state), hashes, launch.tx, None);
         }
         let player = Arc::new(OnceLock::new());
@@ -289,7 +282,8 @@ impl Catalog {
         tx: UnboundedSender<AppEvent>,
         free_player: Option<Arc<OnceLock<tunebox_spotify::Player>>>,
     ) -> Self {
-        let http = tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build().unwrap_or_default();
+        let http =
+            tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build().unwrap_or_default();
         let (remote, commands) = mpsc::unbounded_channel();
         tokio::spawn(remote::send_remote(api.clone(), tx, commands));
         Self {

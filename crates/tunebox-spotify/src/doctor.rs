@@ -1,8 +1,6 @@
 //! Probes which Spotify features are reachable, and through which path.
 
 use anyhow::Result;
-use tunebox_core::doctor::timed;
-pub use tunebox_core::doctor::{Check, Expect, Outcome, Section};
 use librespot::{
     core::{SpotifyId, SpotifyUri, session::Session},
     metadata::{Artist, Lyrics, Metadata, Playlist, Track},
@@ -10,6 +8,8 @@ use librespot::{
 };
 use protobuf::Message;
 use serde_json::Value;
+use tunebox_core::doctor::timed;
+pub use tunebox_core::doctor::{Check, Expect, Outcome, Section};
 
 use crate::{library, pathfinder::Pathfinder, search, webapi::WebApi};
 

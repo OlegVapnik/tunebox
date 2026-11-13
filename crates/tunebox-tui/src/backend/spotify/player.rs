@@ -10,9 +10,6 @@ use std::{
 };
 
 use anyhow::Result;
-use tunebox_core::{paths::Paths, service::Service};
-use tunebox_player::{Engine, events};
-use tunebox_spotify::session;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
 use librespot::{
     connect::{LoadContextOptions, LoadRequest, LoadRequestOptions, Options, PlayingTrack, Spirc},
@@ -24,6 +21,9 @@ use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     watch,
 };
+use tunebox_core::{paths::Paths, service::Service};
+use tunebox_player::{Engine, events};
+use tunebox_spotify::session;
 
 use super::queue;
 use crate::{
@@ -243,7 +243,10 @@ pub fn spawn(
                         forced: forced.clone(),
                     };
                     state.send_replace(SessionState::Ready(connection.clone()));
-                    if tx.send(AppEvent::PlayerReady(Box::new(Player::Spotify(super::Controller::Premium(controller))))).is_err() {
+                    if tx
+                        .send(AppEvent::PlayerReady(Box::new(Player::Spotify(super::Controller::Premium(controller)))))
+                        .is_err()
+                    {
                         return;
                     }
                     let connected = Instant::now();

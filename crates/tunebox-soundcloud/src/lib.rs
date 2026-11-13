@@ -12,11 +12,17 @@ mod source;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
+use futures::future::join_all;
+use serde_json::Value;
+use tokio::sync::Mutex;
 use tunebox_core::{
     artist::{ArtistPage, TopTrack},
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, Track, User},
@@ -24,9 +30,6 @@ use tunebox_core::{
     lyrics::{Lyrics, LyricsQuery},
     paths::Paths,
 };
-use futures::future::join_all;
-use serde_json::Value;
-use tokio::sync::Mutex;
 
 pub use self::{player::Player, source::SoundCloudSource};
 
@@ -61,6 +64,8 @@ struct Inner {
     client_id: Mutex<Option<String>>,
     client_id_file: PathBuf,
     liked: Mutex<Option<HashSet<String>>>,
+    /// Whether SoundCloud has refused the sign-in, so requests go out without it.
+    expired: AtomicBool,
 }
 
 impl SoundCloud {
@@ -83,12 +88,28 @@ impl SoundCloud {
                 client_id: Mutex::new(None),
                 client_id_file: paths.cache.join("soundcloud").join("client_id"),
                 liked: Mutex::new(None),
+                expired: AtomicBool::new(false),
             }),
         })
     }
 
     pub fn signed_in(&self) -> bool {
-        self.inner.token.is_some()
+        self.inner.token.is_some() && !self.expired()
+    }
+
+    /// Whether a saved sign-in is there but SoundCloud won't take it any more, which asks for
+    /// `tunebox login soundcloud` again.
+    pub fn sign_in_expired(&self) -> bool {
+        self.inner.token.is_some() && self.expired()
+    }
+
+    fn expired(&self) -> bool {
+        self.inner.expired.load(Ordering::Relaxed)
+    }
+
+    /// The sign-in to put on a request; nothing once SoundCloud has refused it.
+    fn bearer(&self) -> Option<&str> {
+        self.signed_in().then(|| self.inner.token.as_deref()).flatten()
     }
 
     /// Checks an `oauth_token` cookie and saves it when SoundCloud accepts it.
@@ -115,6 +136,25 @@ impl SoundCloud {
     async fn me_required(&self) -> Result<(String, User)> {
         let me = self.me().await?.context("Not signed in to SoundCloud – run `tunebox login soundcloud`")?;
         Ok((me.id.clone(), me))
+    }
+
+    /// What to try after SoundCloud refused a request, or nothing when it is no use asking
+    /// again: first a new client ID, then no sign-in at all.
+    fn refused(&self, attempt: u32, status: u16) -> Option<u32> {
+        if !matches!(status, 401 | 403) {
+            return None;
+        }
+        match attempt {
+            // A client ID that has gone stale is the usual reason for a refusal.
+            0 => Some(1),
+            // …and when a new one doesn't help, it is the sign-in SoundCloud won't take, so
+            // the public API is asked without it: browsing and playing keep working.
+            1 if self.inner.token.is_some() && !self.expired() => {
+                self.inner.expired.store(true, Ordering::Relaxed);
+                Some(2)
+            }
+            _ => None,
+        }
     }
 
     pub async fn home(&self, _chip: Option<&str>) -> Result<Home> {
@@ -190,12 +230,7 @@ impl SoundCloud {
         let tracks = self.search_tracks(query, 20).await?;
         let (playlists, albums) = self.search_playlists(query, 20).await?;
         let artists = self.search_artists(query, 20).await?;
-        Ok(SearchResults {
-            tracks,
-            albums,
-            artists,
-            playlists,
-        })
+        Ok(SearchResults { tracks, albums, artists, playlists })
     }
 
     async fn search_tracks(&self, query: &str, limit: u32) -> Result<Vec<Track>> {
@@ -226,14 +261,9 @@ impl SoundCloud {
 
     async fn trending(&self) -> Result<Vec<Track>> {
         let value = self
-            .get(
-                "/charts",
-                &[("kind", "trending"), ("genre", "soundcloud:genres:all-music"), ("limit", "30")],
-            )
+            .get("/charts", &[("kind", "trending"), ("genre", "soundcloud:genres:all-music"), ("limit", "30")])
             .await?;
-        Ok(collection(&value)
-            .filter_map(|item| item.get("track").and_then(track).or_else(|| track(item)))
-            .collect())
+        Ok(collection(&value).filter_map(|item| item.get("track").and_then(track).or_else(|| track(item))).collect())
     }
 
     /// The user's own playlists. Signed out, none.
@@ -278,10 +308,8 @@ impl SoundCloud {
         let path = path_of(&value).ok_or_else(|| anyhow!("SoundCloud artist without a page"))?;
         let id = value["id"].as_u64().ok_or_else(|| anyhow!("SoundCloud artist without an ID"))?;
         let tracks = self.get(&format!("/users/{id}/tracks"), &[("limit", "24")]).await?;
-        let top_tracks: Vec<TopTrack> = collection(&tracks)
-            .filter_map(track)
-            .map(|track| TopTrack { track, playcount: None })
-            .collect();
+        let top_tracks: Vec<TopTrack> =
+            collection(&tracks).filter_map(track).map(|track| TopTrack { track, playcount: None }).collect();
         let playlists = self.get(&format!("/users/{id}/playlists"), &[("limit", "24")]).await?;
         let items: Vec<HomeItem> = collection(&playlists)
             .filter_map(playlist)
@@ -325,10 +353,7 @@ impl SoundCloud {
     /// an album.
     pub async fn kind(&self, path: &str) -> Result<(String, bool)> {
         let value = self.resolve(&format!("https://soundcloud.com/{path}")).await?;
-        Ok((
-            value["kind"].as_str().unwrap_or_default().to_owned(),
-            value["is_album"].as_bool().unwrap_or(false),
-        ))
+        Ok((value["kind"].as_str().unwrap_or_default().to_owned(), value["is_album"].as_bool().unwrap_or(false)))
     }
 
     pub async fn playlist_info(&self, uri: &str) -> Result<PlaylistInfo> {
@@ -396,10 +421,7 @@ impl SoundCloud {
             return Ok(uris.iter().map(|uri| (uri.clone(), false)).collect());
         }
         let liked = self.liked_keys().await?;
-        Ok(uris
-            .iter()
-            .map(|uri| (uri.clone(), uri_path(uri).is_some_and(|path| liked.contains(path))))
-            .collect())
+        Ok(uris.iter().map(|uri| (uri.clone(), uri_path(uri).is_some_and(|path| liked.contains(path)))).collect())
     }
 
     pub async fn set_saved(&self, uri: &str, saved: bool) -> Result<()> {
@@ -439,10 +461,8 @@ impl SoundCloud {
         // Progressive plays anywhere; HLS needs mpv's manifest support. Within each, best
         // quality first. SoundCloud's abr_sq stream is sometimes refused, so each is tried
         // in turn rather than only the preferred one.
-        let mut chosen: Vec<&Value> = transcodings
-            .iter()
-            .filter(|item| item["snipped"].as_bool() != Some(true))
-            .collect();
+        let mut chosen: Vec<&Value> =
+            transcodings.iter().filter(|item| item["snipped"].as_bool() != Some(true)).collect();
         chosen.sort_by(|a, b| {
             let key = |item: &Value| {
                 let protocol = item.pointer("/format/protocol").and_then(Value::as_str).unwrap_or_default();
@@ -457,7 +477,7 @@ impl SoundCloud {
             let url = format!("{url}?client_id={client_id}&track_authorization={authorization}");
             match self.get_url(&url).await {
                 Ok(value) => {
-                    return value["url"].as_str().map(str::to_owned).context("SoundCloud didn't give a stream URL")
+                    return value["url"].as_str().map(str::to_owned).context("SoundCloud didn't give a stream URL");
                 }
                 Err(err) => {
                     tracing::debug!("{url}: {err:#}");
@@ -532,12 +552,8 @@ impl SoundCloud {
         if let Some(liked) = self.inner.liked.lock().await.clone() {
             return Ok(liked);
         }
-        let liked: HashSet<String> = self
-            .liked_tracks()
-            .await?
-            .iter()
-            .filter_map(|track| uri_path(&track.uri).map(str::to_owned))
-            .collect();
+        let liked: HashSet<String> =
+            self.liked_tracks().await?.iter().filter_map(|track| uri_path(&track.uri).map(str::to_owned)).collect();
         *self.inner.liked.lock().await = Some(liked.clone());
         Ok(liked)
     }
@@ -553,7 +569,7 @@ impl SoundCloud {
             let client_id = self.client_id(attempt > 0).await?;
             let sep = if url.contains('?') { '&' } else { '?' };
             let mut request = self.inner.http.get(format!("{url}{sep}client_id={client_id}"));
-            if let Some(token) = &self.inner.token {
+            if let Some(token) = self.bearer() {
                 request = request.header(reqwest::header::AUTHORIZATION, format!("OAuth {token}"));
             }
             let response = request.send().await.context("Can't reach SoundCloud")?;
@@ -562,11 +578,9 @@ impl SoundCloud {
                 return response.json().await.context("SoundCloud sent something unexpected");
             }
             let text = response.text().await.unwrap_or_default();
-            if matches!(status.as_u16(), 401 | 403) && attempt == 0 {
-                attempt += 1;
-                continue;
-            }
-            bail!("SoundCloud: {status} {}", first_line(&text));
+            attempt = self
+                .refused(attempt, status.as_u16())
+                .ok_or_else(|| anyhow!("SoundCloud: {status} {}", first_line(&text)))?;
         }
     }
 
@@ -586,7 +600,7 @@ impl SoundCloud {
                 .request(method.clone(), format!("{API}{path}"))
                 .query(&[("client_id", client_id.as_str())])
                 .query(query);
-            if let Some(token) = &self.inner.token {
+            if let Some(token) = self.bearer() {
                 request = request.header(reqwest::header::AUTHORIZATION, format!("OAuth {token}"));
             }
             if let Some(body) = &body {
@@ -602,11 +616,9 @@ impl SoundCloud {
                 return serde_json::from_str(&text).context("SoundCloud sent something unexpected");
             }
             let text = response.text().await.unwrap_or_default();
-            if matches!(status.as_u16(), 401 | 403) && attempt == 0 {
-                attempt += 1;
-                continue;
-            }
-            bail!("SoundCloud: {status} {}", first_line(&text));
+            attempt = self
+                .refused(attempt, status.as_u16())
+                .ok_or_else(|| anyhow!("SoundCloud: {status} {}", first_line(&text)))?;
         }
     }
 
@@ -750,10 +762,7 @@ fn track(value: &Value) -> Option<Track> {
     let user = &value["user"];
     let artist = user["username"].as_str().unwrap_or_default();
     let artist_path = user["permalink_url"].as_str().and_then(uri_path).map(str::to_owned);
-    let album = value
-        .pointer("/publisher_metadata/album_title")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
+    let album = value.pointer("/publisher_metadata/album_title").and_then(Value::as_str).unwrap_or_default();
     Some(Track {
         uri: format!("soundcloud:track:{path}"),
         name: value["title"].as_str().unwrap_or_default().to_owned(),

@@ -5,13 +5,13 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use tunebox_core::{
     artist::ArtistPage,
     catalog::{AlbumInfo, ArtistInfo, PlaylistInfo, SearchResults, ShowInfo, Track, User},
     home::Home,
     lyrics::Lyrics,
 };
-use serde::{Deserialize, Serialize};
 
 /// Built by `cargo run --example demo_fixture` from `demo/plan.json`.
 const SAMPLE: &str = include_str!("../demo/sample.json");

@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::paths::Secret;
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::sync::Mutex;
+use tunebox_core::paths::Secret;
 
 use super::auth::{self, Token};
 
@@ -44,7 +44,9 @@ impl WebApi {
     pub fn new(client_id: impl Into<String>, store: Secret) -> Result<Self> {
         let http = tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build()?;
         let token = match store.read()? {
-            Some(bytes) => Some(serde_json::from_slice(&bytes).context("Stored token corrupted – run `tunebox login`")?),
+            Some(bytes) => {
+                Some(serde_json::from_slice(&bytes).context("Stored token corrupted – run `tunebox login`")?)
+            }
             None => None,
         };
         Ok(Self { http, client_id: client_id.into(), store, token: Mutex::new(token) })

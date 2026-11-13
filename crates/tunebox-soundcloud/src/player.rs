@@ -4,9 +4,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use tokio::sync::mpsc::UnboundedSender;
 use tunebox_core::{paths::Paths, player::PlayerEvent};
 use tunebox_mpv::Player as Engine;
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{SoundCloud, source::SoundCloudSource};
 

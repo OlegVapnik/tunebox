@@ -16,16 +16,18 @@
 
 #[cfg(test)]
 pub mod fake;
+#[cfg(feature = "soundcloud")]
+pub mod soundcloud;
 #[cfg(feature = "spotify")]
 pub mod spotify;
 #[cfg(feature = "ytmusic")]
 pub mod ytmusic;
-#[cfg(feature = "soundcloud")]
-pub mod soundcloud;
 
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Result, bail};
+use futures::{future::BoxFuture, stream::BoxStream};
+use tokio::sync::{Notify, mpsc::UnboundedSender};
 pub use tunebox_core::service::Service;
 use tunebox_core::{
     artist::ArtistPage,
@@ -36,8 +38,6 @@ use tunebox_core::{
     lyrics::{Lyrics, LyricsQuery},
     paths::Paths,
 };
-use futures::{future::BoxFuture, stream::BoxStream};
-use tokio::sync::{Notify, mpsc::UnboundedSender};
 
 use crate::{app::AppEvent, playback::Repeat, queue::Upcoming, views::TrackSource};
 

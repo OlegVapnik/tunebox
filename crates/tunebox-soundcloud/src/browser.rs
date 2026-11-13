@@ -10,8 +10,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::paths::Paths;
 use tokio::process::Command;
+use tunebox_core::paths::Paths;
 
 /// A browser yt-dlp can read cookies from.
 #[derive(Debug, Clone, PartialEq, Eq)]

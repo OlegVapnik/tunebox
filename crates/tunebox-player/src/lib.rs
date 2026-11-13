@@ -5,7 +5,6 @@ mod macos;
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use tunebox_spotify::session::PendingSession;
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{config::DeviceType, session::Session},
@@ -17,6 +16,7 @@ use librespot::{
     },
 };
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tunebox_spotify::session::PendingSession;
 
 /// Preferred audio outputs, best first; librespot's default (rodio) is the fallback.
 #[cfg(target_os = "linux")]

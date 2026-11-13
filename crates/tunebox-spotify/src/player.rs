@@ -4,9 +4,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use tokio::sync::mpsc::UnboundedSender;
 use tunebox_core::{paths::Paths, player::PlayerEvent};
 use tunebox_mpv::Player as Engine;
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{source::SpotifySource, webapi::WebApi};
 
@@ -18,7 +18,12 @@ pub struct Player {
 
 impl Player {
     /// Starts mpv at `volume` (0 to 65535). Fails when mpv isn't installed.
-    pub async fn spawn(api: Arc<WebApi>, paths: &Paths, volume: u16, events: UnboundedSender<PlayerEvent>) -> Result<Player> {
+    pub async fn spawn(
+        api: Arc<WebApi>,
+        paths: &Paths,
+        volume: u16,
+        events: UnboundedSender<PlayerEvent>,
+    ) -> Result<Player> {
         let args = std::env::var("TUNEBOX_MPV_ARGS").unwrap_or_default();
         Self::spawn_with_args(api, paths, volume, events, args.split_whitespace().map(str::to_owned).collect()).await
     }

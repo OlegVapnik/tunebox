@@ -1,7 +1,7 @@
 //! Helpers for the internal API's responses.
 
-use tunebox_core::catalog::PlaylistInfo;
 use serde_json::Value;
+use tunebox_core::catalog::PlaylistInfo;
 
 /// Preferred cover width; Spotify offers roughly 64, 300 and 640 px.
 const IMAGE_WIDTH: u64 = 300;

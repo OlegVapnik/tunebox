@@ -1,11 +1,11 @@
 //! librespot's player events as tunebox's own, which the interface follows whatever the service.
 
-use tunebox_core::player::{CurrentTrack, PlayerEvent, QueueTrack};
 use librespot::{
     core::session::Session,
     metadata::audio::{AudioItem, UniqueFields},
     playback::player::PlayerEvent as LibrespotEvent,
 };
+use tunebox_core::player::{CurrentTrack, PlayerEvent, QueueTrack};
 
 /// The event as tunebox's own; `None` for those only librespot and Spirc have a use for.
 pub fn neutral(event: LibrespotEvent) -> Option<PlayerEvent> {

@@ -9,6 +9,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use tunebox_core::{
     artist::ArtistPage,
     catalog::{AlbumInfo, ArtistInfo, PlaylistInfo, Track, User},
@@ -19,7 +20,6 @@ use tunebox_core::{
 };
 use tunebox_spotify::{artist, catalog, lyrics, pathfinder::Pathfinder, session, webapi::WebApi};
 use tunebox_tui::demo::{Demo, Playing};
-use serde::Deserialize;
 
 /// Spotify's own Liked Songs artwork.
 const LIKED_IMAGE: &str = "https://misc.scdn.co/liked-songs/liked-songs-300.png";

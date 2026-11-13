@@ -3,8 +3,8 @@
 
 use std::time::Duration;
 
-use tunebox_core::{player::PlayerEvent, service::Service};
 use crossterm::event::KeyCode::{Char, Down, Enter};
+use tunebox_core::{player::PlayerEvent, service::Service};
 
 use crate::{backend::fake::SONG, harness::Harness, views::View};
 

@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use tunebox_os::audio::OutputWatch;
 use librespot::playback::{
     NUM_CHANNELS, SAMPLE_RATE,
     audio_backend::{Sink, SinkError, SinkResult},
@@ -27,6 +26,7 @@ use rodio::{
     },
 };
 use tokio::sync::mpsc::UnboundedSender;
+use tunebox_os::audio::OutputWatch;
 
 /// Audio queued ahead, about half a second, like librespot's own rodio output.
 const QUEUED_CHUNKS: usize = 26;

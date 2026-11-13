@@ -4,10 +4,10 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
+use tokio::sync::mpsc;
 use tunebox_core::{doctor::Section, paths::Paths, player::PlayerEvent};
 use tunebox_os::media::Command;
 use tunebox_soundcloud::{Player, SoundCloud, uri_path};
-use tokio::sync::mpsc;
 
 use crate::{
     headless::{Clock, describe, draw_progress},

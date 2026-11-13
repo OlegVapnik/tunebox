@@ -1,12 +1,12 @@
 //! Playlist, album and artist pages, and the songs of playlists and albums page by page.
 
 use anyhow::{Context, Result, bail};
+use futures::{Stream, stream};
+use serde_json::Value;
 use tunebox_core::{
     artist::{ArtistPage, TopTrack},
     catalog::{AlbumInfo, Page, PlaylistInfo, Track},
 };
-use futures::{Stream, stream};
-use serde_json::Value;
 
 use crate::{
     Source, YtMusic, home,

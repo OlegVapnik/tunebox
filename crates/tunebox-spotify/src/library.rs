@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::catalog::PlaylistInfo;
 use futures::{StreamExt, TryStreamExt, stream};
 use serde_json::{Value, json};
+use tunebox_core::catalog::PlaylistInfo;
 
 use crate::{catalog::PAGE_CONCURRENCY, parse, pathfinder::Pathfinder};
 

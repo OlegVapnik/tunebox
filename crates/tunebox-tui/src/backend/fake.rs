@@ -10,6 +10,8 @@ use std::{
 };
 
 use anyhow::{Result, bail};
+use futures::stream::{self, BoxStream, StreamExt};
+use tokio::sync::mpsc::UnboundedSender;
 use tunebox_core::{
     artist::ArtistPage,
     catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User},
@@ -18,8 +20,6 @@ use tunebox_core::{
     player::{CurrentTrack, PlayerEvent, QueueTrack},
     service::Service,
 };
-use futures::stream::{self, BoxStream, StreamExt};
-use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Found, Player, is_track};
 use crate::{app::AppEvent, clock::Instant, playback::Repeat, views::TrackSource};

@@ -61,11 +61,7 @@ fn navigation(
         if x + width > right {
             break;
         }
-        let style = if open {
-            Style::new().fg(accent).bold()
-        } else {
-            Style::new().fg(p.muted)
-        };
+        let style = if open { Style::new().fg(accent).bold() } else { Style::new().fg(p.muted) };
         buf.set_string(x, y, format!("{icon} {label}"), style);
         hits.push((Rect::new(x, y, width, 1), command));
         x += width + NAV_GAP;

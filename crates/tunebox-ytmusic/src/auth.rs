@@ -12,8 +12,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::{catalog::User, paths::Paths};
 use tokio::process::Command;
+use tunebox_core::{catalog::User, paths::Paths};
 
 use crate::{
     YtMusic,

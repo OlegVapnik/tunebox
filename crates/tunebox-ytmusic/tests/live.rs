@@ -2,9 +2,9 @@
 //! out; the nightly workflow runs every ignored test of this crate, to notice when InnerTube
 //! changes before people do.
 
+use futures::StreamExt;
 use tunebox_core::{lyrics::LyricsQuery, paths::Paths};
 use tunebox_ytmusic::{Source, YtMusic};
-use futures::StreamExt;
 
 fn client(name: &str) -> YtMusic {
     let root = std::env::temp_dir().join(format!("tunebox-ytm-live-{name}-{}", std::process::id()));

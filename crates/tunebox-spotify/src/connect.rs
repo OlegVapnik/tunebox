@@ -3,12 +3,12 @@
 //! the queue goes to the device through Spotify Connect itself, sent as tunebox's own device.
 
 use anyhow::Result;
-use tunebox_core::connect::{Device, Playback, PlayingTrack};
 use librespot::{core::session::Session, protocol::player::ProvidedTrack};
 use protobuf_json_mapping::PrintOptions;
 use reqwest::Method;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use tunebox_core::connect::{Device, Playback, PlayingTrack};
 
 use crate::webapi::WebApi;
 

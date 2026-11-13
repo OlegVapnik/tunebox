@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use tunebox_core::config;
 use crossterm::event::{KeyCode, KeyEvent};
+use tunebox_core::config;
 
 use super::{App, COVER_SIZE, Focus, ImageSlot};
 use crate::{

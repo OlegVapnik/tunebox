@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use tunebox_spotify::{connect, webapi::WebApi};
 use tokio::sync::mpsc::{self, UnboundedSender};
+use tunebox_spotify::{connect, webapi::WebApi};
 
 use crate::{app::AppEvent, backend::Remote, loader::DataEvent, playback::Repeat};
 

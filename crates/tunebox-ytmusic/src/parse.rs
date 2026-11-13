@@ -2,11 +2,11 @@
 //! lenient: a field that isn't where it should be leaves its value empty, and an item that
 //! can't be made sense of is skipped rather than failing the whole page.
 
+use serde_json::Value;
 use tunebox_core::{
     catalog::Track,
     home::{HomeItem, ItemKind},
 };
-use serde_json::Value;
 
 /// Cover size for lists and cards, in pixels.
 pub(crate) const IMAGE_SIZE: u32 = 300;

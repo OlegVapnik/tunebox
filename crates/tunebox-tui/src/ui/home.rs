@@ -1,12 +1,12 @@
 //! Home: a greeting or chips, the shortcut grid, and shelves of cover cards or of songs.
 
-use tunebox_core::home::{Chip, HomeItem, ItemKind, Shelf};
 use ratatui::{
     Frame,
     layout::{Rect, Size},
     style::{Color, Style},
     text::{Line, Span},
 };
+use tunebox_core::home::{Chip, HomeItem, ItemKind, Shelf};
 use unicode_width::UnicodeWidthStr;
 
 use super::{text, wordmark};
@@ -163,7 +163,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             let mut spans = vec![Span::styled(title, Style::new().fg(Color::from(p.highlight)).bold())];
             spans.extend(spinner);
             frame.buffer_mut().set_line(inner.x, inner.y, &Line::from(spans), inner.width);
-            let tagline = Span::styled(format!("Your {service} · press S to switch services"), Style::new().fg(p.muted));
+            let tagline =
+                Span::styled(format!("Your {service} · press S to switch services"), Style::new().fg(p.muted));
             frame.buffer_mut().set_line(inner.x, inner.y + 1, &Line::from(tagline), inner.width);
         } else {
             let cursor = view.chip.filter(|_| focused);

@@ -2,8 +2,8 @@
 //! then LRCLIB's.
 
 use anyhow::Result;
-use tunebox_core::lyrics::{self, LyricLine, Lyrics, LyricsQuery};
 use serde_json::{Value, json};
+use tunebox_core::lyrics::{self, LyricLine, Lyrics, LyricsQuery};
 
 use crate::{
     innertube::{ClientKind, InnerTube},

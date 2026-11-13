@@ -1,12 +1,12 @@
 //! Artist pages: popular tracks, discography and related artists in one query.
 
 use anyhow::{Context, Result, bail};
+use serde_json::{Value, json};
 use tunebox_core::{
     artist::{ArtistPage, TopTrack},
     catalog::Track,
     home::{HomeItem, ItemKind, Shelf},
 };
-use serde_json::{Value, json};
 
 use crate::{
     parse::{image, text},

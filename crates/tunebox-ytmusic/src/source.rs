@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use futures::{StreamExt, stream, stream::BoxStream};
 use tunebox_core::{catalog::Track, paths::Paths};
 use tunebox_mpv::{Source as PlaybackSource, Stream, ytdlp};
-use futures::{StreamExt, stream, stream::BoxStream};
 
 use crate::{
     Source, YtMusic, pages,

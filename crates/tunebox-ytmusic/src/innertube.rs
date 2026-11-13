@@ -8,10 +8,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tunebox_core::paths::Secret;
 use reqwest::{StatusCode, header::HeaderMap};
 use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
+use tunebox_core::paths::Secret;
 
 use crate::{
     account::Identity,

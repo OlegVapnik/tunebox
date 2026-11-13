@@ -10,16 +10,6 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use tunebox_core::{
-    artist::ArtistPage,
-    catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User},
-    connect::{Device, Playback},
-    home::Home,
-    lyrics::{self, Lyrics, LyricsQuery},
-    paths::Paths,
-    player::CurrentTrack,
-    update::{self, Release},
-};
 use futures::{StreamExt, stream};
 use image::imageops::FilterType;
 use ratatui::layout::Size;
@@ -30,6 +20,16 @@ use ratatui_image::{
 };
 use sha2::{Digest, Sha256};
 use tokio::sync::{Semaphore, mpsc::UnboundedSender, watch};
+use tunebox_core::{
+    artist::ArtistPage,
+    catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchResults, ShowInfo, Track, User},
+    connect::{Device, Playback},
+    home::Home,
+    lyrics::{self, Lyrics, LyricsQuery},
+    paths::Paths,
+    player::CurrentTrack,
+    update::{self, Release},
+};
 
 use crate::{
     app::AppEvent,
@@ -254,7 +254,8 @@ impl Loader {
         image_cache: PathBuf,
         keep_sources: bool,
     ) -> Self {
-        let http = tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build().unwrap_or_default();
+        let http =
+            tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build().unwrap_or_default();
         // Leave cores for the interface and audio.
         let turns = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(2).clamp(1, 4));
         let picker = image_terminal.picker(ImageProtocol::Auto);

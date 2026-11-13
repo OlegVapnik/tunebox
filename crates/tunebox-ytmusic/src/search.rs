@@ -2,8 +2,8 @@
 //! results of each kind.
 
 use anyhow::Result;
-use tunebox_core::catalog::{AlbumInfo, ArtistInfo, PlaylistInfo, SearchResults, Track};
 use serde_json::{Value, json};
+use tunebox_core::catalog::{AlbumInfo, ArtistInfo, PlaylistInfo, SearchResults, Track};
 
 use crate::{
     innertube::InnerTube,

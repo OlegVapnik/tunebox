@@ -342,11 +342,11 @@ impl App {
 mod tests {
     use std::collections::BTreeMap;
 
+    use tokio::sync::mpsc;
     use tunebox_core::{
         paths::Paths,
         player::{PlayerEvent, QueueTrack},
     };
-    use tokio::sync::mpsc;
 
     use super::*;
     use crate::{

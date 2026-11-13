@@ -17,10 +17,10 @@ use std::{
     time::Duration,
 };
 
-use tunebox_core::paths::Paths;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{Terminal, backend::TestBackend};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
+use tunebox_core::paths::Paths;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{

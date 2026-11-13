@@ -121,8 +121,13 @@ impl Snapshotter {
 
     /// Renders and writes `latest.png`; returns its path.
     pub fn save(&self, buffer: &Buffer, placements: &[Placement]) -> Result<PathBuf> {
+        self.write(buffer, placements, "latest")
+    }
+
+    /// Renders and writes `<dir>/{name}.png`; returns its path.
+    pub(crate) fn write(&self, buffer: &Buffer, placements: &[Placement], name: &str) -> Result<PathBuf> {
         let image = self.render(buffer, placements);
-        let path = self.dir.join("latest.png");
+        let path = self.dir.join(format!("{name}.png"));
         image.save(&path)?;
         Ok(path)
     }
