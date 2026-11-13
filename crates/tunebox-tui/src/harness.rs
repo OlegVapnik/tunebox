@@ -326,18 +326,18 @@ mod pictures {
     async fn the_views() {
         let mut library = Harness::demo().await;
         library.shot("home");
-        library.press(Char('3')).await;
+        library.press(Char('3')).await.wait(Duration::from_millis(600)).await;
         library.shot("library");
         library.press(Down).await;
-        library.press(Enter).await;
+        library.press(Enter).await.wait(Duration::from_millis(600)).await;
         library.shot("playlist");
         library.press(Char('/')).await;
         library.type_text("daft").await;
         library.wait(Duration::from_millis(400)).await;
         library.shot("search");
-        library.press(Char('Q')).await;
+        library.press(Char('Q')).await.wait(Duration::from_millis(600)).await;
         library.shot("queue");
-        library.press(Char('z')).await;
+        library.press(Char('z')).await.wait(Duration::from_millis(600)).await;
         library.shot("now-playing");
     }
 }

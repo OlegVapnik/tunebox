@@ -1,36 +1,36 @@
 
-   ▄▀▀ █ ▄▀▄ ▄▀▄ ▄▀▀ █ █
-   █   █ █ █ █ █ █▀▀  ▀█     ‹     ⌂     ⌕  What do you want to play?                                       ◉  Tester
-    ▀▀ ▀  ▀   ▀  ▀   ▀▀
+
+   tunebox                ‹     ⌂     ⌕  What do you want to play?                                          ◉  Tester
 
 
-   ≡  Your Library          ⤢       Relax   Workout                                                                   ┃
+
+   ⌂ Home       ⌕ Search            Relax   Workout                                                                   ┃
+   ≡ Queue      ⚙ Settings                                                                                            ┃
                                                                                                                       ┃
-   Playlists  Albums               Quick picks                                          ▶ Play all  1–8 of 9   ‹   ›  ┃
+   ≡  Your Library          ⤢      Quick picks                                          ▶ Play all  1–8 of 9   ‹   ›  ┃
                                                                                                                       ┃
-   ▄▄▄▄  Liked Songs               ▀▄▄▀  YouTube Music Song 1                ▀▄▄▀  YouTube Music Song 5               ┃
-   ▄▀▀▄  Playlist · 3 songs        ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
-                                                                                                                      ┃
-   ▀▄▄▀  YouTube Music Mix         ▀▄▄▀  YouTube Music Song 2                ▀▄▄▀  YouTube Music Mix Song 1           ┃
-   ▀▀▀▀  Playlist · Tester         ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
-                                                                                                                      ┃
-   ▀▄▄▀  YouTube Music Album       ▀▄▄▀  YouTube Music Song 3                ▀▄▄▀  YouTube Music Mix Song 2           ┃
-   ▀▀▀▀  Album · YouTube Music…    ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
-                                                                                                                      ┃
-                                   ▀▄▄▀  YouTube Music Song 4                ▀▄▄▀  YouTube Music Mix Song 3           ┃
+   Playlists  Albums               ▀▄▄▀  YouTube Music Song 1                ▀▄▄▀  YouTube Music Song 5               ┃
+                                   ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
+   ▄▄▄▄  Liked Songs                                                                                                  ┃
+   ▄▀▀▄  Playlist · 3 songs        ▀▄▄▀  YouTube Music Song 2                ▀▄▄▀  YouTube Music Mix Song 1           ┃
+                                   ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
+   ▀▄▄▀  YouTube Music Mix                                                                                            ┃
+   ▀▀▀▀  Playlist · Tester         ▀▄▄▀  YouTube Music Song 3                ▀▄▄▀  YouTube Music Mix Song 2           ┃
+                                   ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
+   ▀▄▄▀  YouTube Music Album                                                                                          ┃
+   ▀▀▀▀  Album · YouTube Music…    ▀▄▄▀  YouTube Music Song 4                ▀▄▄▀  YouTube Music Mix Song 3           ┃
                                    ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
                                                                                                                       ┃
                                                                                                                       ┃
-                                   MADE FOR YOU                                                                       ┃
+                                   MADE FOR YOU                                                                       │
                                    For you                                                                            │
                                                                                                                       │
                                     ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀                                                    │
                                     ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀                                                    │
                                      ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀                                                    │
-                                     ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀                                                      │
 
-           Nothing playing
-    ♪      Pick a song and press ↵
-
+             Nothing playing
+             Pick a song and press ↵
+     ♪
 
   enter play   . actions   / search   ^K commands   ? help

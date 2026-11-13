@@ -1,16 +1,16 @@
   ‹   ⌂   ⌕  What do you want to play?
 
-   Good evening                                               ┃
+   Good evening, Sam                                          ┃
+   Your Spotify · press S to switch services                  │
                                                               │
    ▀ ▄▄ ▀                        ▀ ▄▄ ▀                       │
-   ▀▄▄▀▀▀  Liked Songs           ▀▄▄▀▀▀  Late Night Cod… ⡄⡇⡆  │
+   ▀▄▄▀▀▀  Liked Songs           ▀▄▄▀▀▀  Late Night Codi…⡄⡇⡆  │
     ▀▀▀▀▀                         ▀▀▀▀▀                       │
                                                               │
    ▀ ▄▄ ▀                        ▀ ▄▄ ▀                       │
-   ▀▄▄▀▀▀  Random Access Memo…   ▀▄▄▀▀▀  Deep Focus           │
+   ▀▄▄▀▀▀  Random Access Memor…  ▀▄▄▀▀▀  Deep Focus           │
     ▀▀▀▀▀                         ▀▀▀▀▀                       │
                                                               │
-   ▀ ▄▄ ▀                        ▀ ▄▄ ▀                       │
   Around the World · Daft Punk  ✓         ⤨   ◂◂   ❚❚   ▸▸   ↻
-  1:21  ━━━━━━━━━●──────────────────────────────────────  7:09
-  enter open   p play   . actions   D DJ             ▣  tunebox
+  1:21  ━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  7:09
+  enter open   p play   . actions   D DJ            ▣  tunebox

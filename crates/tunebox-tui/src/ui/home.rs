@@ -331,7 +331,12 @@ fn shelf_height(shelf: &Shelf, width: u16) -> u16 {
 }
 
 fn shortcut_columns(width: u16) -> u16 {
-    if width >= 110 { 4 } else { 2 }
+    match width {
+        110.. => 4,
+        72.. => 3,
+        40.. => 2,
+        _ => 1,
+    }
 }
 
 /// The part of rows `y..y + height` that lies inside `area`, across the given columns.
@@ -556,7 +561,7 @@ fn draw_shortcuts(
         // The end of the row holds the play button while hovered, else the playing tile's
         // equalizer; the name stops short of either.
         let reserved = TILE_COVER.width
-            + 3
+            + 2
             + if hovered {
                 super::PLAY_BUTTON_WIDTH + 1
             } else if playing {

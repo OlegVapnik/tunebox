@@ -23,9 +23,9 @@ const THUMB: Size = Size { width: 4, height: 2 };
 /// Two text lines next to the thumbnail, plus a gap.
 const ENTRY_ROWS: u16 = 3;
 /// Rows above the list: the navigation, the title and the filter tabs.
-const LIST_TOP: u16 = 7;
-/// The gap between two navigation entries.
-const NAV_GAP: u16 = 2;
+const LIST_TOP: u16 = 8;
+/// Places stand two to a row, so the labels fit under a narrow sidebar.
+const NAV_COLUMNS: u16 = 2;
 
 /// Where the sidebar's navigation goes, and how to tell it is there already.
 fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
@@ -43,9 +43,9 @@ fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
     ]
 }
 
-/// A row of places to go: Home, Search, Queue and Settings, above the library. Returns their
-/// click areas. Labels go with the icons when they all fit; in a narrow sidebar the icons
-/// stand alone, so nothing is dropped.
+/// The places to go: Home and Search, then Queue and Settings, above the library. Returns their
+/// click areas. A sidebar too narrow for the labels keeps the icons alone, so no place is ever
+/// left out.
 fn navigation(
     buf: &mut ratatui::buffer::Buffer,
     x: u16,
@@ -56,28 +56,27 @@ fn navigation(
 ) -> Vec<(Rect, Command)> {
     let p = theme::palette();
     let nav = nav(app);
-    let room = right.saturating_sub(x);
-    let with_labels: u16 = nav
+    let column = right.saturating_sub(x) / NAV_COLUMNS;
+    let widest = nav
         .iter()
         .map(|(_, icon, label, _)| icon.chars().count() as u16 + 1 + label.len() as u16)
-        .sum::<u16>()
-        + NAV_GAP * nav.len().saturating_sub(1) as u16;
-    let labels = with_labels <= room;
+        .max()
+        .unwrap_or_default();
+    let labels = widest + 1 <= column;
     let mut hits = Vec::new();
-    let mut x = x;
-    for (command, icon, label, open) in nav {
+    for (index, (command, icon, label, open)) in nav.into_iter().enumerate() {
+        let (cell_x, cell_y) = (x + (index as u16 % NAV_COLUMNS) * column, y + index as u16 / NAV_COLUMNS);
         let (text, width) = if labels {
             (format!("{icon} {label}"), icon.chars().count() as u16 + 1 + label.len() as u16)
         } else {
             (icon.to_owned(), icon.chars().count() as u16)
         };
-        if x + width > right {
-            break;
+        if cell_x + width > right {
+            continue;
         }
         let style = if open { Style::new().fg(accent).bold() } else { Style::new().fg(p.muted) };
-        buf.set_string(x, y, text, style);
-        hits.push((Rect::new(x, y, width, 1), command));
-        x += width + NAV_GAP;
+        buf.set_string(cell_x, cell_y, text, style);
+        hits.push((Rect::new(cell_x, cell_y, width, 1), command));
     }
     hits
 }
@@ -101,8 +100,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         title.push(Span::styled(format!("  {}", text::spinner(app.frame())), p.faint));
     }
     let buf = frame.buffer_mut();
-    buf.set_line(area.x + 3, area.y + 3, &Line::from(title), area.width.saturating_sub(8));
-    let expand = Rect::new(area.right().saturating_sub(4), area.y + 3, 2, 1);
+    buf.set_line(area.x + 3, area.y + 4, &Line::from(title), area.width.saturating_sub(8));
+    let expand = Rect::new(area.right().saturating_sub(4), area.y + 4, 2, 1);
     let expand_style = if page_open { Style::new().fg(accent) } else { Style::new().fg(p.muted) };
     buf.set_string(expand.x, expand.y, icons().expand, expand_style);
     app.hits.push((expand, Hit::Command(Command::Library)));
@@ -110,7 +109,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let filters = app.library_filters();
     let active = app.library_filter;
     let chips =
-        tabs(frame.buffer_mut(), area.x + 3, area.y + 5, area.right().saturating_sub(2), &filters, active, accent);
+        tabs(frame.buffer_mut(), area.x + 3, area.y + 6, area.right().saturating_sub(2), &filters, active, accent);
     app.hits.extend(chips.into_iter().map(|(rect, filter)| (rect, Hit::Chip(filter))));
 
     let entries = app.library_entries();

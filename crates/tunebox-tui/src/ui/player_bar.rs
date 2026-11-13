@@ -55,7 +55,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             let accent = app.accent.color();
             let (controls, targets) = controls(app, accent);
             let controls_width = controls.width() as u16;
-            let controls_x = info.right().saturating_sub(controls_width);
+            // The transport sits in the middle of the bar, as in the official client: the track
+            // on the left, the volume on the right. A bar too narrow for a name beside it keeps
+            // the transport on the right, as before.
+            let centred = area.x + area.width.saturating_sub(controls_width) / 2;
+            let controls_x = if centred > info.x + 23 { centred } else { info.right().saturating_sub(controls_width) };
             let volume_width = VOLUME_CELLS + 7;
             let volume_x = info.right().saturating_sub(volume_width);
             // The queue button sits before the volume, as in Spotify's desktop app, and lights
@@ -65,7 +69,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             let queue_x = volume_x.saturating_sub(queue_width + QUEUE_GAP);
             let queue_open = matches!(app.view, View::Queue(_));
 
-            let title_width = info.width.saturating_sub(controls_width + 7) as usize;
+            // The name stops short of the transport, and the heart sits between the two.
+            let title_width = controls_x.saturating_sub(info.x + 7) as usize;
             let title = text::truncate(&track.name, title_width);
             buf.set_string(info.x, info.y, &title, Style::new().fg(p.text).bold());
             let heart_x = info.x + title.width() as u16 + 2;
@@ -75,8 +80,14 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 (icons().save, Style::new().fg(p.faint))
             };
             buf.set_string(heart_x, info.y, heart, heart_style);
-            let note_x = heart_x + 4;
-            let room = controls_x.saturating_sub(note_x + 3) as usize;
+            // What plays from, and the hint for a track that was left, go after the transport
+            // while it stands in the middle, else after the heart, before it.
+            let (note_x, note_end) = if controls_x + controls_width + 4 < info.right() {
+                (controls_x + controls_width + 4, info.right())
+            } else {
+                (heart_x + 4, controls_x)
+            };
+            let room = note_end.saturating_sub(note_x + 2) as usize;
             if app.can_resume() {
                 let hint = "Last played · space to resume";
                 if hint.width() <= room {
@@ -257,7 +268,7 @@ fn volume(volume: u16, accent: Color) -> Line<'static> {
     Line::from(vec![
         Span::styled(format!("{} ", icons().volume), p.faint),
         Span::styled("━".repeat(filled), accent),
-        Span::styled("━".repeat(VOLUME_CELLS as usize - filled), p.raised),
+        Span::styled("━".repeat(VOLUME_CELLS as usize - filled), p.thumb),
         Span::styled(format!(" {:>3}%", (volume as u32 * 100 / u16::MAX as u32)), p.faint),
     ])
 }
@@ -284,7 +295,7 @@ pub(super) fn progress(
         Span::styled(format!("{elapsed}  "), p.muted),
         Span::styled("━".repeat(filled), accent),
         Span::styled("●", Style::new().fg(p.text)),
-        Span::styled("─".repeat(bar_width - filled - 1), p.faint),
+        Span::styled("━".repeat(bar_width - filled - 1), p.thumb),
         Span::styled(format!("  {total}"), p.muted),
     ]);
     buf.set_line(area.x, area.y, &line, area.width);

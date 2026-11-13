@@ -1,36 +1,36 @@
 
-   ▄▀▀ █ ▄▀▄ ▄▀▄ ▄▀▀ █ █
-   █   █ █ █ █ █ █▀▀  ▀█     ‹     ⌂     ⌕  What do you want to play?                                       ◉  Tester
-    ▀▀ ▀  ▀   ▀  ▀   ▀▀
+
+   tunebox                ‹     ⌂     ⌕  What do you want to play?                                          ◉  Tester
 
 
-   ≡  Your Library          ⤢       Relax   Workout                                                                   ┃
+
+   ⌂ Home       ⌕ Search            Relax   Workout                                                                   ┃
+   ≡ Queue      ⚙ Settings                                                                                            ┃
                                                                                                                       ┃
-   Playlists  Albums               Quick picks                                          ▶ Play all  1–8 of 9   ‹   ›  ┃
+   ≡  Your Library          ⤢      Quick picks                                          ▶ Play all  1–8 of 9   ‹   ›  ┃
                                                                                                                       ┃
-   ▄▄▄▄  Liked Songs               ▀▄▄▀  YouTube Music Song 1                ▀▄▄▀  YouTube Music Song 5               ┃
-   ▄▀▀▄  Playlist · 3 songs        ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
-                                                                                                                      ┃
-   ▀▄▄▀  YouTube Music Mix       ╭ ★ Enjoying tunebox? ────────────────────────────────╮ube Music Mix Song 1           ┃
-   ▀▀▀▀  Playlist · Tester       │                                                    │ube Music Band                 ┃
-                                 │  tunebox is free and made in spare time. If you     │                               ┃
-   ▀▄▄▀  YouTube Music Album     │  like it, a star on GitHub helps other people      │ube Music Mix Song 2           ┃
-   ▀▀▀▀  Album · YouTube Music…  │  find it.                                          │ube Music Band                 ┃
-                                 │                                                    │                               ┃
-                                 │           ★ Star on GitHub     No thanks           │ube Music Mix Song 3           ┃
+   Playlists  Albums               ▀▄▄▀  YouTube Music Song 1                ▀▄▄▀  YouTube Music Song 5               ┃
+                                   ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
+   ▄▄▄▄  Liked Songs             ╭ ★ Enjoying tunebox? ───────────────────────────────╮                               ┃
+   ▄▀▀▄  Playlist · 3 songs      │                                                    │ube Music Mix Song 1           ┃
+                                 │  tunebox is free and made in spare time. If you    │ube Music Band                 ┃
+   ▀▄▄▀  YouTube Music Mix       │  like it, a star on GitHub helps other people      │                               ┃
+   ▀▀▀▀  Playlist · Tester       │  find it.                                          │ube Music Mix Song 2           ┃
                                  │                                                    │ube Music Band                 ┃
-                                 │              enter choose · esc close              │                               ┃
+   ▀▄▄▀  YouTube Music Album     │           ★ Star on GitHub     No thanks           │                               ┃
+   ▀▀▀▀  Album · YouTube Music…  │                                                    │ube Music Mix Song 3           ┃
+                                 │              enter choose · esc close              │ube Music Band                 ┃
                                  ╰────────────────────────────────────────────────────╯                               ┃
-                                   MADE FOR YOU                                                                       ┃
+                                                                                                                      ┃
+                                   MADE FOR YOU                                                                       │
                                    For you                                                                            │
                                                                                                                       │
                                     ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀                                                    │
                                     ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀                                                    │
                                      ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀                                                    │
-                                     ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀                                                      │
 
-           Nothing playing
-    ♪      Pick a song and press ↵
-
+             Nothing playing
+             Pick a song and press ↵
+     ♪
 
   enter play   . actions   / search   ^K commands   ? help
