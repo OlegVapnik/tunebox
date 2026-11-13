@@ -44,7 +44,8 @@ fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
 }
 
 /// A row of places to go: Home, Search, Queue and Settings, above the library. Returns their
-/// click areas.
+/// click areas. Labels go with the icons when they all fit; in a narrow sidebar the icons
+/// stand alone, so nothing is dropped.
 fn navigation(
     buf: &mut ratatui::buffer::Buffer,
     x: u16,
@@ -54,15 +55,27 @@ fn navigation(
     accent: Color,
 ) -> Vec<(Rect, Command)> {
     let p = theme::palette();
+    let nav = nav(app);
+    let room = right.saturating_sub(x);
+    let with_labels: u16 = nav
+        .iter()
+        .map(|(_, icon, label, _)| icon.chars().count() as u16 + 1 + label.len() as u16)
+        .sum::<u16>()
+        + NAV_GAP * nav.len().saturating_sub(1) as u16;
+    let labels = with_labels <= room;
     let mut hits = Vec::new();
     let mut x = x;
-    for (command, icon, label, open) in nav(app) {
-        let width = icon.chars().count() as u16 + 1 + label.len() as u16;
+    for (command, icon, label, open) in nav {
+        let (text, width) = if labels {
+            (format!("{icon} {label}"), icon.chars().count() as u16 + 1 + label.len() as u16)
+        } else {
+            (icon.to_owned(), icon.chars().count() as u16)
+        };
         if x + width > right {
             break;
         }
         let style = if open { Style::new().fg(accent).bold() } else { Style::new().fg(p.muted) };
-        buf.set_string(x, y, format!("{icon} {label}"), style);
+        buf.set_string(x, y, text, style);
         hits.push((Rect::new(x, y, width, 1), command));
         x += width + NAV_GAP;
     }

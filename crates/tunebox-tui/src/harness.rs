@@ -31,6 +31,7 @@ use crate::{
     graphics::ImageTerminal,
     loader::Loader,
     preferences::Preferences,
+    snapshot::Snapshotter,
     ui,
 };
 
@@ -57,7 +58,8 @@ impl Harness {
         let (tx, events) = mpsc::unbounded_channel();
         let service = Service::of(&demo.playing.track.uri);
         let images = paths.cache.join("images");
-        let loader = Loader::new(Vec::new(), service, tx, ImageTerminal::halfblocks(), images, false)
+        // Sources are kept so [`Harness::shot`] can paste covers at full size.
+        let loader = Loader::new(Vec::new(), service, tx, ImageTerminal::halfblocks(), images, true)
             .with_demo(Some(demo.clone()));
         let app = App::new(loader, Preferences::default(), Start::Demo(&demo), paths, None, None, None);
         Self::start(app, events, root, Vec::new(), (width, height)).await
@@ -83,7 +85,7 @@ impl Harness {
         let started =
             fakes.iter().map(|fake| (fake.service(), Ok(Catalog::Fake(fake::Catalog(fake.clone()))))).collect();
         let images = paths.cache.join("images");
-        let loader = Loader::new(started, services.first().copied(), tx, ImageTerminal::halfblocks(), images, false);
+        let loader = Loader::new(started, services.first().copied(), tx, ImageTerminal::halfblocks(), images, true);
         let start = Start::Restore(Box::default());
         let app = App::new(loader, Preferences::default(), start, paths, None, None, None);
         Self::start(app, events, root, fakes, (120, 36)).await
@@ -261,6 +263,23 @@ impl Harness {
             panic!("Screen {name} differs; TUNEBOX_UPDATE_SCREENS=1 takes the new one.\n{}", diff(&saved, &screen));
         }
     }
+
+    /// Writes the frame as `tests/shots/<name>.png`, to look at the interface without a terminal.
+    /// Needs the fonts of [`crate::snapshot`] in `~/.cache/tunebox/dev-fonts`; `TUNEBOX_SHOT_DIR`
+    /// sends the pictures elsewhere.
+    pub fn shot(&self, name: &str) {
+        let dir = std::env::var_os("TUNEBOX_SHOT_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/shots"));
+        std::fs::create_dir_all(&dir).expect("a folder for the pictures");
+        let snapshotter = match Snapshotter::new(dir) {
+            Ok(snapshotter) => snapshotter,
+            Err(err) => panic!("snapshots need the dev fonts: {err:#}"),
+        };
+        let path =
+            snapshotter.write(self.terminal.backend().buffer(), &self.app.placements, name).expect("a frame to save");
+        println!("{}", path.display());
+    }
 }
 
 impl Drop for Harness {
@@ -290,4 +309,35 @@ fn diff(saved: &str, screen: &str) -> String {
         }
     }
     out
+}
+
+/// Pictures of the main views, for reviews that shouldn't need a terminal:
+/// `cargo test -p tunebox-tui --lib -- --ignored --nocapture` writes them into `tests/shots`.
+#[cfg(test)]
+mod pictures {
+    use std::time::Duration;
+
+    use crossterm::event::KeyCode::{Char, Down, Enter};
+
+    use super::Harness;
+
+    #[tokio::test]
+    #[ignore = "writes pictures and needs the dev fonts"]
+    async fn the_views() {
+        let mut library = Harness::demo().await;
+        library.shot("home");
+        library.press(Char('3')).await;
+        library.shot("library");
+        library.press(Down).await;
+        library.press(Enter).await;
+        library.shot("playlist");
+        library.press(Char('/')).await;
+        library.type_text("daft").await;
+        library.wait(Duration::from_millis(400)).await;
+        library.shot("search");
+        library.press(Char('Q')).await;
+        library.shot("queue");
+        library.press(Char('z')).await;
+        library.shot("now-playing");
+    }
 }

@@ -20,8 +20,8 @@ use crate::graphics::{INLINE_CELL, Inline};
 
 /// Font size in pixels; cells come out about 12×26, close to a typical terminal.
 const PX: f32 = 20.0;
-const DEFAULT_BG: [u8; 3] = [13, 13, 16];
-const DEFAULT_FG: [u8; 3] = [236, 236, 241];
+const DEFAULT_BG: [u8; 3] = [18, 17, 21];
+const DEFAULT_FG: [u8; 3] = [237, 234, 226];
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
 /// A rasterized glyph, or `None` if no font has it.
@@ -69,7 +69,7 @@ impl Snapshotter {
         }
     }
 
-    fn new(dir: PathBuf) -> Result<Self> {
+    pub(crate) fn new(dir: PathBuf) -> Result<Self> {
         let fonts = std::env::var_os("TUNEBOX_SNAPSHOT_FONTS")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache/tunebox/dev-fonts")))
