@@ -58,6 +58,9 @@ struct Auth {
     identity: Identity,
     /// Where the cookies are kept; `None` for a sign-in that isn't kept, or no longer is.
     store: Option<Stored>,
+    /// The browser's yt-dlp name, to read the sign-in from it again when YouTube stops
+    /// taking the cookies; `None` for one pasted or saved by an older tunebox.
+    browser: Option<String>,
     dirty: bool,
     saved: Instant,
 }
@@ -73,7 +76,8 @@ impl InnerTube {
         let auth = store.read()?.and_then(|bytes| {
             let text = String::from_utf8_lossy(&bytes);
             let (jar, identity) = (Jar::parse(&text), Identity::parse(&text));
-            signed_in(&jar).then(|| Auth::new(jar, identity, Some(Stored { secret: store, bytes })))
+            let browser = crate::auth::browser_of(&text);
+            signed_in(&jar).then(|| Auth::new(jar, identity, browser, Some(Stored { secret: store, bytes })))
         });
         Self::with_auth(auth)
     }
@@ -81,7 +85,7 @@ impl InnerTube {
     /// Signed in with cookies that aren't kept, to try them before they are. They act as the
     /// browser's first account until `set_identity` picks another.
     pub fn unsaved(jar: Jar) -> Result<Self> {
-        Self::with_auth(signed_in(&jar).then(|| Auth::new(jar, Identity::default(), None)))
+        Self::with_auth(signed_in(&jar).then(|| Auth::new(jar, Identity::default(), None, None)))
     }
 
     fn with_auth(auth: Option<Auth>) -> Result<Self> {
@@ -105,6 +109,23 @@ impl InnerTube {
             auth.identity = identity;
         }
         // The visitor YouTube gave the account before isn't this one's.
+        *self.visitor.lock().unwrap() = None;
+    }
+
+    /// Keeps a sign-in read from the browser again, in place of the stored one; `text` is one
+    /// as [`Auth::text`] writes, cookies with their account notes and the browser's name.
+    pub fn replace_sign_in(&self, text: &str) {
+        if let Some(auth) = self.auth.lock().unwrap().as_mut() {
+            auth.jar = Jar::parse(text);
+            auth.identity = Identity::parse(text);
+            let browser = crate::auth::browser_of(text).or_else(|| auth.browser.take());
+            auth.browser = browser;
+            auth.dirty = true;
+            if let Some(stored) = auth.store.as_mut() {
+                // The file holds it already; writing it again would only churn the disk.
+                stored.bytes = text.as_bytes().to_vec();
+            }
+        }
         *self.visitor.lock().unwrap() = None;
     }
 
@@ -295,16 +316,36 @@ impl InnerTube {
     pub fn sign_in_text(&self) -> Option<String> {
         self.auth.lock().unwrap().as_ref().map(Auth::text)
     }
+
+    /// The browser the sign-in came from, as yt-dlp names it; `None` when it isn't known, as
+    /// for a pasted sign-in or one saved by an older tunebox.
+    pub fn browser(&self) -> Option<String> {
+        self.auth.lock().unwrap().as_ref().and_then(|auth| auth.browser.clone())
+    }
+
+    /// Remembers where the sign-in came from, so it can be read again later.
+    pub fn set_browser(&self, browser: Option<String>) {
+        if let Some(auth) = self.auth.lock().unwrap().as_mut() {
+            auth.dirty |= auth.browser != browser;
+            auth.browser = browser;
+        }
+    }
 }
 
 impl Auth {
-    fn new(jar: Jar, identity: Identity, store: Option<Stored>) -> Self {
-        Self { jar, identity, store, dirty: false, saved: Instant::now() }
+    fn new(jar: Jar, identity: Identity, browser: Option<String>, store: Option<Stored>) -> Self {
+        Self { jar, identity, store, browser, dirty: false, saved: Instant::now() }
     }
 
-    /// The `cookies.txt` it is kept as, with the account in comments at the end.
+    /// The `cookies.txt` it is kept as, with the account and the browser in comments at the end.
     fn text(&self) -> String {
-        self.jar.to_text() + &self.identity.notes()
+        let mut text = self.jar.to_text() + &self.identity.notes();
+        if let Some(browser) = &self.browser {
+            text.push_str(crate::auth::BROWSER_NOTE);
+            text.push_str(browser);
+            text.push('\n');
+        }
+        text
     }
 
     /// Writes the cookies back, unless the sign-in was replaced or removed since this client

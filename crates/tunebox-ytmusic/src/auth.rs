@@ -17,7 +17,7 @@ use tunebox_core::{catalog::User, paths::Paths};
 
 use crate::{
     YtMusic,
-    account::{self, Account},
+    account::{self, Account, Identity},
     cookies::Jar,
     innertube, library,
 };
@@ -184,16 +184,33 @@ pub fn open_add_account() -> bool {
     open::that_detached(ADD_ACCOUNT_URL).is_ok()
 }
 
+/// The note in a saved cookie file that says which browser it came from, so a sign-in that
+/// YouTube no longer takes can be re-read from that same browser. Older sign-ins and pasted
+/// ones have no such note: `tunebox login ytmusic --force` records one.
+pub const BROWSER_NOTE: &str = "# tunebox-browser: ";
+
+/// The browser a saved sign-in came from, if it recorded one.
+pub fn browser_of(text: &str) -> Option<String> {
+    text.lines()
+        .rev()
+        .take_while(|line| line.starts_with('#'))
+        .find_map(|line| line.strip_prefix(BROWSER_NOTE))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
 /// A sign-in read from a browser or pasted, not kept yet: it replaces the one before only once
 /// YouTube Music took it, so one that doesn't work leaves a working one in place. It acts as the
 /// browser's first account until `choose` picks another.
 pub struct SignIn {
     client: YtMusic,
+    browser: Option<String>,
 }
 
 impl SignIn {
-    fn new(jar: Jar) -> Result<Self> {
-        Ok(Self { client: YtMusic::unsaved(jar)? })
+    fn new(jar: Jar, browser: Option<String>) -> Result<Self> {
+        Ok(Self { client: YtMusic::unsaved(jar)?, browser })
     }
 
     /// The accounts it can act as: each Google account signed in to the browser, in Google's
@@ -212,12 +229,41 @@ impl SignIn {
         library::me(self.client.api()).await
     }
 
-    /// Keeps it in place of the sign-in before, with the account chosen and the cookies
-    /// YouTube refreshed meanwhile.
+    /// Keeps it in place of the sign-in before, with the account chosen, the cookies YouTube
+    /// refreshed meanwhile, and the browser it came from (so a refusal can read it again).
     pub fn save(self, paths: &Paths) -> Result<()> {
+        // The browser it came from goes with the cookies, so a refusal can read them again.
+        self.client.api().set_browser(self.browser.clone());
         let text = self.client.api().sign_in_text().context("No cookies to keep")?;
         private_dir(paths)?;
         paths.ytmusic_cookies().write(text.as_bytes())
+    }
+
+    /// Re-reads the sign-in from `browser`, acting as the same account, and keeps it only when
+    /// YouTube still says it is `was`: a browser that went on using its sign-in has fresh
+    /// cookies for it, and the ones tunebox copied stopped working.
+    pub async fn refresh(
+        paths: &Paths,
+        browser: &mut Browser,
+        was: Option<&User>,
+        identity: Identity,
+    ) -> Result<Option<SignIn>> {
+        let found = match from_browser(paths, browser).await? {
+            Some(found) => found,
+            None => return Ok(None),
+        };
+        found.client.api().set_identity(identity);
+        let now = found.check().await.ok();
+        let same = match (&was, &now) {
+            // The channel or handle tells the accounts apart; the name alone doesn't.
+            (Some(was), Some(now)) => was.id == now.id || was.name == now.name,
+            _ => false,
+        };
+        if !same {
+            tracing::debug!("the sign-in from {} isn't the same account any more", browser.name);
+            return Ok(None);
+        }
+        Ok(Some(found))
     }
 }
 
@@ -241,7 +287,7 @@ pub async fn from_browser(paths: &Paths, browser: &mut Browser) -> Result<Option
         browser.spec = spec;
     }
     if signed_in(&jar) {
-        return SignIn::new(jar).map(Some);
+        return SignIn::new(jar, Some(browser.spec.clone())).map(Some);
     }
     // Cookies it couldn't decrypt may be the sign-in.
     if undecrypted(&stderr) {
@@ -316,7 +362,7 @@ fn reason(stderr: &str) -> String {
 pub fn from_cookie_header(header: &str) -> Result<SignIn> {
     let jar = Jar::from_header(header);
     innertube::check_jar(&jar)?;
-    SignIn::new(jar)
+    SignIn::new(jar, None)
 }
 
 /// Forgets the cookies; YouTube Music is signed out on the next start.
@@ -387,6 +433,19 @@ mod tests {
         let client = crate::YtMusic::new(&paths).unwrap();
         assert_eq!(client.api().identity(), Some(brand));
         assert_eq!(client.api().jar().unwrap().get("SAPISID"), Some("abc"));
+        fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn the_browser_a_sign_in_came_from_is_kept_with_it() {
+        let paths = paths("browser");
+        let jar = Jar::from_header("SAPISID=abc; LOGIN_INFO=def");
+        SignIn::new(jar, Some("firefox:/home/me/.mozilla/firefox".into())).unwrap().save(&paths).unwrap();
+        let client = crate::YtMusic::new(&paths).unwrap();
+        assert_eq!(client.api().browser().as_deref(), Some("firefox:/home/me/.mozilla/firefox"));
+        // A pasted one says nothing about where it came from, so nothing can read it again.
+        from_cookie_header("SAPISID=abc; LOGIN_INFO=def").unwrap().save(&paths).unwrap();
+        assert_eq!(crate::YtMusic::new(&paths).unwrap().api().browser(), None);
         fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
     }
 
