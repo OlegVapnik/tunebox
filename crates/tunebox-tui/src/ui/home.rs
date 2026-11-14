@@ -273,7 +273,7 @@ fn chips(
     chips: &[Chip],
     cursor: Option<usize>,
 ) -> (Vec<(Rect, Hit)>, u16) {
-    const GAP: u16 = 1;
+    const GAP: u16 = 2;
     let p = theme::palette();
     let widths: Vec<u16> = chips.iter().map(|c| c.title.width() as u16 + 2).collect();
     let right = area.x + room;
@@ -297,7 +297,7 @@ fn chips(
             (true, true) => Style::new().fg(p.bg).bg(accent).bold().underlined(),
             (true, false) => Style::new().fg(p.bg).bg(accent).bold(),
             (false, true) => Style::new().fg(p.text).bg(selection).bold(),
-            (false, false) => Style::new().fg(p.text).bg(p.raised),
+            (false, false) => Style::new().fg(p.muted).bg(p.unfocused),
         };
         buf.set_string(x, area.y, format!(" {} ", chip.title), style);
         hits.push((Rect::new(x, area.y, width, 1), Hit::HomeChip(index)));

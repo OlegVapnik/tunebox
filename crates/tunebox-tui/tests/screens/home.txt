@@ -2,14 +2,13 @@
 
    tunebox                      ‹     ⌂     ⌕  What do you want to play?                                       ◉  Sam
 
-
                                  │
    ⌂ Home       ⌕ Search         │ Good evening, Sam                                                                  ┃
    ≡ Queue      ⚙ Settings       │ Your Spotify · press S to switch services                                          ┃
                                  │                                                                                    ┃
    ≡  Your Library          ⤢    │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     ┃
                                  │ ▀▄▄▀▀▀  Liked Songs         ▀▄▄▀▀▀  Late Night Co…⡄⡇⡆   ▀▄▄▀▀▀  Random Access Mem… ┃
-   Playlists  Albums  Artists    │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     │
+   Playlists  Albums  Artists    │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     ┃
                                  │                                                                                    │
    ▄▄▄▄  Liked Songs           ┃ │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     │
    ▄▀▀▄  Playlist · 20 songs   ┃ │ ▀▄▄▀▀▀  Deep Focus          ▀▄▄▀▀▀  Tame Impala         ▀▄▄▀▀▀  Synthwave Drive    │
@@ -27,6 +26,7 @@
    ▀▀▀▀  Playlist · Sam        │ │   ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀          ▀ ▀  ▄▄▄ ▀ ▀ │
                                │ │   ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀            ▀ ▄▄▄▄▀▀ ▀   │
                                │ │ ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀         ▀ ▀ ▀▀▄▀▀▀  ▀  │
+                               │ │ ▀  ▀ ▀▀▀  ▀ ▀          ▀  ▀ ▀▀▀  ▀ ▀          ▀  ▀ ▀▀▀  ▀ ▀         ▀  ▀ ▀▀▀  ▀ ▀  │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ▀ ▀  ▀ ▀ ▀   Around the World  ✓               ⤨   ◂◂    ▌▌    ▸▸   ↻    ♫  Playlist · Late Night Coding
   ▀ ▀▀▄▄▄▀▀    Daft Punk · Homework                                                              ≡   ♪ ━━━━━━━━━━  69%

@@ -20,7 +20,7 @@ use crate::{
     views::View,
 };
 
-pub const HEIGHT: u16 = 5;
+pub const HEIGHT: u16 = 4;
 /// A square-ish button with its icon in the middle cell.
 const BUTTON_WIDTH: u16 = 5;
 /// The search field in a small window keeps this much room for its prompt before the update
@@ -157,7 +157,7 @@ fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: 
         let width = label.width() as u16 + 2 * padding;
         let area = Rect::new(x.saturating_sub(width), y, width, 1).intersection(buf.area);
         let style = if Some(service) == shown {
-            Style::new().fg(app.accent.color()).bold()
+            Style::new().fg(app.accent.color()).bold().underlined()
         } else if app.failed_to_start(service) {
             Style::new().fg(p.faint)
         } else {

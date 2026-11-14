@@ -2,7 +2,6 @@
 
    tunebox                      ‹     ⌂     ⌕  What do you want to play?                                       ◉  Sam
 
-
                                  │
    ⌂ Home       ⌕ Search         │  ▀ ▀    ▀ ▀  ▀
    ≡ Queue      ⚙ Settings       │  ▀  ▀ ▀▄▀  ▀ ▀   PLAYLIST
@@ -25,6 +24,7 @@
                                │ │   9  Dayvan Cowboy                           Boards of Canada                 5:00
    ▀▄▄▀  Sunday Morning        │ │  10  Eden                                    Hania Rani                       4:55
    ▀▀▀▀  Playlist · Sam        │ │
+                               │ │
                                │ │
                                │ │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

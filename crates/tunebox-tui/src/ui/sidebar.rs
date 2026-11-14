@@ -271,7 +271,12 @@ pub(super) fn describe(app: &App, entry: LibraryEntry) -> (String, String, Optio
         }
         LibraryEntry::Playlist(i) => {
             let p = &app.playlists[i];
-            (p.name.clone(), format!("Playlist · {}", p.owner_name), p.image_url.clone(), false)
+            let subtitle = if p.owner_name.is_empty() {
+                "Playlist".to_owned()
+            } else {
+                format!("Playlist · {}", p.owner_name)
+            };
+            (p.name.clone(), subtitle, p.image_url.clone(), false)
         }
         LibraryEntry::Album(i) => {
             let a = &app.albums[i];

@@ -16,6 +16,7 @@ type Hint = (&'static str, &'static str, Option<HintAction>);
 
 pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let p = theme::palette();
+    buf.set_style(area, Style::new().bg(p.bg));
     // Where the service has no other devices, there is nothing to switch to.
     let device = match (app.transferring_to(), &app.now.device, app.is_connected()) {
         _ if !app.supports_devices() => Span::raw(""),

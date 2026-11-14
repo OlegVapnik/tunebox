@@ -401,7 +401,7 @@ impl<'a> Summary<'a> {
             playing: false,
             meta: t.artists.join(", "),
             linked: &t.artists[..t.artist_uris.len().min(t.artists.len())],
-            album: Some((&t.album, !t.album_uri.is_empty())),
+            album: if t.album.is_empty() || t.album == t.name { None } else { Some((&t.album, !t.album_uri.is_empty())) },
             field: text::duration(t.duration_ms),
             icon: icons().note,
             image_url: t.image_url.as_deref(),

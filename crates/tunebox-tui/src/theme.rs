@@ -158,7 +158,7 @@ impl Accent {
     /// The selection background: a muted step between the pane and raised surfaces, so the
     /// accent bar and the bold name carry the focus rather than a wash of color.
     pub fn selection(&self) -> Color {
-        Rgb::of(palette().bg).mix(Rgb::of(palette().raised), 0.45).into()
+        Rgb::of(palette().bg).mix(Rgb::of(palette().raised), 0.25).into()
     }
 
     pub fn is_fading(&self) -> bool {

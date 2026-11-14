@@ -4,6 +4,14 @@ const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 /// Three thin bars drawn with braille dots, bouncing out of phase.
 const EQUALIZER: [&str; 8] = ["⡄⡇⡆", "⡆⡄⡇", "⡇⡆⡄", "⡆⡇⡆", "⡄⡆⡇", "⡇⡄⡆", "⡆⡇⡄", "⡄⡆⡆"];
 
+/// Drops zero-width and variation-selector characters (emoji joiners, combining marks) that
+/// terminals render at no width but `unicode-width` may count, so columns stay aligned.
+pub fn sanitize(text: &str) -> String {
+    text.chars()
+        .filter(|c| c.width().unwrap_or(0) != 0 || c.is_whitespace())
+        .collect()
+}
+
 /// Cuts `text` to `width` columns with an ellipsis, then pads it to exactly `width`.
 pub fn fit(text: &str, width: usize) -> String {
     let mut out = truncate(text, width);
@@ -15,6 +23,7 @@ pub fn fit(text: &str, width: usize) -> String {
 /// Splits `text` into at most two lines of `width` columns. The second line gets the
 /// ellipsis when the text overflows; the first never does, so a title can run on.
 pub fn wrap_two(text: &str, width: usize) -> (String, String) {
+    let text = sanitize(text);
     if text.width() <= width {
         return (text.to_owned(), String::new());
     }
@@ -39,8 +48,9 @@ pub fn wrap_two(text: &str, width: usize) -> (String, String) {
 }
 
 pub fn truncate(text: &str, width: usize) -> String {
+    let text = sanitize(text);
     if text.width() <= width {
-        return text.to_owned();
+        return text;
     }
     let mut out = String::new();
     let mut used = 0;

@@ -2,7 +2,6 @@
 
    tunebox                      ‹     ⌂     ⌕  daft                                                            ◉  Sam
 
-
                                  │
    ⌂ Home       ⌕ Search         │                                                                                    ┃
    ≡ Queue      ⚙ Settings       │ Songs                                                                              ┃
@@ -13,8 +12,8 @@
                                  │ ▀▄▄▀  One More Time                         Discovery                         5:20 ┃
    ▄▄▄▄  Liked Songs           ┃ │ ▀▀▀▀  Daft Punk                                                                    ┃
    ▄▀▀▄  Playlist · 20 songs   ┃ │                                                                                    ┃
-                               │ │ ▀▄▄▀  Fragments of Time (feat. Todd Edwar…  Random Access Memories            4:39 │
-   ▀▄▄▀  Late Night Coding ⡇⡆⡄ │ │ ▀▀▀▀  Daft Punk, Todd Edwards                                                      │
+                               │ │ ▀▄▄▀  Fragments of Time (feat. Todd Edwar…  Random Access Memories            4:39 ┃
+   ▀▄▄▀  Late Night Coding ⡇⡆⡄ │ │ ▀▀▀▀  Daft Punk, Todd Edwards                                                      ┃
    ▀▀▀▀  Playlist · Sam        │ │                                                                                    │
                                │ │ ▀▄▄▀  Da Funk                               Homework                          5:28 │
    ▀▄▄▀  Morning Run           │ │ ▀▀▀▀  Daft Punk                                                                    │
@@ -25,7 +24,8 @@
                                │ │ ▀▄▄▀  Give Life Back to Music               Random Access Memories            4:35 │
    ▀▄▄▀  Sunday Morning        │ │ ▀▀▀▀  Daft Punk                                                                    │
    ▀▀▀▀  Playlist · Sam        │ │                                                                                    │
-                               │ │                                                                                    │
+                               │ │ ▀▄▄▀  Beyond                                Random Access Memories            4:50 │
+                               │ │ ▀▀▀▀  Daft Punk                                                                    │
                                │ │                                                                                    │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ▀ ▀  ▀ ▀ ▀   Around the World  ✓               ⤨   ◂◂    ▌▌    ▸▸   ↻    ♫  Playlist · Late Night Coding
