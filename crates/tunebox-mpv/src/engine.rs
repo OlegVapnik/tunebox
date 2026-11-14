@@ -88,6 +88,7 @@ enum Command {
     ClearQueue,
     AddToQueue(String),
     SkipTo(String),
+    Prefetch(String),
     Shutdown,
 }
 
@@ -175,6 +176,12 @@ impl Player {
     /// Adds a song after the ones queued before.
     pub fn add_to_queue(&self, uri: &str) -> Result<()> {
         self.send(Command::AddToQueue(uri.to_owned()))
+    }
+
+    /// Resolves a track's stream ahead of time, so playing it later starts without waiting for
+    /// yt-dlp. Only single tracks are prefetched.
+    pub fn prefetch(&self, uri: &str) -> Result<()> {
+        self.send(Command::Prefetch(uri.to_owned()))
     }
 
     /// Jumps to an upcoming song.
@@ -419,6 +426,15 @@ impl Engine {
                     bail!("{uri} isn't coming up");
                 }
                 self.begin(0).await
+            }
+            Command::Prefetch(uri) => {
+                if self.source.is_track(&uri) {
+                    let key = self.source.key(&uri);
+                    if !self.streams.get(&key).is_some_and(Stream::fresh) && !self.resolving.contains(&key) {
+                        self.resolve(&key);
+                    }
+                }
+                Ok(())
             }
             Command::Shutdown => Ok(()),
         }

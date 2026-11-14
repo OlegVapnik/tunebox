@@ -319,6 +319,20 @@ impl Player {
         dispatch!(self, Player, player => player.add_to_queue(uri))
     }
 
+    /// Resolves a track's stream ahead of time, where the service plays through mpv.
+    pub fn prefetch_track(&self, uri: &str) -> Result<()> {
+        match self {
+            #[cfg(feature = "spotify")]
+            Player::Spotify(player) => player.prefetch(uri),
+            #[cfg(feature = "ytmusic")]
+            Player::YouTubeMusic(player) => player.prefetch(uri),
+            #[cfg(feature = "soundcloud")]
+            Player::SoundCloud(player) => player.prefetch(uri),
+            #[cfg(test)]
+            Player::Fake(_) => Ok(()),
+        }
+    }
+
     pub fn shutdown(&self) {
         dispatch!(self, Player, player => player.shutdown())
     }

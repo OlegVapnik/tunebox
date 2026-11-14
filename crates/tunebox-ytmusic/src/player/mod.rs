@@ -102,6 +102,10 @@ impl Player {
         self.inner.add_to_queue(uri)
     }
 
+    pub fn prefetch(&self, uri: &str) -> Result<()> {
+        self.inner.prefetch(uri)
+    }
+
     /// Jumps to an upcoming song.
     pub fn skip_to(&self, uri: &str) -> Result<()> {
         self.inner.skip_to(uri)

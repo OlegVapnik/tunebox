@@ -571,6 +571,8 @@ pub struct App {
     pub terminal_out: Vec<String>,
     /// Covers the frame being drawn will likely show soon; see [`App::prefetch`].
     prefetch: Vec<(String, Size, bool)>,
+    /// Last track whose stream was prefetched on hover, and when, for the debounce.
+    track_prefetch: Option<(String, Instant)>,
     /// Known library state per URI: liked songs, saved albums, followed playlists.
     pub saved: HashMap<String, bool>,
     /// Library changes not sent yet: wanted state, item name, time of the last toggle.
@@ -738,6 +740,7 @@ impl App {
             frame_started: Instant::now(),
             terminal_out: Vec::new(),
             prefetch: Vec::new(),
+            track_prefetch: None,
             saved: HashMap::new(),
             pending_saves: HashMap::new(),
             saving: HashSet::new(),
@@ -2469,6 +2472,47 @@ impl App {
         self.hovered = self.mouse.and_then(|position| self.hit_at(position)).filter(Hit::is_interactive);
     }
 
+    /// The track URI the mouse is currently over, if any: for hover prefetching.
+    pub fn hovered_track_uri(&self) -> Option<String> {
+        let hit = self.hovered?;
+        match hit {
+            Hit::Row(index) => match &self.view {
+                View::Tracks(v) => v.tracks.get(index).map(|t| t.uri.clone()),
+                View::Search(v) => match v.entries.get(index) {
+                    Some(SearchEntry::Track(t)) => Some(t.uri.clone()),
+                    _ => None,
+                },
+                View::Queue(v) => match v.rows.get(index) {
+                    Some(QueueRow::Playing(t) | QueueRow::Next { track: t, .. }) => Some(t.uri.clone()),
+                    _ => None,
+                },
+                View::Artist(v) => {
+                    let page = v.page.as_ref()?;
+                    if index < page.top_tracks.len() {
+                        Some(page.top_tracks[index].track.uri.clone())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            },
+            Hit::Card { shelf, item } => match &self.view {
+                View::Home(v) => {
+                    let home = v.home.as_ref()?;
+                    let shelf = home.shelves.get(shelf)?;
+                    shelf.items.get(item).map(|i| i.uri.clone())
+                }
+                View::Artist(v) => {
+                    let page = v.page.as_ref()?;
+                    let shelf = page.shelves.get(shelf)?;
+                    shelf.items.get(item).map(|i| i.uri.clone())
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Moves the cursor to a clicked row, card or sidebar entry.
     fn select(&mut self, hit: Hit) {
         match hit {
@@ -3282,6 +3326,19 @@ impl App {
             self.loader.prefetch_image(key, url, size, round);
         }
         self.prefetch = queue;
+
+        // Prefetch the stream of the track under the mouse, so playing it later starts without
+        // waiting for yt-dlp. Debounced, so a resting cursor doesn't hammer the service.
+        if let Some(uri) = self.hovered_track_uri()
+            && self.player().is_some()
+            && backend::is_playable(&uri)
+            && self.track_prefetch.as_ref().map_or(true, |(last, when)| last != &uri || when.elapsed() >= Duration::from_millis(300))
+        {
+            if let Some(player) = self.player() {
+                let _ = player.prefetch_track(&uri);
+            }
+            self.track_prefetch = Some((uri, Instant::now()));
+        }
     }
 
     /// Asks for a cover that is likely shown soon, such as the next page of a shelf, so it is

@@ -2,6 +2,9 @@
 //! runtime can solve, which yt-dlp does (with deno). A URL is good for about six hours.
 
 use std::{
+    collections::hash_map::DefaultHasher,
+    fs,
+    hash::{Hash, Hasher},
     path::PathBuf,
     process::Stdio,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -49,10 +52,21 @@ impl Stream {
 
 /// Resolves the best audio stream at `target`, which is a page, a search (`ytsearch1:…`) or
 /// another yt-dlp input. `service` names it in the error when yt-dlp is missing.
+///
+/// A disk cache (under `cache_dir/stream-cache`) keeps resolved URLs around so a song that
+/// played before doesn't cost another yt-dlp run; entries expire with the URL.
 pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) -> Result<Stream> {
+    // Try the disk cache first.
+    if let Some(dir) = &cache_dir
+        && let Some(stream) = read_cache(dir, target)
+    {
+        tracing::debug!("resolved {target} from disk cache");
+        return Ok(stream);
+    }
+
     let mut command = Command::new("yt-dlp");
-    command.args(["--no-config", "--no-playlist", "--no-warnings", "--quiet", "-f", "bestaudio/best", "-g"]);
-    if let Some(dir) = cache_dir {
+    command.args(["--no-config", "--no-playlist", "--no-warnings", "--quiet", "--no-progress", "-f", "bestaudio/best", "-g"]);
+    if let Some(dir) = &cache_dir {
         command.arg("--cache-dir").arg(dir);
     }
     command.arg(target).stdin(Stdio::null()).kill_on_drop(true);
@@ -67,7 +81,13 @@ pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) ->
     let stdout = String::from_utf8_lossy(&output.stdout);
     let url = stdout.lines().find(|line| line.starts_with("http"));
     match url {
-        Some(url) if output.status.success() => Ok(Stream { url: url.to_owned(), until: valid_until(url) }),
+        Some(url) if output.status.success() => {
+            let stream = Stream { url: url.to_owned(), until: valid_until(url) };
+            if let Some(dir) = &cache_dir {
+                write_cache(dir, target, &stream);
+            }
+            Ok(stream)
+        }
         _ => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if is_bot_check(&stderr) {
@@ -77,6 +97,43 @@ pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) ->
             bail!("{}", reason.strip_prefix("ERROR: ").unwrap_or(reason))
         }
     }
+}
+
+/// Where a cached stream for `target` lives.
+fn cache_path(dir: &PathBuf, target: &str) -> PathBuf {
+    let mut hasher = DefaultHasher::new();
+    target.hash(&mut hasher);
+    dir.join("stream-cache").join(format!("{:016x}.json", hasher.finish()))
+}
+
+/// Reads a still-fresh stream for `target` from disk, if any.
+fn read_cache(dir: &PathBuf, target: &str) -> Option<Stream> {
+    let path = cache_path(dir, target);
+    let data = fs::read_to_string(&path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&data).ok()?;
+    let url = value.get("url")?.as_str()?.to_owned();
+    let until_epoch = value.get("until")?.as_u64()?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    // Keep a small margin so a URL that is about to expire isn't handed out.
+    if until_epoch <= now + 60 {
+        let _ = fs::remove_file(&path);
+        return None;
+    }
+    Some(Stream { url, until: Instant::now() + Duration::from_secs(until_epoch - now) })
+}
+
+/// Writes a resolved stream to disk so the next run can skip yt-dlp.
+fn write_cache(dir: &PathBuf, target: &str, stream: &Stream) {
+    let path = cache_path(dir, target);
+    if fs::create_dir_all(path.parent().unwrap_or(dir)).is_err() {
+        return;
+    }
+    let until_epoch = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+        + stream.until.saturating_duration_since(Instant::now()).as_secs();
+    let value = serde_json::json!({ "url": stream.url, "until": until_epoch });
+    let _ = fs::write(&path, value.to_string());
 }
 
 /// Whether yt-dlp failed on YouTube's "Sign in to confirm you're not a bot".

@@ -210,6 +210,13 @@ impl Controller {
         }
     }
 
+    pub fn prefetch(&self, uri: &str) -> Result<()> {
+        match self {
+            Self::Premium(_) => Ok(()),
+            Self::Free(player) => player.prefetch(uri),
+        }
+    }
+
     pub fn next_segment(&self) -> Result<()> {
         match self {
             Self::Premium(player) => player.next_segment(),

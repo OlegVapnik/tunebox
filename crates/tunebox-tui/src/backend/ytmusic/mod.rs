@@ -127,6 +127,10 @@ impl Controller {
         self.0.add_to_queue(uri)
     }
 
+    pub fn prefetch(&self, uri: &str) -> Result<()> {
+        self.0.prefetch(uri)
+    }
+
     /// The queue is tunebox's own, so the player jumps there itself.
     pub fn skip_to(&self, uri: &str) -> Result<bool> {
         self.0.skip_to(uri).map(|()| true)
