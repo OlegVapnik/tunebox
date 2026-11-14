@@ -317,7 +317,7 @@ fn diff(saved: &str, screen: &str) -> String {
 mod pictures {
     use std::time::Duration;
 
-    use crossterm::event::KeyCode::{Char, Down, Enter};
+    use crossterm::event::KeyCode::{Char, Down, Enter, Esc};
 
     use super::Harness;
 
@@ -335,6 +335,8 @@ mod pictures {
         library.type_text("daft").await;
         library.wait(Duration::from_millis(400)).await;
         library.shot("search");
+        // Leave the search field, or the next letters would be typed into it.
+        library.press(Esc).await;
         library.press(Char('Q')).await.wait(Duration::from_millis(600)).await;
         library.shot("queue");
         library.press(Char('z')).await.wait(Duration::from_millis(600)).await;

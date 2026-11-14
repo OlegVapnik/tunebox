@@ -313,6 +313,12 @@ fn search(
 
 /// Draws the queue page and returns how many rows fit on a page. Laid out like the search
 /// results, so a song looks the same in both. Thumbnails are left in `thumbs` for the caller.
+/// How long a queue runs, in hours and minutes: `1 hr 34 min`.
+fn queue_length(total_ms: u64) -> String {
+    let minutes = (total_ms / 60_000).max(1);
+    if minutes >= 60 { format!("{} hr {} min", minutes / 60, minutes % 60) } else { format!("{minutes} min") }
+}
+
 fn queue(
     buf: &mut Buffer,
     view: &mut QueueView,
@@ -323,6 +329,15 @@ fn queue(
 ) -> usize {
     let p = theme::palette();
     buf.set_string(area.x, area.y, "Queue", Style::new().fg(p.text).bold());
+    // A quiet count on the right says how long the queue is before it is read.
+    let songs: Vec<&Track> = view.rows.iter().filter_map(QueueRow::track).collect();
+    if !songs.is_empty() {
+        let total: u64 = songs.iter().map(|t| u64::from(t.duration_ms)).sum();
+        let count = if songs.len() == 1 { "1 song".to_owned() } else { format!("{} songs", songs.len()) };
+        let caption = format!("{count} · {}", queue_length(total));
+        let x = area.right().saturating_sub(caption.width() as u16);
+        buf.set_string(x, area.y, caption, Style::new().fg(p.faint));
+    }
     // A blank row under the page title; with thumbnails, section titles bring another one, as
     // they do between sections.
     let list = Rect { y: area.y + 2, height: area.height.saturating_sub(2), ..area };
@@ -336,14 +351,24 @@ fn queue(
 
     view.entry_rows = grid.rows;
     let fitting = (list.height / grid.rows) as usize;
-    let visible = view.list.visible(fitting, view.rows.len());
+    let mut visible = view.list.visible(fitting, view.rows.len());
+    // A section title on the last visible row has none of its songs in view, so it would read
+    // as a stray heading; leave it for the next scroll.
+    if visible.len() > 1 && matches!(view.rows.get(visible.end - 1), Some(QueueRow::Header(_))) {
+        visible.end -= 1;
+    }
     let shown = visible.len();
     for (slot, index) in visible.enumerate() {
         let y = list.y + slot as u16 * grid.rows;
         let (track, playing) = match &view.rows[index] {
             QueueRow::Header(title) => {
                 let y = if grid.thumbnails { y + 1 } else { y };
-                buf.set_string(list.x, y, text::truncate(title, list.width as usize), Style::new().fg(p.text).bold());
+                let label = text::truncate(&title.to_uppercase(), list.width as usize);
+                buf.set_string(list.x, y, &label, Style::new().fg(p.faint).bold());
+                let rule_x = list.x + label.width() as u16 + 2;
+                if rule_x < list.right() {
+                    buf.set_string(rule_x, y, "─".repeat((list.right() - rule_x) as usize), Style::new().fg(p.raised));
+                }
                 continue;
             }
             QueueRow::Playing(track) => (track, true),

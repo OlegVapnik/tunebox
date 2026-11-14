@@ -67,7 +67,7 @@ async fn the_demo_says_it_plays_nothing() {
 async fn the_queue_page_lists_what_plays_next() {
     let mut h = Harness::demo().await;
     h.press(Char('Q')).await;
-    let (now, next) = (h.find("Now playing").unwrap(), h.find("Next in queue").unwrap());
+    let (now, next) = (h.find("NOW PLAYING").unwrap(), h.find("NEXT IN QUEUE").unwrap());
     let (playing, queued) = (h.find("Around the World  ").unwrap(), h.find("Digital Love").unwrap());
     assert!(now.1 < playing.1 && playing.1 < next.1 && next.1 < queued.1, "{}", h.screen());
 }

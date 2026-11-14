@@ -2488,11 +2488,7 @@ impl App {
                 },
                 View::Artist(v) => {
                     let page = v.page.as_ref()?;
-                    if index < page.top_tracks.len() {
-                        Some(page.top_tracks[index].track.uri.clone())
-                    } else {
-                        None
-                    }
+                    if index < page.top_tracks.len() { Some(page.top_tracks[index].track.uri.clone()) } else { None }
                 }
                 _ => None,
             },
@@ -3332,7 +3328,10 @@ impl App {
         if let Some(uri) = self.hovered_track_uri()
             && self.player().is_some()
             && backend::is_playable(&uri)
-            && self.track_prefetch.as_ref().map_or(true, |(last, when)| last != &uri || when.elapsed() >= Duration::from_millis(300))
+            && self
+                .track_prefetch
+                .as_ref()
+                .map_or(true, |(last, when)| last != &uri || when.elapsed() >= Duration::from_millis(300))
         {
             if let Some(player) = self.player() {
                 let _ = player.prefetch_track(&uri);
