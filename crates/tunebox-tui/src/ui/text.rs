@@ -12,6 +12,32 @@ pub fn fit(text: &str, width: usize) -> String {
     out
 }
 
+/// Splits `text` into at most two lines of `width` columns. The second line gets the
+/// ellipsis when the text overflows; the first never does, so a title can run on.
+pub fn wrap_two(text: &str, width: usize) -> (String, String) {
+    if text.width() <= width {
+        return (text.to_owned(), String::new());
+    }
+    let mut first = String::new();
+    let mut used = 0;
+    let mut rest_start = 0;
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let w = chars[i].width().unwrap_or(0);
+        if used + w > width {
+            break;
+        }
+        first.push(chars[i]);
+        used += w;
+        i += 1;
+        rest_start = i;
+    }
+    let rest: String = chars[rest_start..].iter().collect();
+    let second = truncate(&rest, width);
+    (first, second)
+}
+
 pub fn truncate(text: &str, width: usize) -> String {
     if text.width() <= width {
         return text.to_owned();

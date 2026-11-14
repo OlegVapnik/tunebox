@@ -9,7 +9,7 @@
                                  │                                                                                    ┃
    ≡  Your Library          ⤢    │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     ┃
                                  │ ▀▄▄▀▀▀  Liked Songs         ▀▄▄▀▀▀  Late Night Co…⡄⡇⡆   ▀▄▄▀▀▀  Random Access Mem… ┃
-   Playlists  Albums  Artists    │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     ┃
+   Playlists  Albums  Artists    │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     │
                                  │                                                                                    │
    ▄▄▄▄  Liked Songs           ┃ │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     │
    ▄▀▀▄  Playlist · 20 songs   ┃ │ ▀▄▄▀▀▀  Deep Focus          ▀▄▄▀▀▀  Tame Impala         ▀▄▄▀▀▀  Synthwave Drive    │

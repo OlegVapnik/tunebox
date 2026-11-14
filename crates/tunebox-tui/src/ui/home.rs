@@ -20,7 +20,7 @@ use crate::{
 const COVER: Size = Size { width: 14, height: 7 };
 const CARD_GAP: u16 = 4;
 /// Title, gap, cover, two text lines and spacing below.
-pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 2 + 3;
+pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 3 + 3;
 const TILE_COVER: Size = Size { width: 6, height: 3 };
 const TILE_GAP: u16 = 2;
 /// A song's cover in a shelf of songs, as in the sidebar.
@@ -383,7 +383,7 @@ pub(super) fn draw_shelf(
             if let Some(card) = card {
                 frame.buffer_mut().set_style(card, Style::new().bg(selection));
             }
-            selection_bar(frame, area, x.saturating_sub(1), cover_y, COVER.height, accent);
+            selection_bar(frame, area, x.saturating_sub(1), cover_y - 1, COVER.height + 4, accent);
         }
         draw_cover(frame, app, (x, cover_y), area, item, COVER);
         let buf = frame.buffer_mut();
@@ -391,16 +391,25 @@ pub(super) fn draw_shelf(
         let title_style = card_title_style(accent, playing, is_selected);
         let width = COVER.width as usize;
         let text_y = cover_y + COVER.height as i32;
+        let title_width = if playing { width.saturating_sub(4) } else { width };
+        let (first, second) = text::wrap_two(&item.title, title_width);
         if let Some(y) = row(area, text_y) {
-            let title_width = if playing { width - 4 } else { width };
-            buf.set_string(x, y, text::truncate(&item.title, title_width), title_style);
-            // Below the cover, so it never lands on image cells.
+            buf.set_string(x, y, &first, title_style);
             if playing {
                 buf.set_string(x + COVER.width - 3, y, marker, Style::new().fg(accent));
             }
         }
         if let Some(y) = row(area, text_y + 1) {
-            buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
+            if second.is_empty() {
+                buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
+            } else {
+                buf.set_string(x, y, &second, title_style);
+            }
+        }
+        if let Some(y) = row(area, text_y + 2) {
+            if !second.is_empty() {
+                buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
+            }
         }
         if let Some(card) = card {
             app.hits.push((card, Hit::Card { shelf: layout.index, item: index }));
@@ -409,7 +418,7 @@ pub(super) fn draw_shelf(
                 && let Some(y) = row(area, button_y)
             {
                 let hit = Hit::CardPlay { shelf: layout.index, item: index };
-                super::play_button(frame.buffer_mut(), app, x + COVER.width, y, hit, true);
+                super::play_button(frame.buffer_mut(), app, x + COVER.width - 1, y.saturating_sub(1), hit, true);
             }
         }
     }
