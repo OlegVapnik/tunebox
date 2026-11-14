@@ -7,9 +7,7 @@ const EQUALIZER: [&str; 8] = ["⡄⡇⡆", "⡆⡄⡇", "⡇⡆⡄", "⡆⡇⡆"
 /// Drops zero-width and variation-selector characters (emoji joiners, combining marks) that
 /// terminals render at no width but `unicode-width` may count, so columns stay aligned.
 pub fn sanitize(text: &str) -> String {
-    text.chars()
-        .filter(|c| c.width().unwrap_or(0) != 0 || c.is_whitespace())
-        .collect()
+    text.chars().filter(|c| c.width().unwrap_or(0) != 0 || c.is_whitespace()).collect()
 }
 
 /// Cuts `text` to `width` columns with an ellipsis, then pads it to exactly `width`.

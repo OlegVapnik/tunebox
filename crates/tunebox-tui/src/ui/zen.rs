@@ -95,7 +95,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_cover(frame: &mut Frame, app: &mut App, area: Rect) {
-    let p = theme::palette();
+    let name = app.now.track.as_ref().map(|t| t.name.clone()).unwrap_or_default();
     app.zen_cover_want = Some(Size::new(area.width, area.height));
     let url = app.now.track.as_ref().and_then(|t| t.cover_url_large.as_deref());
     let placed = match &app.zen_cover {
@@ -106,8 +106,9 @@ fn draw_cover(frame: &mut Frame, app: &mut App, area: Rect) {
         Some(placement) => app.placements.extend(placement),
         None => {
             let buf = frame.buffer_mut();
-            buf.set_style(area, Style::new().bg(p.raised));
-            buf.set_string(area.x + area.width / 2, area.y + area.height / 2, icons().note, Style::new().fg(p.faint));
+            // A designed placeholder instead of a stray note icon, consistent with every
+            // other cover slot in the app.
+            super::placeholder(buf, area, &name, false);
         }
     }
     app.hits.push((area, Hit::Cover));

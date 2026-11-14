@@ -51,7 +51,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         // portrait, the name beside it and the status where the stats will be.
         let buf = frame.buffer_mut();
         let portrait = Rect::new(inner.x, inner.y, PORTRAIT.width, PORTRAIT.height).intersection(inner);
-        buf.set_style(portrait, Style::new().bg(p.raised));
+        super::placeholder(buf, portrait, &view.name, true);
         let text_x = inner.x + PORTRAIT.width + 3;
         let width = inner.right().saturating_sub(text_x) as usize;
         let status = match &view.error {
@@ -142,7 +142,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         if !super::cover_in(frame, app, header.1.as_deref(), PORTRAIT, true, slot, PORTRAIT, inner) {
             let rows = (header_y + PORTRAIT.height as i32 - inner.y as i32).min(PORTRAIT.height as i32) as u16;
             let top = header_y.max(inner.y as i32) as u16;
-            frame.buffer_mut().set_style(Rect::new(inner.x, top, PORTRAIT.width, rows), Style::new().bg(p.raised));
+            super::placeholder(frame.buffer_mut(), Rect::new(inner.x, top, PORTRAIT.width, rows), &header.0, true);
         }
         let text_x = inner.x + PORTRAIT.width + 3;
         let width = inner.right().saturating_sub(text_x) as usize;
