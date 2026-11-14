@@ -22,27 +22,28 @@ pub fn fit(text: &str, width: usize) -> String {
 /// ellipsis when the text overflows; the first never does, so a title can run on.
 pub fn wrap_two(text: &str, width: usize) -> (String, String) {
     let text = sanitize(text);
-    if text.width() <= width {
+    if text.width() <= width || width == 0 {
         return (text.to_owned(), String::new());
     }
-    let mut first = String::new();
-    let mut used = 0;
-    let mut rest_start = 0;
+    // Break after the last space that fits, so words stay whole; a single word wider than the
+    // line is cut.
     let chars: Vec<char> = text.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let w = chars[i].width().unwrap_or(0);
+    let (mut used, mut fit, mut space) = (0usize, 0usize, None);
+    for (i, c) in chars.iter().enumerate() {
+        let w = c.width().unwrap_or(0);
         if used + w > width {
             break;
         }
-        first.push(chars[i]);
         used += w;
-        i += 1;
-        rest_start = i;
+        fit = i + 1;
+        if *c == ' ' {
+            space = Some(i);
+        }
     }
-    let rest: String = chars[rest_start..].iter().collect();
-    let second = truncate(&rest, width);
-    (first, second)
+    let split = space.filter(|&s| s > 0).unwrap_or(fit);
+    let first: String = chars[..split].iter().collect();
+    let rest: String = chars[split..].iter().collect();
+    (first.trim_end().to_owned(), truncate(rest.trim_start(), width))
 }
 
 pub fn truncate(text: &str, width: usize) -> String {
@@ -109,4 +110,27 @@ pub fn spinner(frame: u64) -> &'static str {
 
 pub fn equalizer(frame: u64) -> &'static str {
     EQUALIZER[frame as usize % EQUALIZER.len()]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wrap_two_keeps_words_whole() {
+        assert_eq!(wrap_two("popular English songs from tiktok", 14), ("popular".into(), "English songs…".into()));
+        assert_eq!(wrap_two("Whit Girl Hardstyle (Hards…)", 14).0, "Whit Girl");
+    }
+
+    #[test]
+    fn wrap_two_cuts_a_word_wider_than_the_line() {
+        let (first, second) = wrap_two("Hardstyledubstep", 10);
+        assert_eq!(first, "Hardstyled");
+        assert_eq!(second, "ubstep");
+    }
+
+    #[test]
+    fn wrap_two_leaves_a_short_title_on_one_line() {
+        assert_eq!(wrap_two("Deep Focus", 14), ("Deep Focus".into(), String::new()));
+    }
 }

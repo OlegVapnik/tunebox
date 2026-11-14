@@ -131,19 +131,19 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     for (index, &entry) in entries.iter().enumerate().take(last).skip(first) {
         let x = home::card_x(grid.x, grid.width, columns, index % columns);
         let y = row_y(index);
-        let card = home::clip(clip, x.saturating_sub(1), COVER.width + 2, y - 1, COVER.height + 4);
+        let card = home::clip(clip, x.saturating_sub(1), COVER.width + 2, y, COVER.height + 2);
         let selected = index == cursor;
         if selected {
             if let Some(card) = card {
                 frame.buffer_mut().set_style(card, Style::new().bg(selection));
             }
-            home::selection_bar(frame, grid, x.saturating_sub(1), y, COVER.height, accent);
+            home::selection_bar(frame, grid, x.saturating_sub(1), y, COVER.height + 2, accent);
         }
         let (title, subtitle, image_url, round) = sidebar::describe(app, entry);
         if !super::cover_in(frame, app, image_url.as_deref(), COVER, round, (x, y), COVER, grid)
             && let Some(part) = home::clip(grid, x, COVER.width, y, COVER.height)
         {
-            frame.buffer_mut().set_style(part, Style::new().bg(p.raised));
+            super::placeholder(frame.buffer_mut(), part, &title, round);
         }
         let playing = is_playing(app, entry);
         let title_style = home::card_title_style(accent, playing, selected);

@@ -314,11 +314,6 @@ fn search(
 /// Draws the queue page and returns how many rows fit on a page. Laid out like the search
 /// results, so a song looks the same in both. Thumbnails are left in `thumbs` for the caller.
 /// How long a queue runs, in hours and minutes: `1 hr 34 min`.
-fn queue_length(total_ms: u64) -> String {
-    let minutes = (total_ms / 60_000).max(1);
-    if minutes >= 60 { format!("{} hr {} min", minutes / 60, minutes % 60) } else { format!("{minutes} min") }
-}
-
 fn queue(
     buf: &mut Buffer,
     view: &mut QueueView,
@@ -334,7 +329,7 @@ fn queue(
     if !songs.is_empty() {
         let total: u64 = songs.iter().map(|t| u64::from(t.duration_ms)).sum();
         let count = if songs.len() == 1 { "1 song".to_owned() } else { format!("{} songs", songs.len()) };
-        let caption = format!("{count} · {}", queue_length(total));
+        let caption = format!("{count} · {}", text::total_duration(total));
         let x = area.right().saturating_sub(caption.width() as u16);
         buf.set_string(x, area.y, caption, Style::new().fg(p.faint));
     }

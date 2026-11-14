@@ -378,12 +378,13 @@ pub(super) fn draw_shelf(
         let x = card_x(area.x, area.width, slots, column);
         let index = layout.first + column;
         let is_selected = selected == Some(index);
-        let card = clip(padded, x.saturating_sub(1), COVER.width + 2, cover_y - 1, COVER.height + 4);
+        // The card's box is its cover and the three text rows under it.
+        let card = clip(padded, x.saturating_sub(1), COVER.width + 2, cover_y, COVER.height + 3);
         if is_selected {
             if let Some(card) = card {
                 frame.buffer_mut().set_style(card, Style::new().bg(selection));
             }
-            selection_bar(frame, area, x.saturating_sub(1), cover_y - 1, COVER.height + 4, accent);
+            selection_bar(frame, area, x.saturating_sub(1), cover_y, COVER.height + 3, accent);
         }
         draw_cover(frame, app, (x, cover_y), area, item, COVER);
         let buf = frame.buffer_mut();
@@ -400,16 +401,13 @@ pub(super) fn draw_shelf(
             }
         }
         if let Some(y) = row(area, text_y + 1) {
-            if second.is_empty() {
-                buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
-            } else {
+            if !second.is_empty() {
                 buf.set_string(x, y, &second, title_style);
             }
         }
+        // Every card keeps its subtitle on the same row, whether its title took one line or two.
         if let Some(y) = row(area, text_y + 2) {
-            if !second.is_empty() {
-                buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
-            }
+            buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
         }
         if let Some(card) = card {
             app.hits.push((card, Hit::Card { shelf: layout.index, item: index }));

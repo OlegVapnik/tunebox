@@ -3295,9 +3295,10 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// A cover, or the drawn placeholder for items without one. Nothing with cover art off.
+    /// A cover, or nothing for an item without one: the views draw the gradient placeholder
+    /// themselves, from the item's name.
     pub fn cover(&mut self, url: Option<&str>, size: Size, round: bool) -> Option<&Picture> {
-        self.image(url.unwrap_or(crate::art::PLACEHOLDER_COVER), size, round)
+        self.image(url?, size, round)
     }
 
     /// Starts drawing a frame.
@@ -3346,7 +3347,7 @@ impl App {
         if !self.prefs.covers {
             return;
         }
-        let url = url.unwrap_or(crate::art::PLACEHOLDER_COVER);
+        let Some(url) = url else { return };
         self.prefetch.push((url.to_owned(), size, round));
     }
 
