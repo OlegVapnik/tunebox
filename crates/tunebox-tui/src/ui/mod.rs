@@ -47,6 +47,9 @@ const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let p = theme::palette();
     app.begin_frame();
+    // Stale glyphs (inline image placeholders, previous frames' text) must not survive:
+    // set_style only changes colors, so a cell's symbol would otherwise linger.
+    frame.buffer_mut().reset();
     let area = frame.area();
     app.screen = area;
     app.hits.clear();
@@ -211,10 +214,9 @@ pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool)
         // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
         // placeholder then has the same silhouette as a masked image.
         let height = area.height as usize;
-        let depth = if round { 2 } else { 1 };
-        let edge = (row < depth || row + depth >= height) && height > 2 * depth;
+        let (depth, inset) = if round { (2usize, 2u16) } else { (0usize, 0u16) };
+        let edge = depth > 0 && (row < depth || row + depth >= height) && height > 2 * depth;
         if edge && band.width > 4 {
-            let inset = if round { 2 } else { 1 };
             band = Rect::new(band.x + inset, y, band.width - 2 * inset, 1);
         }
         buf.set_style(band, Style::new().bg(shade.into()));
@@ -379,6 +381,15 @@ fn hover(buf: &mut Buffer, app: &App) {
     // Only the topmost target counts: an overlay's body hides the rows and cards under it.
     let Some((area, hit)) = app.hits.iter().rev().find(|(area, _)| area.contains(position)) else { return };
     if !hit.is_interactive() {
+        return;
+    }
+    // A card that is already selected shows its selection wash; tinting it again for the
+    // hovering mouse makes two highlights, so leave it alone.
+    if let (Hit::Card { shelf, item }, View::Home(view)) = (hit, &app.view)
+        && view.chip.is_none()
+        && view.shelf == *shelf
+        && view.item == *item
+    {
         return;
     }
     if let Hit::Link(_) = hit {
