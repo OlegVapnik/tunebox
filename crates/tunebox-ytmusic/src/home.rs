@@ -18,6 +18,9 @@ const MAX_PAGES: usize = 5;
 /// The chip of podcasts, which tunebox can't play on YouTube Music. Titles are English, since
 /// tunebox asks for English.
 const PODCASTS: &str = "Podcasts";
+/// The order of the mood chips, so their places stay put between visits; chips not named here
+/// follow in whatever order the service sent them.
+const CHIP_ORDER: &[&str] = &["Energize", "Relax", "Workout", "Commute", "Focus", "Party", "Sleep"];
 
 /// Home, or the Home of the chip with this ID.
 pub(crate) async fn home(api: &InnerTube, chip: Option<&str>) -> Result<Home> {
@@ -51,7 +54,7 @@ pub(crate) async fn home(api: &InnerTube, chip: Option<&str>) -> Result<Home> {
 /// The chips above Home's shelves; `asked` is the ID of the chip Home was asked for.
 fn parse_chips(sections: &Value, asked: Option<&str>) -> Vec<Chip> {
     let chips = sections.pointer("/header/chipCloudRenderer/chips").unwrap_or(&Value::Null);
-    list(chips)
+    let mut chips: Vec<Chip> = list(chips)
         .iter()
         .filter_map(|chip| {
             let chip = chip.get("chipCloudChipRenderer")?;
@@ -60,7 +63,9 @@ fn parse_chips(sections: &Value, asked: Option<&str>) -> Vec<Chip> {
             let selected = chip["isSelected"] == true || asked == Some(id.as_str());
             (!title.is_empty() && title != PODCASTS).then_some(Chip { title, id, selected })
         })
-        .collect()
+        .collect();
+    chips.sort_by_key(|chip| CHIP_ORDER.iter().position(|&title| title == chip.title).unwrap_or(CHIP_ORDER.len()));
+    chips
 }
 
 /// The shelves of a section list; ones with nothing tunebox can show are left out.
@@ -145,11 +150,15 @@ mod tests {
         let sections = find(&page, "sectionListRenderer").unwrap();
         let chips = parse_chips(sections, None);
         let titles: Vec<_> = chips.iter().map(|c| c.title.as_str()).collect();
-        assert_eq!(titles, ["Workout", "Relax"], "tunebox can't play podcasts on YouTube Music");
+        assert_eq!(
+            titles,
+            ["Relax", "Workout"],
+            "tunebox can't play podcasts on YouTube Music, and known chips keep their order"
+        );
         assert!(chips.iter().all(|c| !c.selected && c.id.starts_with("ggN")));
 
-        let relax = parse_chips(sections, Some(&chips[1].id));
-        assert!(relax[1].selected && !relax[0].selected, "the chip asked for is the selected one");
+        let relax = parse_chips(sections, Some(&chips[0].id));
+        assert!(relax[0].selected && !relax[1].selected, "the chip asked for is the selected one");
     }
 
     #[test]

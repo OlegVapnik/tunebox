@@ -19,14 +19,14 @@
          YouTube Music Album     │                                                                                    ┃
     Y    Album · YouTube Music…  │       YouTube Music Song 4                       YouTube Music Mix Song 3          ┃
                                  │  Y    YouTube Music Band                    Y    YouTube Music Band                ┃
-                                 │                                                                                    │
-                                 │                                                                                    │
+                                 │                                                                                    ┃
                                  │                                                                                    │
                                  │ MADE FOR YOU                                                                       │
                                  │ For you                                                                            │
                                  │                                                                                    │
                                  │                                                                                    │
                                  │       Y                      Y                                                     │
+                                 │                                                                                    │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                Nothing playing
                Pick a song and press ↵

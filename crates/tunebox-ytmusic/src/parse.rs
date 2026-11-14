@@ -392,7 +392,7 @@ pub(crate) fn home_item(item: &Value) -> Option<HomeItem> {
     {
         // A row of songs only: what the row says under the title, e.g. "Artist • Album".
         let mut item = song_item(&track);
-        let below = below_title(row);
+        let below = below_title(row, &item.title);
         if !below.is_empty() {
             item.subtitle = below;
         }
@@ -402,15 +402,25 @@ pub(crate) fn home_item(item: &Value) -> Option<HomeItem> {
     let columns = flex_columns(row);
     let title: String = columns.first()?.iter().filter_map(|r| r["text"].as_str()).collect();
     let byline = Byline::parse(columns.iter().skip(1).copied());
-    let subtitle = below_title(row);
+    let subtitle = below_title(row, &title);
     make_item(link, title, &byline, subtitle, &row["thumbnail"])
 }
 
-/// The columns of a list row after its title, as one line: "Artist • Album".
-fn below_title(row: &Value) -> String {
+/// The columns of a list row after its title, as one line: "Artist • Album". A column that
+/// repeats the title adds nothing, so it is left out.
+fn below_title(row: &Value, title: &str) -> String {
+    let title = normalized(title);
     let columns = flex_columns(row);
     let texts = columns.iter().skip(1).map(|runs| runs.iter().filter_map(|r| r["text"].as_str()).collect::<String>());
-    texts.filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" • ")
+    texts
+        .filter(|s| !s.is_empty() && normalized(s) != title)
+        .collect::<Vec<_>>()
+        .join(" • ")
+}
+
+/// A name compared without case or stray spaces; the service spells the same album both ways.
+fn normalized(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
 }
 
 fn make_item(link: Link, title: String, byline: &Byline, subtitle: String, thumbnail: &Value) -> Option<HomeItem> {
@@ -503,6 +513,16 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    fn column(text: &str) -> Value {
+        json!({ "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [run(text)] } } })
+    }
+
+    #[test]
+    fn a_column_that_repeats_the_title_is_left_out() {
+        let row = json!({ "flexColumns": [column("Вика"), column("Palmdropov"), column("  ВИКА "), column("1.5M plays")] });
+        assert_eq!(below_title(&row, "Вика"), "Palmdropov • 1.5M plays");
+    }
 
     fn run(text: &str) -> Value {
         json!({ "text": text })

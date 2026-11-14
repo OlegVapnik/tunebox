@@ -19,14 +19,14 @@
          YouTube Music Album     │                                                    │                               ┃
     Y    Album · YouTube Music…  │           ★ Star on GitHub     No thanks           │Tube Music Mix Song 3          ┃
                                  │                                                    │Tube Music Band                ┃
-                                 │              enter choose · esc close              │                               │
+                                 │              enter choose · esc close              │                               ┃
                                  ╰────────────────────────────────────────────────────╯                               │
-                                 │                                                                                    │
                                  │ MADE FOR YOU                                                                       │
                                  │ For you                                                                            │
                                  │                                                                                    │
                                  │                                                                                    │
                                  │       Y                      Y                                                     │
+                                 │                                                                                    │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                Nothing playing
                Pick a song and press ↵

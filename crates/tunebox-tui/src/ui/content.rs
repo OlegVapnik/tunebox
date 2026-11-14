@@ -412,6 +412,12 @@ struct Summary<'a> {
     round: bool,
 }
 
+/// A name compared without case or stray spaces: an album that merely repeats the title adds
+/// nothing to the row.
+fn normalized(name: &str) -> String {
+    name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
 impl<'a> Summary<'a> {
     fn track(t: &'a Track) -> Self {
         Summary {
@@ -421,7 +427,7 @@ impl<'a> Summary<'a> {
             playing: false,
             meta: t.artists.join(", "),
             linked: &t.artists[..t.artist_uris.len().min(t.artists.len())],
-            album: if t.album.is_empty() || t.album == t.name {
+            album: if t.album.is_empty() || normalized(&t.album) == normalized(&t.name) {
                 None
             } else {
                 Some((&t.album, !t.album_uri.is_empty()))

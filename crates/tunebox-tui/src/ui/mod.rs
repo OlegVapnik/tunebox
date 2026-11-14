@@ -153,7 +153,9 @@ pub(super) fn cover_in(
     {
         let buf = frame.buffer_mut();
         let rect = Rect::new(x, y.max(0) as u16, slot.width, slot.height);
-        let area = rect.intersection(buf.area);
+        // Only the part in view: the rest of a scrolled slot reaches into the top bar and would
+        // repaint its buttons and search field with the pane background.
+        let area = rect.intersection(clip).intersection(buf.area);
         if !area.is_empty() {
             buf.set_style(area, Style::new().bg(theme::palette().bg));
         }
@@ -308,16 +310,13 @@ fn take_upload(cell: &mut Cell) -> Option<String> {
 
 pub(super) const PLAY_BUTTON_WIDTH: u16 = 3;
 
-/// The play button of a hovered card, ending at column `right` in row `y`. On a cover, a dark
-/// cell to its left sets it off from covers in the accent color.
-pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, hit: Hit, on_cover: bool) {
+/// The play button of a hovered card, ending at column `right` in row `y`, with a cell clear of
+/// the cover's right edge so it does not read as part of the art.
+pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, hit: Hit) {
     let p = theme::palette();
     let icons = icons();
     let area = Rect::new(right.saturating_sub(PLAY_BUTTON_WIDTH), y, PLAY_BUTTON_WIDTH, 1).intersection(buf.area);
     let accent = app.accent.color();
-    if on_cover && let Some(edge) = area.x.checked_sub(1) {
-        buf.set_string(edge, y, " ", Style::new().bg(p.bg));
-    }
     // Blank the cells rather than only recoloring them: over a cover they hold image cells,
     // which would keep showing pieces of the picture around the icon.
     buf.set_string(area.x, y, " ".repeat(area.width as usize), Style::new().bg(accent));

@@ -19,8 +19,10 @@ use crate::{
 /// Card cover in cells; cells are about twice as tall as wide, so this is roughly square.
 const COVER: Size = Size { width: 14, height: 7 };
 const CARD_GAP: u16 = 4;
+/// The air between one section of Home and the next.
+const SECTION_GAP: u16 = 2;
 /// Title, gap, cover, two text lines and spacing below.
-pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 3 + 3;
+pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 3 + SECTION_GAP;
 const TILE_COVER: Size = Size { width: 6, height: 3 };
 const TILE_GAP: u16 = 2;
 /// A song's cover in a shelf of songs, as in the sidebar.
@@ -29,7 +31,7 @@ const SONG_COVER: Size = Size { width: 4, height: 2 };
 const SONG_WIDTH: u16 = 36;
 const SONG_GAP: u16 = 4;
 /// Title, gap, the songs two rows each with a row between them, and spacing below.
-const SONGS_ROWS: u16 = 1 + 1 + SONG_ROWS as u16 * 3 - 1 + 3;
+const SONGS_ROWS: u16 = 1 + 1 + SONG_ROWS as u16 * 3 - 1 + SECTION_GAP;
 /// The Play all button in a shelf's title row.
 const PLAY_ALL: &str = "Play all";
 
@@ -380,10 +382,17 @@ pub(super) fn draw_shelf(
         let is_selected = selected == Some(index);
         // The card's box is its cover and the three text rows under it.
         let card = clip(padded, x.saturating_sub(1), COVER.width + 2, cover_y, COVER.height + 3);
+        // Whole cards only: a row cut by the player or the top edge reads as a glitch. A whole
+        // row that does not fit still peeks in when nothing else would be drawn.
+        let full = cover_y >= area.y as i32 && cover_y + (COVER.height + 3) as i32 <= area.bottom() as i32;
+        let card = if full || cover_y < area.y as i32 {
+            card.filter(|card| card.y as i32 == cover_y && card.height == COVER.height + 3)
+        } else {
+            card
+        };
+        let Some(card) = card else { continue };
         if is_selected {
-            if let Some(card) = card {
-                frame.buffer_mut().set_style(card, Style::new().bg(selection));
-            }
+            frame.buffer_mut().set_style(card, Style::new().bg(selection));
             selection_bar(frame, area, x.saturating_sub(1), cover_y, COVER.height + 3, accent);
         }
         draw_cover(frame, app, (x, cover_y), area, item, COVER);
@@ -392,32 +401,33 @@ pub(super) fn draw_shelf(
         let title_style = card_title_style(accent, playing, is_selected);
         let width = COVER.width as usize;
         let text_y = cover_y + COVER.height as i32;
-        let title_width = if playing { width.saturating_sub(4) } else { width };
+        // The note sits before the playing card's name, which is otherwise easy to miss.
+        let text_x = if playing { x + 2 } else { x };
+        let title_width = width.saturating_sub(if playing { 2 } else { 0 });
         let (first, second) = text::wrap_two(&item.title, title_width);
         if let Some(y) = row(area, text_y) {
-            buf.set_string(x, y, &first, title_style);
             if playing {
-                buf.set_string(x + COVER.width - 3, y, marker, Style::new().fg(accent));
+                buf.set_string(x, y, marker, Style::new().fg(accent));
             }
+            buf.set_string(text_x, y, &first, title_style);
         }
-        if let Some(y) = row(area, text_y + 1) {
-            if !second.is_empty() {
-                buf.set_string(x, y, &second, title_style);
-            }
+        if let Some(y) = row(area, text_y + 1)
+            && !second.is_empty()
+        {
+            buf.set_string(text_x, y, &second, title_style);
         }
-        // Every card keeps its subtitle on the same row, whether its title took one line or two.
-        if let Some(y) = row(area, text_y + 2) {
+        // The subtitle follows the title directly, whether it took one line or two.
+        let subtitle_y = text_y + if second.is_empty() { 1 } else { 2 };
+        if let Some(y) = row(area, subtitle_y) {
             buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
         }
-        if let Some(card) = card {
-            app.hits.push((card, Hit::Card { shelf: layout.index, item: index }));
-            let button_y = cover_y + COVER.height as i32 - 1;
-            if super::hovered(app, card)
-                && let Some(y) = row(area, button_y)
-            {
-                let hit = Hit::CardPlay { shelf: layout.index, item: index };
-                super::play_button(frame.buffer_mut(), app, x + COVER.width - 1, y.saturating_sub(1), hit, true);
-            }
+        app.hits.push((card, Hit::Card { shelf: layout.index, item: index }));
+        let button_y = cover_y + COVER.height as i32 - 1;
+        if super::hovered(app, card)
+            && let Some(y) = row(area, button_y)
+        {
+            let hit = Hit::CardPlay { shelf: layout.index, item: index };
+            super::play_button(frame.buffer_mut(), app, x + COVER.width - 2, y.saturating_sub(1), hit);
         }
     }
 }
@@ -506,6 +516,16 @@ fn draw_songs(
         let index = layout.first + position;
         let is_selected = selected == Some(index);
         let Some(cell) = clip(padded, x.saturating_sub(1), width + 2, y, SONG_COVER.height) else { continue };
+        // Whole rows only: a row sliced by the player bar or the top edge looks broken. The
+        // last row still peeks in when nothing above it fits either.
+        let full = y >= area.y as i32 && y + 3 <= area.bottom() as i32;
+        let any_full = top + 2 >= area.y as i32 && top + 5 <= area.bottom() as i32;
+        if !full && (any_full || y < area.y as i32) {
+            continue;
+        }
+        if full && (cell.y as i32 != y || cell.height != SONG_COVER.height) {
+            continue;
+        }
         if is_selected {
             frame.buffer_mut().set_style(cell, Style::new().bg(selection));
             selection_bar(frame, area, x.saturating_sub(1), y, SONG_COVER.height, accent);
@@ -539,7 +559,7 @@ fn draw_songs(
         app.hits.push((cell, Hit::Card { shelf: layout.index, item: index }));
         if hovered && let Some(row) = row(area, y) {
             let hit = Hit::CardPlay { shelf: layout.index, item: index };
-            super::play_button(frame.buffer_mut(), app, x + width, row, hit, false);
+            super::play_button(frame.buffer_mut(), app, x + width, row, hit);
         }
     }
 }
@@ -563,6 +583,10 @@ fn draw_shortcuts(
         let tile_y = layout.y + (index as u16 / columns * (TILE_COVER.height + 1)) as i32;
         let x = area.x + column * (tile_width + TILE_GAP);
         let Some(tile) = clip(area, x, tile_width, tile_y, TILE_COVER.height) else { continue };
+        let fits = tile_y >= area.y as i32 && tile_y + TILE_COVER.height as i32 + 1 <= area.bottom() as i32;
+        if fits && (tile.y as i32 != tile_y || tile.height != TILE_COVER.height) {
+            continue;
+        }
         let is_selected = selected == Some(index);
         frame.buffer_mut().set_style(tile, Style::new().bg(if is_selected { selection } else { p.raised }));
         if is_selected {
@@ -594,7 +618,7 @@ fn draw_shortcuts(
         // The play button of a hovered tile takes the equalizer's place.
         if hovered {
             let hit = Hit::CardPlay { shelf: layout.index, item: index };
-            super::play_button(frame.buffer_mut(), app, x + tile_width - 1, y, hit, false);
+            super::play_button(frame.buffer_mut(), app, x + tile_width - 1, y, hit);
         } else if playing {
             frame.buffer_mut().set_string(x + tile_width - 4, y, marker, Style::new().fg(accent));
         }
