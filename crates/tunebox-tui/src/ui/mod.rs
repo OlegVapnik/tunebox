@@ -206,9 +206,14 @@ pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool)
     for (row, y) in (area.top()..area.bottom()).enumerate() {
         let shade = from.mix(to, row as f32 / last);
         let mut band = Rect::new(area.x, y, area.width, 1);
-        // A round cover keeps its corners clear, as the round covers do.
-        if round && area.height >= 3 && (row == 0 || row == area.height as usize - 1) && band.width > 2 {
-            band = Rect::new(band.x + 1, y, band.width - 2, 1);
+        // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
+        // placeholder then has the same silhouette as a masked image.
+        let height = area.height as usize;
+        let depth = if round { 2 } else { 1 };
+        let edge = (row < depth || row + depth >= height) && height > 2 * depth;
+        if edge && band.width > 4 {
+            let inset = if round { 2 } else { 1 };
+            band = Rect::new(band.x + inset, y, band.width - 2 * inset, 1);
         }
         buf.set_style(band, Style::new().bg(shade.into()));
     }
@@ -218,7 +223,7 @@ pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool)
     }
     let x = area.x + (area.width - initial.width() as u16) / 2;
     let y = area.y + area.height / 2;
-    let ink = from.mix(theme::Rgb(255, 255, 255), 0.78);
+    let ink = from.mix(theme::Rgb(255, 255, 255), 0.85);
     buf.set_string(x, y, initial, Style::new().fg(ink.into()).bold());
 }
 
@@ -415,7 +420,7 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 3));
         let area = buf.area;
         placeholder(&mut buf, area, "morning run", false);
-        assert_ne!(buf[(0, 0)].bg, buf[(0, 2)].bg, "the gradient runs top to bottom");
+        assert_ne!(buf[(1, 0)].bg, buf[(1, 2)].bg, "the gradient runs top to bottom");
         assert_eq!(buf[(2, 1)].symbol(), "M", "the first letter, centered");
         // The same name always gets the same placeholder.
         let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));

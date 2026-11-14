@@ -175,7 +175,8 @@ pub fn placeholder_colors(name: &str) -> (Rgb, Rgb) {
         hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    let hue = (hash % 360) as f32;
+    // Mix in the high bits so names that share a prefix still land on different hues.
+    let hue = ((hash ^ (hash >> 32)) % 360) as f32;
     // Muted tones, so a shelf of placeholders stays behind the titles.
     let (r, g, b) = hsl_to_rgb(hue, 0.38, 0.34);
     let (r2, g2, b2) = hsl_to_rgb((hue + 24.0) % 360.0, 0.42, 0.20);

@@ -699,6 +699,11 @@ impl Loader {
                 let side = width.min(height);
                 image = image.crop_imm((width - side) / 2, (height - side) / 2, side, side);
             }
+            // Some services hand out a solid-colour square (SoundCloud's all-black artwork)
+            // as a cover. Drawn, it reads as a broken tile, so treat it as missing.
+            if featureless(&image) {
+                return Err(anyhow::anyhow!("featureless cover"));
+            }
             let extra = process(&mut image);
             let source = keep_source.then(|| Arc::new(image.clone()));
             // Triangle (bilinear) is several times faster than Lanczos and looks the same when shrinking.
@@ -1081,6 +1086,31 @@ fn rounded(image: &image::DynamicImage) -> image::DynamicImage {
     rgba.into()
 }
 
+/// A cover with no detail at all: a single flat colour, such as the all-black squares
+/// SoundCloud hands out for some playlists. Drawn, it reads as a broken tile, so the view
+/// falls back to its generated placeholder instead.
+fn featureless(image: &image::DynamicImage) -> bool {
+    let rgb = image.to_rgb8();
+    let (width, height) = rgb.dimensions();
+    if width == 0 || height == 0 {
+        return true;
+    }
+    let step_x = (width / 16).max(1) as usize;
+    let step_y = (height / 16).max(1) as usize;
+    let mut min = [255u8; 3];
+    let mut max = [0u8; 3];
+    for y in (0..height).step_by(step_y) {
+        for x in (0..width).step_by(step_x) {
+            let pixel = rgb.get_pixel(x, y).0;
+            for channel in 0..3 {
+                min[channel] = min[channel].min(pixel[channel]);
+                max[channel] = max[channel].max(pixel[channel]);
+            }
+        }
+    }
+    (0..3).all(|channel| max[channel].saturating_sub(min[channel]) <= 2)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1092,6 +1122,15 @@ mod tests {
         assert_eq!(masked.get_pixel(0, 0).0[3], 0, "the corner is cut away");
         assert_eq!(masked.get_pixel(32, 32).0[3], 255, "the middle is untouched");
         assert_eq!(masked.get_pixel(2, 32).0[3], 255, "so is an edge that is not a corner");
+    }
+
+    #[test]
+    fn a_flat_cover_counts_as_missing() {
+        let flat = image::RgbImage::from_pixel(32, 32, image::Rgb([0, 0, 0])).into();
+        assert!(featureless(&flat));
+        let mut detailed = image::RgbImage::from_pixel(32, 32, image::Rgb([0, 0, 0]));
+        detailed.put_pixel(10, 10, image::Rgb([255, 0, 0]));
+        assert!(!featureless(&image::DynamicImage::ImageRgb8(detailed)));
     }
 
     #[test]
