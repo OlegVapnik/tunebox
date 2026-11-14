@@ -147,6 +147,16 @@ pub(super) fn cover_in(
     slot: Size,
     clip: Rect,
 ) -> bool {
+    if round {
+        // Round covers leave their corners uncovered; fill them with the pane background so
+        // the panel's raised colour never shows through as a square halo behind the art.
+        let buf = frame.buffer_mut();
+        let rect = Rect::new(x, y.max(0) as u16, slot.width, slot.height);
+        let area = rect.intersection(buf.area);
+        if !area.is_empty() {
+            buf.set_style(area, Style::new().bg(theme::palette().bg));
+        }
+    }
     if !app.prefs.covers {
         let size = Size::new(size.width.min(slot.width), size.height.min(slot.height));
         tile(frame.buffer_mut(), (x, y), size, slot, clip, round);

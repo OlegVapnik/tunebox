@@ -238,7 +238,8 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
 
     let x = thumb.right() + 2;
     // What is playing shows in the accent color with a moving equalizer, like Spotify's speaker.
-    let playing = app.playing_context().is_some_and(|context| app.entry_uri(entry).as_deref() == Some(context));
+    let playing = (app.now.playing || app.now.device.is_some())
+        && app.playing_context().is_some_and(|context| app.entry_uri(entry).as_deref() == Some(context));
     // Text stays out of the last column, where the scrollbar goes. The equalizer ends a column
     // before it, and only the title row makes room for it.
     let width = area.right().saturating_sub(x + 1) as usize;

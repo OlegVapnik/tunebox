@@ -39,7 +39,7 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     }
 
     // Back and home buttons and the search field, centered in the window like Spotify's.
-    let search_width = (area.width / 2).clamp(28, 64);
+    let search_width = (area.width / 2).clamp(28, 48);
     let cluster = 2 * (BUTTON_WIDTH + 1) + search_width;
     let left_limit = if wide { area.x + 3 + wordmark::WIDTH + 3 } else { area.x + 2 };
     let x = (area.x + area.width.saturating_sub(cluster) / 2).max(left_limit);

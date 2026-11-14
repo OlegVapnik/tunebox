@@ -1,6 +1,6 @@
 
 
-   tunebox                ‹     ⌂     ⌕  What do you want to play?                                          ◉  Tester
+   tunebox                      ‹     ⌂     ⌕  What do you want to play?                                    ◉  Tester
 
 
                                  │

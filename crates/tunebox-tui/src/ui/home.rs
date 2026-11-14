@@ -26,7 +26,7 @@ const TILE_GAP: u16 = 2;
 /// A song's cover in a shelf of songs, as in the sidebar.
 const SONG_COVER: Size = Size { width: 4, height: 2 };
 /// Narrowest column of songs, and the room between columns.
-const SONG_WIDTH: u16 = 30;
+const SONG_WIDTH: u16 = 36;
 const SONG_GAP: u16 = 4;
 /// Title, gap, the songs two rows each with a row between them, and spacing below.
 const SONGS_ROWS: u16 = 1 + 1 + SONG_ROWS as u16 * 3 - 1 + 3;
