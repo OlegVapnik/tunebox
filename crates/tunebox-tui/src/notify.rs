@@ -238,7 +238,9 @@ mod tests {
     fn speaks_each_terminal_s_protocol() {
         let mut kitty = notifier(Protocol::Kitty);
         let sequence = settle(&mut kitty, &track("spotify:track:1"), false).unwrap();
-        assert!(sequence.starts_with("\x1b]99;i=tunebox:d=0:e=1:o=unfocused:f=Y2xvb2Z5;T25lIE1vcmUgVGltZQ==\x1b\\"));
+        assert!(
+            sequence.starts_with("\x1b]99;i=tunebox:d=0:e=1:o=unfocused:f=dHVuZWJveA==;T25lIE1vcmUgVGltZQ==\x1b\\")
+        );
         let mut iterm = notifier(Protocol::ITerm);
         let sequence = settle(&mut iterm, &track("spotify:track:1"), false);
         assert_eq!(sequence.as_deref(), Some("\x1b]9;One More Time · Daft Punk · Discovery\x07"));

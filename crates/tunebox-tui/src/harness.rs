@@ -236,8 +236,8 @@ impl Harness {
     pub fn player_bar(&self) -> String {
         let screen = self.screen();
         let rows: Vec<_> = screen.lines().collect();
-        // Above an empty row and the key hints.
-        rows[rows.len() - 5..rows.len() - 2].join("\n")
+        // The player is seven rows above the key hints; leave out its hairline on top.
+        rows[rows.len() - 7..rows.len() - 2].join("\n")
     }
 
     pub fn shows(&self, text: &str) -> bool {

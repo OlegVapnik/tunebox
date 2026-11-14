@@ -132,7 +132,8 @@ impl Preferences {
             Setting::Icons => ("icons", self.icons.config().map(Value::from)),
             Setting::PowerSaving => ("power_saving", self.power_saving.config().map(Value::from)),
             Setting::Notifications => ("notifications", off(self.notifications)),
-            Setting::UpdateCheck => ("update_check", off(self.update_check)),
+            // Checking for updates is the one switch that starts off, so it writes only when on.
+            Setting::UpdateCheck => ("update_check", self.update_check.then(|| Value::from(true))),
         }
     }
 }
@@ -206,7 +207,7 @@ pub enum AccentChoice {
     /// The dominant color of the playing cover.
     Cover,
     /// The accent of the colors in use: `theme.toml`'s or, with Colors on Auto, Omarchy's
-    /// theme's; tunebox's green otherwise.
+    /// theme's; tunebox's own mauve otherwise. This is what the default theme uses.
     Theme,
     Fixed(NamedColor),
 }

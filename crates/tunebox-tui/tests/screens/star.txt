@@ -3,34 +3,34 @@
    tunebox                ‹     ⌂     ⌕  What do you want to play?                                          ◉  Tester
 
 
-
-   ⌂ Home       ⌕ Search            Relax   Workout                                                                   ┃
-   ≡ Queue      ⚙ Settings                                                                                            ┃
-                                                                                                                      ┃
-   ≡  Your Library          ⤢      Quick picks                                          ▶ Play all  1–8 of 9   ‹   ›  ┃
-                                                                                                                      ┃
-   Playlists  Albums               ▀▄▄▀  YouTube Music Song 1                ▀▄▄▀  YouTube Music Song 5               ┃
-                                   ▀▀▀▀  YouTube Music Band                  ▀▀▀▀  YouTube Music Band                 ┃
+                                 │
+   ⌂ Home       ⌕ Search         │  Relax   Workout                                                                   ┃
+   ≡ Queue      ⚙ Settings       │                                                                                    ┃
+                                 │                                                                                    ┃
+   ≡  Your Library          ⤢    │ Quick picks                                          ▸ Play all  1–8 of 9   ‹   ›  ┃
+                                 │                                                                                    ┃
+   Playlists  Albums             │ ▀▄▄▀  YouTube Music Song 1                 ▀▄▄▀  YouTube Music Song 5              ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
    ▄▄▄▄  Liked Songs             ╭ ★ Enjoying tunebox? ───────────────────────────────╮                               ┃
-   ▄▀▀▄  Playlist · 3 songs      │                                                    │ube Music Mix Song 1           ┃
-                                 │  tunebox is free and made in spare time. If you    │ube Music Band                 ┃
+   ▄▀▀▄  Playlist · 3 songs      │                                                    │Tube Music Mix Song 1          ┃
+                                 │  tunebox is free and made in spare time. If you    │Tube Music Band                ┃
    ▀▄▄▀  YouTube Music Mix       │  like it, a star on GitHub helps other people      │                               ┃
-   ▀▀▀▀  Playlist · Tester       │  find it.                                          │ube Music Mix Song 2           ┃
-                                 │                                                    │ube Music Band                 ┃
+   ▀▀▀▀  Playlist · Tester       │  find it.                                          │Tube Music Mix Song 2          ┃
+                                 │                                                    │Tube Music Band                ┃
    ▀▄▄▀  YouTube Music Album     │           ★ Star on GitHub     No thanks           │                               ┃
-   ▀▀▀▀  Album · YouTube Music…  │                                                    │ube Music Mix Song 3           ┃
-                                 │              enter choose · esc close              │ube Music Band                 ┃
-                                 ╰────────────────────────────────────────────────────╯                               ┃
-                                                                                                                      ┃
-                                   MADE FOR YOU                                                                       │
-                                   For you                                                                            │
-                                                                                                                      │
-                                    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀                                                    │
-                                    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀                                                    │
-                                     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀                                                    │
+   ▀▀▀▀  Album · YouTube Music…  │                                                    │Tube Music Mix Song 3          ┃
+                                 │              enter choose · esc close              │Tube Music Band                │
+                                 ╰────────────────────────────────────────────────────╯                               │
+                                 │                                                                                    │
+                                 │                                                                                    │
+                                 │ MADE FOR YOU                                                                       │
+                                 │ For you                                                                            │
+                                 │                                                                                    │
+                                 │  ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀                                              │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+               Nothing playing
+               Pick a song and press ↵
+      T
 
-             Nothing playing
-             Pick a song and press ↵
-     ♪
 
   enter play   . actions   / search   ^K commands   ? help

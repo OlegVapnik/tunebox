@@ -219,14 +219,22 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
     if cursor {
         frame.buffer_mut().set_style(row, Style::new().bg(app.accent.selection()));
     }
-    if open {
-        let marker = Style::new().fg(app.accent.color());
-        frame.buffer_mut().set_string(area.x + 1, y, "▎", marker);
-        frame.buffer_mut().set_string(area.x + 1, y + 1, "▎", marker);
+    // A bar in the padding marks the cursor, and a shorter one what is open under it.
+    if cursor || open {
+        let (glyph, style) = if cursor {
+            ("▌", Style::new().fg(app.accent.color()))
+        } else {
+            ("▎", Style::new().fg(app.accent.color()))
+        };
+        for row in y..y + THUMB.height {
+            frame.buffer_mut().set_string(area.x + 1, row, glyph, style);
+        }
     }
 
     let thumb = Rect::new(area.x + 3, y, THUMB.width, THUMB.height);
-    super::cover(frame, app, image_url.as_deref(), THUMB, round, thumb);
+    if !super::cover(frame, app, image_url.as_deref(), THUMB, round, thumb) {
+        super::placeholder(frame.buffer_mut(), thumb, &title, round);
+    }
 
     let x = thumb.right() + 2;
     // What is playing shows in the accent color with a moving equalizer, like Spotify's speaker.

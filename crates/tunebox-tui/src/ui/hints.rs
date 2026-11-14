@@ -54,8 +54,9 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         if x + len > area.x + width {
             break;
         }
-        buf.set_string(x, area.y, *key, Style::new().fg(p.muted).bold());
-        buf.set_string(x + key.width() as u16 + 1, area.y, *label, Style::new().fg(p.faint));
+        // The quietest line on screen: a hint should not compete with the music.
+        buf.set_string(x, area.y, *key, Style::new().fg(p.faint).bold());
+        buf.set_string(x + key.width() as u16 + 1, area.y, *label, Style::new().fg(p.disabled));
         if let Some(action) = action {
             app.hits.push((Rect::new(x, area.y, len, 1), Hit::Hint(*action)));
         }

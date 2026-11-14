@@ -32,8 +32,9 @@ const RESULT_ROWS: u16 = THUMB.height + 1;
 /// Shorter result lists drop the thumbnails and give each result one row.
 const RESULT_THUMBS_MIN_HEIGHT: u16 = 3 * RESULT_ROWS;
 
-/// A thumbnail to draw once the buffer is free: slot, cover URL and whether it is round.
-type Thumb = (Rect, Option<String>, bool);
+/// A thumbnail to draw once the buffer is free: slot, cover URL, whether it is round, and the
+/// name its placeholder takes.
+type Thumb = (Rect, Option<String>, bool, String);
 
 /// Colors and state shared by every row of a list.
 struct RowStyle<'a> {
@@ -56,12 +57,16 @@ impl RowStyle<'_> {
     }
 
     fn heart(&self, uri: &str) -> Span<'static> {
-        if self.is_saved(uri) { Span::styled(format!("{} ", icons().saved), self.accent) } else { Span::raw("  ") }
+        // Saved is a state, not a focus: it stays in the text color, clear but quiet.
+        if self.is_saved(uri) {
+            Span::styled(format!("{} ", icons().saved), theme::palette().text)
+        } else {
+            Span::raw("  ")
+        }
     }
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
-    let p = theme::palette();
     app.content_area = area;
     let inner = Rect {
         x: area.x + 3,
@@ -74,18 +79,18 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     app.hits.push((area, Hit::ContentArea));
 
-    let cover_url = match &app.view {
+    let cover = match &app.view {
         View::Tracks(v) if inner.height >= COVER_HEADER_MIN_HEIGHT => Some(match &v.source {
-            TrackSource::Liked => Some(LIKED_COVER.to_owned()),
-            TrackSource::Playlist(p) => p.image_url.clone(),
-            TrackSource::Album(a) => a.image_url.clone(),
+            TrackSource::Liked => (Some(LIKED_COVER.to_owned()), "Liked Songs".to_owned()),
+            TrackSource::Playlist(p) => (p.image_url.clone(), p.name.clone()),
+            TrackSource::Album(a) => (a.image_url.clone(), a.name.clone()),
         }),
         _ => None,
     };
-    if let Some(url) = &cover_url {
+    if let Some((url, name)) = &cover {
         let slot = Rect::new(inner.x, inner.y, HEADER_COVER.width, HEADER_COVER.height);
         if !super::cover(frame, app, url.as_deref(), HEADER_COVER, false, slot) {
-            frame.buffer_mut().set_style(slot, Style::new().bg(p.raised));
+            super::placeholder(frame.buffer_mut(), slot, name, false);
         }
     }
 
@@ -115,14 +120,14 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let searching = app.focus == Focus::SearchInput;
     let mut thumbs = Vec::new();
     app.page_height = match &mut app.view {
-        View::Tracks(view) => tracks(buf, view, inner, &style, &mut app.hits, cover_url.is_some(), page_saved),
+        View::Tracks(view) => tracks(buf, view, inner, &style, &mut app.hits, cover.is_some(), page_saved),
         View::Search(view) => search(buf, view, inner, &style, searching, &mut app.hits, &mut thumbs),
         View::Queue(view) => queue(buf, view, inner, &style, &mut app.hits, &mut thumbs),
         View::Home(_) | View::Artist(_) | View::Library(_) | View::Settings(_) => 0,
     };
-    for (slot, url, round) in thumbs {
+    for (slot, url, round, name) in thumbs {
         if !super::cover(frame, app, url.as_deref(), THUMB, round, slot) {
-            frame.buffer_mut().set_style(slot, Style::new().bg(p.raised));
+            super::placeholder(frame.buffer_mut(), slot, &name, round);
         }
     }
 }
@@ -483,7 +488,7 @@ impl ResultGrid {
         let second_x = x + (self.name + 2) as u16;
         if self.thumbnails {
             let slot = Rect::new(row.x, y, THUMB.width, THUMB.height);
-            thumbs.push((slot, result.image_url.map(str::to_owned), result.round));
+            thumbs.push((slot, result.image_url.map(str::to_owned), result.round, result.name.to_owned()));
         } else {
             // Songs get a quiet note; the other kinds stand out.
             let color = if result.song { p.faint } else { style.accent };

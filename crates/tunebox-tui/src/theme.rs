@@ -47,24 +47,25 @@ pub struct Palette {
 }
 
 impl Palette {
-    /// tunebox's own dark colors, graphite with a soft yellow accent.
+    /// Catppuccin Mocha: graphite-blue panels, one mauve accent. Levels from `text` down to
+    /// `faint` carry the hierarchy, so the accent is left for what is playing and what has focus.
     pub const DEFAULT: Palette = Palette {
-        bg: Color::Rgb(18, 17, 21),
-        surface: Color::Rgb(24, 23, 28),
-        player: Color::Rgb(21, 20, 25),
-        raised: Color::Rgb(35, 34, 41),
-        text: Color::Rgb(237, 234, 226),
-        muted: Color::Rgb(150, 147, 139),
-        faint: Color::Rgb(86, 84, 82),
-        danger: Color::Rgb(255, 110, 100),
-        unfocused: Color::Rgb(28, 27, 33),
-        disabled: Color::Rgb(68, 66, 73),
-        placeholder: Color::Rgb(49, 48, 56),
-        thumb: Color::Rgb(106, 103, 112),
-        lyric_near: Color::Rgb(207, 204, 195),
-        lyric_far: Color::Rgb(78, 75, 83),
-        highlight: Rgb(250, 246, 235),
-        accent: Rgb(232, 195, 106),
+        bg: Color::Rgb(17, 17, 27),
+        surface: Color::Rgb(24, 24, 37),
+        player: Color::Rgb(24, 24, 37),
+        raised: Color::Rgb(49, 50, 68),
+        text: Color::Rgb(205, 214, 244),
+        muted: Color::Rgb(166, 173, 200),
+        faint: Color::Rgb(108, 112, 134),
+        danger: Color::Rgb(243, 139, 168),
+        unfocused: Color::Rgb(30, 30, 46),
+        disabled: Color::Rgb(88, 91, 112),
+        placeholder: Color::Rgb(49, 50, 68),
+        thumb: Color::Rgb(88, 91, 112),
+        lyric_near: Color::Rgb(186, 194, 222),
+        lyric_far: Color::Rgb(88, 91, 112),
+        highlight: Rgb(245, 224, 220),
+        accent: Rgb(203, 166, 247),
     };
 
     /// Whether this is a light theme, with dark text on a light background.
@@ -154,14 +155,34 @@ impl Accent {
         self.rgb().into()
     }
 
-    /// The selection background: a raised surface tinted with the accent.
+    /// The selection background: one step above the panels, so the accent bar and the bold name
+    /// carry the focus rather than a wash of color.
     pub fn selection(&self) -> Color {
-        Rgb::of(palette().raised).mix(self.rgb(), 0.14).into()
+        Rgb::of(palette().raised).mix(palette().highlight, 0.06).into()
     }
 
     pub fn is_fading(&self) -> bool {
         self.since.elapsed() < ACCENT_FADE
     }
+}
+
+/// The two ends of the gradient that stands in for a cover nobody has: fixed to the name, so the
+/// same playlist keeps the same one across runs.
+pub fn placeholder_colors(name: &str) -> (Rgb, Rgb) {
+    // FNV-1a, which spreads short names well.
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in name.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    let hue = (hash % 360) as f32;
+    // Muted tones, so a shelf of placeholders stays behind the titles.
+    let (r, g, b) = hsl_to_rgb(hue, 0.38, 0.34);
+    let (r2, g2, b2) = hsl_to_rgb((hue + 24.0) % 360.0, 0.42, 0.20);
+    (
+        Rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8),
+        Rgb((r2 * 255.0) as u8, (g2 * 255.0) as u8, (b2 * 255.0) as u8),
+    )
 }
 
 /// The dominant vivid color of a cover, if it has one. [`cover_accent`] tunes it to the

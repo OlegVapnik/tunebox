@@ -3,34 +3,34 @@
    tunebox                ‹     ⌂     ⌕  What do you want to play?                                             ◉  Sam
 
 
-
-   ⌂ Home       ⌕ Search           Good evening, Sam                                                                  ┃
-   ≡ Queue      ⚙ Settings         Your Spotify · press S to switch services                                          ┃
-                                                                                                                      ┃
-   ≡  Your Library          ⤢      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     ┃
-                                   ▀▄▄▀▀▀  Liked Songs         ▀▄▄▀▀▀  Late Night Co…⡄⡇⡆   ▀▄▄▀▀▀  Random Access Mem… ┃
-   Playlists  Albums  Artists       ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     ┃
-                                                                                                                      ┃
-   ▄▄▄▄  Liked Songs           ┃   ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     │
-   ▄▀▀▄  Playlist · 20 songs   ┃   ▀▄▄▀▀▀  Deep Focus          ▀▄▄▀▀▀  Tame Impala         ▀▄▄▀▀▀  Synthwave Drive    │
-                               │    ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     │
-   ▀▄▄▀  Late Night Coding ⡄⡇⡆ │                                                                                      │
-   ▀▀▀▀  Playlist · Sam        │   ▀ ▄▄ ▀                      ▀ ▄▄ ▀                                                 │
-                               │   ▀▄▄▀▀▀  Currents            ▀▄▄▀▀▀  Daily Mix 1                                    │
-   ▀▄▄▀  Morning Run           │    ▀▀▀▀▀                       ▀▀▀▀▀                                                 │
-   ▀▀▀▀  Playlist · Sam        │                                                                                      │
-                               │                                                                                      │
-   ▀▄▄▀  Deep Focus            │   Made For You                                                     1–5 of 6   ‹   ›  │
-   ▀▀▀▀  Playlist · Sam        │                                                                                      │
-                               │    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀ │
-   ▀▄▄▀  Sunday Morning        │    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀ │
-   ▀▀▀▀  Playlist · Sam        │     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀ │
-                               │     ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀   │
-                               │   ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀  │
-                               │   ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀  │
-
-  ▀▀  ▀▀ ▀   Around the World  ✓                  ⤨   ◂◂   ❚❚   ▸▸   ↻    ♫  Playlist · Late Night Coding
-  ▀▀▀▄▄▄▀▀   Daft Punk · Homework                                                                ≡   ♪ ━━━━━━━━━━  69%
-  ▀▀▄▄▀▀ ▀   1:21  ━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  7:09
-   ▀▀▀▀▀▀▀
+                                 │
+   ⌂ Home       ⌕ Search         │ Good evening, Sam                                                                  ┃
+   ≡ Queue      ⚙ Settings       │ Your Spotify · press S to switch services                                          ┃
+                                 │                                                                                    ┃
+   ≡  Your Library          ⤢    │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     ┃
+                                 │ ▀▄▄▀▀▀  Liked Songs         ▀▄▄▀▀▀  Late Night Co…⡄⡇⡆   ▀▄▄▀▀▀  Random Access Mem… ┃
+   Playlists  Albums  Artists    │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     ┃
+                                 │                                                                                    │
+   ▄▄▄▄  Liked Songs           ┃ │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                      ▀ ▄▄ ▀                     │
+   ▄▀▀▄  Playlist · 20 songs   ┃ │ ▀▄▄▀▀▀  Deep Focus          ▀▄▄▀▀▀  Tame Impala         ▀▄▄▀▀▀  Synthwave Drive    │
+                               │ │  ▀▀▀▀▀                       ▀▀▀▀▀                       ▀▀▀▀▀                     │
+   ▀▄▄▀  Late Night Coding ⡄⡇⡆ │ │                                                                                    │
+   ▀▀▀▀  Playlist · Sam        │ │ ▀ ▄▄ ▀                      ▀ ▄▄ ▀                                                 │
+                               │ │ ▀▄▄▀▀▀  Currents            ▀▄▄▀▀▀  Daily Mix 1                                    │
+   ▀▄▄▀  Morning Run           │ │  ▀▀▀▀▀                       ▀▀▀▀▀                                                 │
+   ▀▀▀▀  Playlist · Sam        │ │                                                                                    │
+                               │ │                                                                                    │
+   ▀▄▄▀  Deep Focus            │ │ Made For You                                                     1–4 of 6   ‹   ›  │
+   ▀▀▀▀  Playlist · Sam        │ │                                                                                    │
+                               │ │  ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀         ▀ ▀    ▀ ▀  ▀ │
+   ▀▄▄▀  Sunday Morning        │ │  ▀  ▀ ▀▄▀  ▀ ▀          ▀  ▀ ▀▄▀  ▀ ▀          ▀  ▀ ▀▄▀  ▀ ▀         ▀  ▀ ▀▄▀  ▀ ▀ │
+   ▀▀▀▀  Playlist · Sam        │ │   ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀          ▀ ▀  ▄▄▄ ▀ ▀ │
+                               │ │   ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀            ▀ ▄▄▄▄▀▀ ▀   │
+                               │ │ ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀         ▀ ▀ ▀▀▄▀▀▀  ▀  │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ▀ ▀  ▀ ▀ ▀   Around the World  ✓               ⤨   ◂◂    ▌▌    ▸▸   ↻    ♫  Playlist · Late Night Coding
+  ▀ ▀▀▄▄▄▀▀    Daft Punk · Homework                                                              ≡   ♪ ━━━━━━━━━━  69%
+   ▀ ▄▄▀▀▀▀
+   ▀ ▀▀▀▀ ▀▀   1:21  ━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  7:09
+   ▀▀ ▀ ▀▀ ▀
   enter open   p play   . actions   D DJ   / search   ^K commands   ? help                                  ▣  tunebox

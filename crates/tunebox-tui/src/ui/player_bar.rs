@@ -28,26 +28,21 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         return compact(frame.buffer_mut(), app, area);
     }
     // A hairline above the bar: the player is its own panel, not more of the page.
-    frame.buffer_mut().set_style(Rect::new(area.x, area.y, area.width, 1), Style::new().bg(p.raised));
+    let buf = frame.buffer_mut();
+    buf.set_string(area.x, area.y, "─".repeat(area.width as usize), Style::new().fg(p.raised).bg(p.player));
     let cover = Rect::new(area.x + 2, area.y + 1, COVER_SIZE.width, COVER_SIZE.height);
     let placed = app.now.cover.as_ref().map(|c| super::picture_at(frame, &c.picture, cover));
     match placed {
         Some(placement) => app.placements.extend(placement),
         None => {
-            let buf = frame.buffer_mut();
-            buf.set_style(cover, Style::new().bg(p.raised));
-            buf.set_string(
-                cover.x + cover.width / 2 - 1,
-                cover.y + cover.height / 2,
-                icons().note,
-                Style::new().fg(p.faint),
-            );
+            let name = app.now.track.as_ref().map(|track| track.name.clone()).unwrap_or_else(|| "tunebox".into());
+            super::placeholder(frame.buffer_mut(), cover, &name, false);
         }
     }
     app.hits.push((cover, Hit::Cover));
 
     let x = cover.right() + 3;
-    let info = Rect::new(x, area.y + 1, area.right().saturating_sub(x + 2), 3);
+    let info = Rect::new(x, area.y + 1, area.right().saturating_sub(x + 2), 5);
     let buf = frame.buffer_mut();
     let mut hits = Vec::new();
     match &app.now.track {
@@ -75,7 +70,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             buf.set_string(info.x, info.y, &title, Style::new().fg(p.text).bold());
             let heart_x = info.x + title.width() as u16 + 2;
             let (heart, heart_style) = if app.is_saved(&track.uri) {
-                (icons().saved, Style::new().fg(accent))
+                (icons().saved, Style::new().fg(p.text))
             } else {
                 (icons().save, Style::new().fg(p.faint))
             };
@@ -91,7 +86,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             if app.can_resume() {
                 let hint = "Last played · space to resume";
                 if hint.width() <= room {
-                    buf.set_string(note_x, info.y, hint, Style::new().fg(accent));
+                    buf.set_string(note_x, info.y, hint, Style::new().fg(p.muted));
                 }
             } else if let Some(label) = app.playing_context().and_then(|uri| app.context_label(uri))
                 && room > 12
@@ -134,7 +129,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 Hit::Volume { x: volume_x + 2, width: VOLUME_CELLS },
             ));
 
-            let bar = Rect { y: info.y + 2, height: 1, ..info };
+            let bar = Rect { y: info.y + 3, height: 1, ..info };
             hits.extend(progress(
                 buf,
                 bar,
@@ -193,7 +188,7 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     let heart_x = area.x + 2 + title.width() as u16 + 2;
     if heart_x + 1 < area.right() {
         let (heart, heart_style) = if app.is_saved(&track.uri) {
-            (icons().saved, Style::new().fg(accent))
+            (icons().saved, Style::new().fg(p.text))
         } else {
             (icons().save, Style::new().fg(p.faint))
         };
@@ -223,27 +218,23 @@ pub(super) fn controls(app: &App, accent: Color) -> (Line<'static>, Vec<(u16, u1
     let icons = icons();
     let toggle = |on: bool| if on { Style::new().fg(accent) } else { Style::new().fg(p.faint) };
     let repeat = if app.now.repeat == Repeat::Track { icons.repeat_one } else { icons.repeat };
-    // A track on its way spins in place of play/pause.
-    let play = match (&app.now.pending, app.now.playing) {
-        (Some(_), _) => text::spinner(app.frame()),
-        (None, true) => icons.pause,
-        (None, false) => icons.play,
+    // A track on its way spins in place of play/pause; otherwise the button is the one filled
+    // control of the bar, so the eye finds it first.
+    let (play, play_style) = match (&app.now.pending, app.now.playing) {
+        (Some(_), _) => (text::spinner(app.frame()).to_owned(), Style::new().fg(p.muted)),
+        (None, true) => (format!(" {} ", icons.pause), Style::new().fg(p.bg).bg(accent).bold()),
+        (None, false) => (format!(" {} ", icons.play), Style::new().fg(p.bg).bg(accent).bold()),
     };
-    let mut parts = vec![
-        (icons.shuffle, toggle(app.now.shuffle), Command::Shuffle),
-        (icons.previous, Style::new().fg(p.muted), Command::Previous),
-        (
-            play,
-            // The play button glows while it would continue the last session.
-            if app.can_resume() { Style::new().fg(accent).bold() } else { Style::new().fg(p.text).bold() },
-            Command::PlayPause,
-        ),
-        (icons.next, Style::new().fg(p.muted), Command::Next),
-        (repeat, toggle(app.now.repeat != Repeat::Off), Command::Repeat),
+    let mut parts: Vec<(String, Style, Command)> = vec![
+        (icons.shuffle.to_owned(), toggle(app.now.shuffle), Command::Shuffle),
+        (icons.previous.to_owned(), Style::new().fg(p.muted), Command::Previous),
+        (play, play_style, Command::PlayPause),
+        (icons.next.to_owned(), Style::new().fg(p.muted), Command::Next),
+        (repeat.to_owned(), toggle(app.now.repeat != Repeat::Off), Command::Repeat),
     ];
     // While DJ plays, its button moves it on to different picks, as in Spotify's apps.
     if app.dj_playing() {
-        parts.push((icons.dj, Style::new().fg(accent), Command::Dj));
+        parts.push((icons.dj.to_owned(), Style::new().fg(accent), Command::Dj));
     }
     let mut spans = Vec::new();
     let mut targets = Vec::new();

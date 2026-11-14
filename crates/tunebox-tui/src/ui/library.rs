@@ -15,9 +15,9 @@ use crate::{
 };
 
 const COVER: Size = Size { width: 14, height: 7 };
-const GAP: u16 = 3;
+const GAP: u16 = 4;
 /// Cover, title, subtitle and spacing.
-const CARD_ROWS: u16 = COVER.height + 2 + 2;
+const CARD_ROWS: u16 = COVER.height + 2 + 3;
 /// Title, gap and tabs above the grid.
 const HEADER_ROWS: u16 = 5;
 
@@ -133,8 +133,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         let y = row_y(index);
         let card = home::clip(clip, x.saturating_sub(1), COVER.width + 2, y - 1, COVER.height + 4);
         let selected = index == cursor;
-        if selected && let Some(card) = card {
-            frame.buffer_mut().set_style(card, Style::new().bg(selection));
+        if selected {
+            if let Some(card) = card {
+                frame.buffer_mut().set_style(card, Style::new().bg(selection));
+            }
+            home::selection_bar(frame, grid, x.saturating_sub(1), y, COVER.height, accent);
         }
         let (title, subtitle, image_url, round) = sidebar::describe(app, entry);
         if !super::cover_in(frame, app, image_url.as_deref(), COVER, round, (x, y), COVER, grid)

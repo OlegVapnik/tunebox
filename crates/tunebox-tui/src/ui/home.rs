@@ -18,18 +18,18 @@ use crate::{
 
 /// Card cover in cells; cells are about twice as tall as wide, so this is roughly square.
 const COVER: Size = Size { width: 14, height: 7 };
-const CARD_GAP: u16 = 3;
+const CARD_GAP: u16 = 4;
 /// Title, gap, cover, two text lines and spacing below.
-pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 2 + 2;
+pub(super) const SHELF_ROWS: u16 = 1 + 1 + 7 + 2 + 3;
 const TILE_COVER: Size = Size { width: 6, height: 3 };
 const TILE_GAP: u16 = 2;
 /// A song's cover in a shelf of songs, as in the sidebar.
 const SONG_COVER: Size = Size { width: 4, height: 2 };
 /// Narrowest column of songs, and the room between columns.
 const SONG_WIDTH: u16 = 30;
-const SONG_GAP: u16 = 3;
+const SONG_GAP: u16 = 4;
 /// Title, gap, the songs two rows each with a row between them, and spacing below.
-const SONGS_ROWS: u16 = 1 + 1 + SONG_ROWS as u16 * 3 - 1 + 2;
+const SONGS_ROWS: u16 = 1 + 1 + SONG_ROWS as u16 * 3 - 1 + 3;
 /// The Play all button in a shelf's title row.
 const PLAY_ALL: &str = "Play all";
 
@@ -379,8 +379,11 @@ pub(super) fn draw_shelf(
         let index = layout.first + column;
         let is_selected = selected == Some(index);
         let card = clip(padded, x.saturating_sub(1), COVER.width + 2, cover_y - 1, COVER.height + 4);
-        if is_selected && let Some(card) = card {
-            frame.buffer_mut().set_style(card, Style::new().bg(selection));
+        if is_selected {
+            if let Some(card) = card {
+                frame.buffer_mut().set_style(card, Style::new().bg(selection));
+            }
+            selection_bar(frame, area, x.saturating_sub(1), cover_y, COVER.height, accent);
         }
         draw_cover(frame, app, (x, cover_y), area, item, COVER);
         let buf = frame.buffer_mut();
@@ -420,7 +423,7 @@ fn header(frame: &mut Frame, app: &mut App, area: Rect, layout: &ShelfLayout, se
     if !layout.strapline.is_empty() {
         if let Some(row) = row(area, y) {
             let strapline = text::truncate(&layout.strapline, area.width as usize);
-            frame.buffer_mut().set_string(area.x, row, strapline, Style::new().fg(p.muted));
+            frame.buffer_mut().set_string(area.x, row, strapline, Style::new().fg(p.faint));
         }
         y += 1;
     }
@@ -498,6 +501,7 @@ fn draw_songs(
         let Some(cell) = clip(padded, x.saturating_sub(1), width + 2, y, SONG_COVER.height) else { continue };
         if is_selected {
             frame.buffer_mut().set_style(cell, Style::new().bg(selection));
+            selection_bar(frame, area, x.saturating_sub(1), y, SONG_COVER.height, accent);
         }
         draw_cover(frame, app, (x, y), area, item, SONG_COVER);
         let playing = app.now.track.as_ref().is_some_and(|track| track.uri == item.context_uri);
@@ -554,6 +558,9 @@ fn draw_shortcuts(
         let Some(tile) = clip(area, x, tile_width, tile_y, TILE_COVER.height) else { continue };
         let is_selected = selected == Some(index);
         frame.buffer_mut().set_style(tile, Style::new().bg(if is_selected { selection } else { p.raised }));
+        if is_selected {
+            selection_bar(frame, area, x.saturating_sub(1), tile_y, TILE_COVER.height, accent);
+        }
         draw_cover(frame, app, (x, tile_y), area, item, TILE_COVER);
         let playing = is_playing(app, item);
         let style = if playing { Style::new().fg(accent).bold() } else { Style::new().fg(p.text).bold() };
@@ -587,6 +594,14 @@ fn draw_shortcuts(
     }
 }
 
+/// The accent bar in the padding left of a selected card, over its cover.
+pub(super) fn selection_bar(frame: &mut Frame, area: Rect, x: u16, y: i32, height: u16, accent: Color) {
+    let Some(bar) = self::clip(area, x, 1, y, height) else { return };
+    for row in bar.top()..bar.bottom() {
+        frame.buffer_mut().set_string(bar.x, row, "▌", Style::new().fg(accent));
+    }
+}
+
 /// A card's title: the accent marks what plays, as in track lists. The selection shows as the
 /// background, so its title is only bold.
 pub(super) fn card_title_style(accent: Color, playing: bool, selected: bool) -> Style {
@@ -613,7 +628,7 @@ pub(super) fn playing_marker(app: &App) -> &'static str {
     if app.now.playing { super::equalizer(app) } else { crate::icons::icons().volume }
 }
 
-/// A card's cover at `(x, y)`, cut to `clip`; an icon on a plain square while it loads.
+/// A card's cover at `(x, y)`, cut to `clip`; a placeholder picked by its name while it loads.
 pub(super) fn draw_cover(
     frame: &mut Frame,
     app: &mut App,
@@ -622,25 +637,12 @@ pub(super) fn draw_cover(
     item: &HomeItem,
     size: Size,
 ) {
-    let p = theme::palette();
     let round = item.kind == ItemKind::Artist;
     if super::cover_in(frame, app, item.image_url.as_deref(), size, round, (x, y), size, clip) {
         return;
     }
     let Some(part) = self::clip(clip, x, size.width, y, size.height) else { return };
-    let buf = frame.buffer_mut();
-    buf.set_style(part, Style::new().bg(p.raised));
-    let icons = crate::icons::icons();
-    let icon = match item.kind {
-        ItemKind::Playlist => icons.playlist,
-        ItemKind::Album => icons.album,
-        ItemKind::Artist => icons.artist,
-        ItemKind::Audiobook => icons.audiobook,
-        ItemKind::Podcast | ItemKind::Episode => icons.podcast,
-    };
-    if let Some(row) = row(clip, y + (size.height / 2) as i32) {
-        buf.set_string(x + size.width / 2, row, icon, Style::new().fg(p.faint));
-    }
+    super::placeholder(frame.buffer_mut(), part, &item.title, round);
 }
 
 #[cfg(test)]

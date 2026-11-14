@@ -40,7 +40,7 @@ use crate::{
 const SIDEBAR_WIDTH: u16 = 32;
 /// Below this width only the focused pane is shown.
 const TWO_PANE_MIN_WIDTH: u16 = 90;
-const PLAYER_HEIGHT: u16 = 5;
+const PLAYER_HEIGHT: u16 = 6;
 /// The character Kitty image cells are made of.
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
@@ -83,6 +83,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 Layout::horizontal([Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)]).areas(main);
             sidebar::draw(frame, app, nav);
             draw_content(frame, app, content);
+            // One hairline between the panes, so they read as the two panels they are. It
+            // stands a column off the sidebar, clear of its scrollbar.
+            let divider = nav.right() + 1;
+            for y in main.top()..main.bottom() {
+                frame.buffer_mut().set_string(divider, y, "│", Style::new().fg(p.raised).bg(p.bg));
+            }
         } else if app.focus == Focus::Nav {
             sidebar::draw(frame, app, main);
         } else {
@@ -175,6 +181,34 @@ fn tile(buf: &mut Buffer, (x, y): (u16, i32), size: Size, slot: Size, clip: Rect
     if area.width >= 2 && (visible_top..visible_bottom).contains(&middle) {
         buf.set_string(left + (size.width - 1) / 2, middle as u16, icon, Style::new().fg(p.faint));
     }
+}
+
+/// Stands in for a cover nobody has: a gradient picked by the name, with its first letter. A
+/// shelf of these reads as a designed placeholder rather than as a failed load.
+pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool) {
+    let area = area.intersection(buf.area);
+    if area.is_empty() || area.width == 0 {
+        return;
+    }
+    let (from, to) = theme::placeholder_colors(name);
+    let last = area.height.saturating_sub(1).max(1) as f32;
+    for (row, y) in (area.top()..area.bottom()).enumerate() {
+        let shade = from.mix(to, row as f32 / last);
+        let mut band = Rect::new(area.x, y, area.width, 1);
+        // A round cover keeps its corners clear, as the round covers do.
+        if round && area.height >= 3 && (row == 0 || row == area.height as usize - 1) && band.width > 2 {
+            band = Rect::new(band.x + 1, y, band.width - 2, 1);
+        }
+        buf.set_style(band, Style::new().bg(shade.into()));
+    }
+    let initial = name.chars().find(|c| !c.is_whitespace()).map(|c| c.to_uppercase().to_string()).unwrap_or_default();
+    if initial.is_empty() || area.width < initial.width() as u16 {
+        return;
+    }
+    let x = area.x + (area.width - initial.width() as u16) / 2;
+    let y = area.y + area.height / 2;
+    let ink = from.mix(theme::Rgb(255, 255, 255), 0.78);
+    buf.set_string(x, y, initial, Style::new().fg(ink.into()).bold());
 }
 
 /// Draws an image centered in `slot`; returns where it went, for dev snapshots.
@@ -358,5 +392,23 @@ fn tint(buf: &mut Buffer, app: &App, area: Rect, amount: f32) {
             };
             cell.bg = base.mix(p.highlight, amount).into();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_cover_gets_a_gradient_and_its_first_letter() {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 3));
+        let area = buf.area;
+        placeholder(&mut buf, area, "morning run", false);
+        assert_ne!(buf[(0, 0)].bg, buf[(0, 2)].bg, "the gradient runs top to bottom");
+        assert_eq!(buf[(2, 1)].symbol(), "M", "the first letter, centered");
+        // The same name always gets the same placeholder.
+        let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));
+        placeholder(&mut other, area, "morning run", true);
+        assert_eq!(buf[(4, 1)].bg, other[(4, 1)].bg);
     }
 }

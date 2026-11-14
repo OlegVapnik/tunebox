@@ -6,6 +6,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+/// Not every glyph is used by every build, and some only by the plain-text set.
+#[allow(dead_code)]
 pub struct Icons {
     pub home: &'static str,
     pub search: &'static str,
@@ -109,8 +111,8 @@ const TEXT: Icons = Icons {
     shuffle: "⤨",
     previous: "◂◂",
     next: "▸▸",
-    play: "▶",
-    pause: "❚❚",
+    play: "▸",
+    pause: "▌▌",
     repeat: "↻",
     repeat_one: "↻1",
     volume: "♪",

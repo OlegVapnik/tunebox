@@ -3,34 +3,34 @@
    tunebox                ‹     ⌂     ⌕  What do you want to play?                                             ◉  Sam
 
 
-
-   ⌂ Home       ⌕ Search           Your Library
-   ≡ Queue      ⚙ Settings
-                                   All  Playlists  Albums  Artists
-   ≡  Your Library          ⤢
-
-   Playlists  Albums  Artists      ▄▄▄▄▄▄▄▄▄▄▄▄▄▄    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀ ┃
-                                   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀ ┃
-   ▄▄▄▄  Liked Songs           ┃   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀ ┃
-   ▄▀▀▄  Playlist · 20 songs   ┃   ▄▄▄▄▀▀▀▀▀▀▄▄▄▄     ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀   ┃
-                               │   ▄▄▄▄▄▀▀▀▀▄▄▄▄▄   ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀  │
-   ▀▄▄▀  Late Night Coding ⡄⡇⡆ │   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄   ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀  │
-   ▀▀▀▀  Playlist · Sam        │   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄    ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀  │
-                               │   Liked Songs      Late Nigh… ⡄⡇⡆   Morning Run      Deep Focus       Sunday Morning │
-   ▀▄▄▀  Morning Run           │   Playlist · 20…   Playlist · Sam   Playlist · Sam   Playlist · Sam   Playlist · Sam │
-   ▀▀▀▀  Playlist · Sam        │                                                                                      │
-                               │                                                                                      │
-   ▀▄▄▀  Deep Focus            │    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀    ▀ ▀    ▀ ▀  ▀ │
-   ▀▀▀▀  Playlist · Sam        │    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀    ▀  ▀ ▀▄▀  ▀ ▀ │
-                               │     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀     ▀ ▀  ▄▄▄ ▀ ▀ │
-   ▀▄▄▀  Sunday Morning        │     ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀       ▀ ▄▄▄▄▀▀ ▀   │
-   ▀▀▀▀  Playlist · Sam        │   ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀    ▀ ▀ ▀▀▄▀▀▀  ▀  │
-                               │   ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀    ▀  ▀ ▀▀▀  ▀ ▀  │
-                               │    ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀     ▀ ▀ ▀  ▀ ▀ ▀  │
-                               │   Synthwave Dri…   Golden Era       Jazz in the B…   Random Access…   Discovery      │
-
-  ▀▀  ▀▀ ▀   Around the World  ✓                  ⤨   ◂◂   ❚❚   ▸▸   ↻    ♫  Playlist · Late Night Coding
-  ▀▀▀▄▄▄▀▀   Daft Punk · Homework                                                                ≡   ♪ ━━━━━━━━━━  69%
-  ▀▀▄▄▀▀ ▀   1:21  ━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  7:09
-   ▀▀▀▀▀▀▀
+                                 │
+   ⌂ Home       ⌕ Search         │ Your Library
+   ≡ Queue      ⚙ Settings       │
+                                 │ All  Playlists  Albums  Artists
+   ≡  Your Library          ⤢    │
+                                 │
+   Playlists  Albums  Artists    │ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄          ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀         ▀ ▀    ▀ ▀  ▀ ┃
+                                 │ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄          ▀  ▀ ▀▄▀  ▀ ▀          ▀  ▀ ▀▄▀  ▀ ▀         ▀  ▀ ▀▄▀  ▀ ▀ ┃
+   ▄▄▄▄  Liked Songs           ┃ │ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄           ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀          ▀ ▀  ▄▄▄ ▀ ▀ ┃
+   ▄▀▀▄  Playlist · 20 songs   ┃ │ ▄▄▄▄▀▀▀▀▀▀▄▄▄▄           ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀            ▀ ▄▄▄▄▀▀ ▀   │
+                               │ │ ▄▄▄▄▄▀▀▀▀▄▄▄▄▄         ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀         ▀ ▀ ▀▀▄▀▀▀  ▀  │
+   ▀▄▄▀  Late Night Coding ⡄⡇⡆ │ │ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄         ▀  ▀ ▀▀▀  ▀ ▀          ▀  ▀ ▀▀▀  ▀ ▀         ▀  ▀ ▀▀▀  ▀ ▀  │
+   ▀▀▀▀  Playlist · Sam        │ │ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄          ▀ ▀ ▀  ▀ ▀ ▀           ▀ ▀ ▀  ▀ ▀ ▀          ▀ ▀ ▀  ▀ ▀ ▀  │
+                               │ │ Liked Songs            Late Nigh… ⡄⡇⡆         Morning Run           Deep Focus     │
+   ▀▄▄▀  Morning Run           │ │ Playlist · 20…         Playlist · Sam         Playlist · Sam        Playlist · Sam │
+   ▀▀▀▀  Playlist · Sam        │ │                                                                                    │
+                               │ │                                                                                    │
+   ▀▄▄▀  Deep Focus            │ │                                                                                    │
+   ▀▀▀▀  Playlist · Sam        │ │  ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀          ▀ ▀    ▀ ▀  ▀         ▀ ▀    ▀ ▀  ▀ │
+                               │ │  ▀  ▀ ▀▄▀  ▀ ▀          ▀  ▀ ▀▄▀  ▀ ▀          ▀  ▀ ▀▄▀  ▀ ▀         ▀  ▀ ▀▄▀  ▀ ▀ │
+   ▀▄▄▀  Sunday Morning        │ │   ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀           ▀ ▀  ▄▄▄ ▀ ▀          ▀ ▀  ▄▄▄ ▀ ▀ │
+   ▀▀▀▀  Playlist · Sam        │ │   ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀             ▀ ▄▄▄▄▀▀ ▀            ▀ ▄▄▄▄▀▀ ▀   │
+                               │ │ ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀          ▀ ▀ ▀▀▄▀▀▀  ▀         ▀ ▀ ▀▀▄▀▀▀  ▀  │
+                               │ │ ▀  ▀ ▀▀▀  ▀ ▀          ▀  ▀ ▀▀▀  ▀ ▀          ▀  ▀ ▀▀▀  ▀ ▀         ▀  ▀ ▀▀▀  ▀ ▀  │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ▀ ▀  ▀ ▀ ▀   Around the World  ✓               ⤨   ◂◂    ▌▌    ▸▸   ↻    ♫  Playlist · Late Night Coding
+  ▀ ▀▀▄▄▄▀▀    Daft Punk · Homework                                                              ≡   ♪ ━━━━━━━━━━  69%
+   ▀ ▄▄▀▀▀▀
+   ▀ ▀▀▀▀ ▀▀   1:21  ━━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  7:09
+   ▀▀ ▀ ▀▀ ▀
   enter open   < > filter   . actions   esc back   ^K commands   ? help                                     ▣  tunebox
