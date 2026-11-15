@@ -140,10 +140,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             home::selection_bar(frame, grid, x.saturating_sub(1), y, COVER.height + 2, accent);
         }
         let (title, subtitle, image_url, round) = sidebar::describe(app, entry);
-        if !super::cover_in(frame, app, image_url.as_deref(), COVER, round, (x, y), COVER, grid)
-            && let Some(part) = home::clip(grid, x, COVER.width, y, COVER.height)
-        {
-            super::placeholder(frame.buffer_mut(), part, &title, round);
+        if !super::cover_in(frame, app, image_url.as_deref(), COVER, round, (x, y), COVER, grid) {
+            super::placeholder_in(frame.buffer_mut(), (x, y), COVER, grid, &title, round);
         }
         let playing = is_playing(app, entry);
         let title_style = home::card_title_style(accent, playing, selected);

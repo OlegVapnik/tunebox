@@ -709,15 +709,14 @@ impl Loader {
             // Triangle (bilinear) is several times faster than Lanczos and looks the same when shrinking.
             let (graphic, terminal_bytes) = match picker.protocol_type() {
                 ProtocolType::Kitty => {
-                    // Kitty fits an image into its cells itself, so it is only shrunk to the
-                    // pixels the cells have, never enlarged: that would only add pixels to
-                    // encode, send and store, such as a 640 px cover blown up to fill Now Playing.
+                    // Fill the cells exactly. Fitted in proportion, a square cover leaves a
+                    // letterboxed strip in cells that are about twice as tall as wide, and then
+                    // the gradient placeholder, which does fill its slot, looks larger than the
+                    // artwork it stands in for. The stretch comes only from the cell shape.
                     let font = picker.font_size();
                     let width = u32::from(size.width) * u32::from(font.width);
                     let height = u32::from(size.height) * u32::from(font.height);
-                    if image.width() > width || image.height() > height {
-                        image = image.resize(width, height, FilterType::Triangle);
-                    }
+                    image = image.resize_exact(width, height, FilterType::Triangle);
                     let terminal_bytes = image.width() as usize * image.height() as usize * 4;
                     (Graphic::Cells(picker.new_protocol_cells(image, size)?), terminal_bytes)
                 }

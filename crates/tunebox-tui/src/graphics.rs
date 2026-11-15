@@ -216,8 +216,10 @@ impl Inline {
     /// Encodes `image` to fit `size` cells, in proportion, at the top left.
     pub fn new(kind: ProtocolType, image: &DynamicImage, size: Size, font: FontSize, tmux: bool) -> Result<Self> {
         let (width, height) = (u32::from(font.width), u32::from(font.height));
-        // Triangle (bilinear) is several times faster than Lanczos and looks the same when shrinking.
-        let fitted = image.resize(u32::from(size.width) * width, u32::from(size.height) * height, FilterType::Triangle);
+        // Fill the cells exactly, so artwork and its gradient placeholder cover the same rows.
+        // Triangle (bilinear) is several times faster than Lanczos and looks the same shrinking.
+        let fitted =
+            image.resize_exact(u32::from(size.width) * width, u32::from(size.height) * height, FilterType::Triangle);
         let size = Size::new(fitted.width().div_ceil(width) as u16, fitted.height().div_ceil(height) as u16);
         // Whole cells, so that rows are as tall as cells; the rest stays transparent.
         let mut canvas = RgbaImage::new(u32::from(size.width) * width, u32::from(size.height) * height);

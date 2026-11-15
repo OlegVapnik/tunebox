@@ -418,7 +418,7 @@ impl Catalog {
         if shelves.is_empty() {
             bail!("Spotify returned nothing for Home; try Search instead");
         }
-        Ok(Home { greeting: "Spotify".into(), chips: Vec::new(), shelves })
+        Ok(Home { greeting: String::new(), chips: Vec::new(), shelves })
     }
 
     /// An artist page without Spotify's own app: their top songs and albums from the Web API.

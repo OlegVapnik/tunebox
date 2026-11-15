@@ -159,7 +159,13 @@ impl SoundCloud {
 
     pub async fn home(&self, _chip: Option<&str>) -> Result<Home> {
         let mut shelves = Vec::new();
-        if let Ok(trending) = self.trending().await {
+        // The charts endpoint is the first thing SoundCloud breaks; a search for what is popular
+        // fills the same shelf when it does.
+        let trending = match self.trending().await {
+            Ok(tracks) if !tracks.is_empty() => Ok(tracks),
+            _ => self.search_tracks("popular", 30).await,
+        };
+        if let Ok(trending) = trending {
             if !trending.is_empty() {
                 let context = songs_context(&trending);
                 shelves.push(Shelf {
@@ -223,7 +229,7 @@ impl SoundCloud {
                 });
             }
         }
-        Ok(Home { greeting: "SoundCloud".into(), chips: Vec::new(), shelves })
+        Ok(Home { greeting: String::new(), chips: Vec::new(), shelves })
     }
 
     pub async fn search(&self, query: &str) -> Result<SearchResults> {

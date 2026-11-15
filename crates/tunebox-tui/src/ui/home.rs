@@ -679,8 +679,7 @@ pub(super) fn draw_cover(
     if super::cover_in(frame, app, item.image_url.as_deref(), size, round, (x, y), size, clip) {
         return;
     }
-    let Some(part) = self::clip(clip, x, size.width, y, size.height) else { return };
-    super::placeholder(frame.buffer_mut(), part, &item.title, round);
+    super::placeholder_in(frame.buffer_mut(), (x, y), size, clip, &item.title, round);
 }
 
 #[cfg(test)]

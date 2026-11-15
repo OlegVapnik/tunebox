@@ -202,33 +202,49 @@ fn tile(buf: &mut Buffer, (x, y): (u16, i32), size: Size, slot: Size, clip: Rect
 /// Stands in for a cover nobody has: a gradient picked by the name, with its first letter. A
 /// shelf of these reads as a designed placeholder rather than as a failed load.
 pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool) {
-    let area = area.intersection(buf.area);
-    if area.is_empty() || area.width == 0 {
+    placeholder_in(buf, (area.x, area.y as i32), area.as_size(), area, name, round);
+}
+
+/// Like [`placeholder`], for a slot at `(x, y)` that may reach past `clip` while scrolling: the
+/// gradient keeps its rows from the top of the slot, so a half-scrolled card shows the part of
+/// the placeholder that belongs there.
+pub(super) fn placeholder_in(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: Rect, name: &str, round: bool) {
+    if size.width == 0 || size.height == 0 {
         return;
     }
     let (from, to) = theme::placeholder_colors(name);
-    let last = area.height.saturating_sub(1).max(1) as f32;
-    for (row, y) in (area.top()..area.bottom()).enumerate() {
-        let shade = from.mix(to, row as f32 / last);
-        let mut band = Rect::new(area.x, y, area.width, 1);
-        // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
-        // placeholder then has the same silhouette as a masked image.
-        let height = area.height as usize;
-        let (depth, inset) = if round { (2usize, 2u16) } else { (0usize, 0u16) };
-        let edge = depth > 0 && (row < depth || row + depth >= height) && height > 2 * depth;
-        if edge && band.width > 4 {
-            band = Rect::new(band.x + inset, y, band.width - 2 * inset, 1);
+    let last = size.height.saturating_sub(1).max(1) as f32;
+    let height = size.height as usize;
+    // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
+    // placeholder then has the same silhouette as a masked image.
+    let (depth, inset) = if round { (2usize, 2u16) } else { (1usize, 1u16) };
+    for row in 0..height {
+        let screen = y + row as i32;
+        if screen < clip.y as i32 || screen >= clip.bottom() as i32 {
+            continue;
         }
-        buf.set_style(band, Style::new().bg(shade.into()));
+        let shade = from.mix(to, row as f32 / last);
+        let mut band = Rect::new(x, screen as u16, size.width, 1);
+        let edge = (row < depth || row + depth >= height) && height > 2 * depth;
+        if edge && band.width > 4 {
+            band = Rect::new(band.x + inset, screen as u16, band.width - 2 * inset, 1);
+        }
+        let band = band.intersection(clip).intersection(buf.area);
+        if !band.is_empty() {
+            buf.set_style(band, Style::new().bg(shade.into()));
+        }
     }
     let initial = name.chars().find(|c| !c.is_whitespace()).map(|c| c.to_uppercase().to_string()).unwrap_or_default();
-    if initial.is_empty() || area.width < initial.width() as u16 {
+    if initial.is_empty() || size.width < initial.width() as u16 {
         return;
     }
-    let x = area.x + (area.width - initial.width() as u16) / 2;
-    let y = area.y + area.height / 2;
+    let x = x + (size.width - initial.width() as u16) / 2;
+    let y = y + (size.height / 2) as i32;
+    if y < clip.y as i32 || y >= clip.bottom() as i32 || x + initial.width() as u16 > clip.right() {
+        return;
+    }
     let ink = from.mix(theme::Rgb(255, 255, 255), 0.85);
-    buf.set_string(x, y, initial, Style::new().fg(ink.into()).bold());
+    buf.set_string(x, y as u16, initial, Style::new().fg(ink.into()).bold());
 }
 
 /// Draws an image centered in `slot`; returns where it went, for dev snapshots.
@@ -436,5 +452,15 @@ mod tests {
         let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));
         placeholder(&mut other, area, "morning run", true);
         assert_eq!(buf[(4, 1)].bg, other[(4, 1)].bg);
+    }
+
+    #[test]
+    fn a_scrolled_placeholder_paints_only_its_visible_rows() {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 4));
+        let area = buf.area;
+        // A six-row slot scrolled up by two: the screen starts at the slot's third row.
+        placeholder_in(&mut buf, (0, -2), Size::new(6, 6), area, "morning run", false);
+        assert_ne!(buf[(0, 0)].bg, Color::Reset, "the visible part is painted");
+        assert_eq!(buf[(0, 3)].bg, Color::Reset, "the rounded bottom corner is cleared");
     }
 }
