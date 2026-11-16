@@ -416,9 +416,12 @@ pub(super) fn draw_shelf(
         {
             buf.set_string(text_x, y, &second, title_style);
         }
-        // The subtitle follows the title directly, whether it took one line or two.
+        // The subtitle follows the title directly, whether it took one line or two. SoundCloud
+        // sometimes gives a one-character owner name; on its own that reads as a stray glyph.
         let subtitle_y = text_y + if second.is_empty() { 1 } else { 2 };
-        if let Some(y) = row(area, subtitle_y) {
+        if item.subtitle.trim().chars().count() > 1
+            && let Some(y) = row(area, subtitle_y)
+        {
             buf.set_string(x, y, text::truncate(&item.subtitle, width), Style::new().fg(p.muted));
         }
         app.hits.push((card, Hit::Card { shelf: layout.index, item: index }));
