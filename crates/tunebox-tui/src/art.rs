@@ -104,8 +104,45 @@ fn glyph(letter: char) -> Option<[u8; 5]> {
         '7' => [0b111, 0b001, 0b010, 0b010, 0b010],
         '8' => [0b010, 0b101, 0b010, 0b101, 0b010],
         '9' => [0b010, 0b101, 0b011, 0b001, 0b110],
+        // Cyrillic initials are common in the user's libraries; keep them in the image too.
+        'А' => [0b010, 0b101, 0b111, 0b101, 0b101],
+        'Б' => [0b110, 0b100, 0b110, 0b101, 0b110],
+        'В' => [0b110, 0b101, 0b110, 0b101, 0b110],
+        'Г' => [0b111, 0b100, 0b100, 0b100, 0b100],
+        'Д' => [0b010, 0b101, 0b101, 0b101, 0b111],
+        'Е' | 'Ё' => [0b111, 0b100, 0b110, 0b100, 0b111],
+        'Ж' => [0b101, 0b101, 0b111, 0b101, 0b101],
+        'З' => [0b111, 0b001, 0b111, 0b001, 0b111],
+        'И' | 'Й' => [0b101, 0b101, 0b111, 0b101, 0b101],
+        'К' => [0b101, 0b101, 0b110, 0b101, 0b101],
+        'Л' => [0b100, 0b100, 0b100, 0b100, 0b111],
+        'М' => [0b101, 0b111, 0b111, 0b101, 0b101],
+        'Н' => [0b101, 0b101, 0b111, 0b101, 0b101],
+        'О' => [0b010, 0b101, 0b101, 0b101, 0b010],
+        'П' => [0b111, 0b101, 0b101, 0b101, 0b101],
+        'Р' => [0b110, 0b101, 0b110, 0b100, 0b100],
+        'С' => [0b011, 0b100, 0b100, 0b100, 0b011],
+        'Т' => [0b111, 0b010, 0b010, 0b010, 0b010],
+        'У' => [0b101, 0b101, 0b101, 0b011, 0b001],
+        'Ф' => [0b010, 0b101, 0b111, 0b101, 0b010],
+        'Х' => [0b101, 0b101, 0b010, 0b101, 0b101],
+        'Ц' => [0b101, 0b101, 0b101, 0b011, 0b001],
+        'Ч' => [0b110, 0b010, 0b010, 0b010, 0b010],
+        'Ш' => [0b101, 0b101, 0b111, 0b111, 0b101],
+        'Щ' => [0b101, 0b101, 0b111, 0b111, 0b001],
+        'Ъ' => [0b110, 0b101, 0b110, 0b101, 0b110],
+        'Ы' => [0b101, 0b101, 0b110, 0b101, 0b101],
+        'Ь' => [0b110, 0b100, 0b110, 0b101, 0b110],
+        'Э' => [0b011, 0b100, 0b100, 0b100, 0b011],
+        'Ю' => [0b101, 0b111, 0b110, 0b101, 0b101],
+        'Я' => [0b010, 0b101, 0b011, 0b101, 0b101],
         _ => return None,
     })
+}
+
+/// Whether the generated cover can draw this initial itself; otherwise the view keeps its text one.
+pub fn has_glyph(letter: char) -> bool {
+    glyph(letter).is_some()
 }
 
 fn letter_coverage(letter: Option<[u8; 5]>, x: u32, y: u32) -> f32 {
@@ -201,8 +238,20 @@ mod tests {
     }
 
     #[test]
+    fn a_cyrillic_initial_is_drawn_into_the_cover() {
+        assert!(has_glyph('Э'));
+        let with_letter = name_cover("Эндорфин");
+        let without_letter = name_cover("1ндорфин");
+        let a = with_letter.to_rgba8();
+        let b = without_letter.to_rgba8();
+        let different = (0..SIZE).any(|y| (0..SIZE).any(|x| a.get_pixel(x, y).0 != b.get_pixel(x, y).0));
+        assert!(different, "a Cyrillic initial must be visible in the generated art");
+    }
+
+    #[test]
     fn a_name_without_a_known_glyph_still_gets_a_gradient() {
-        let image = name_cover("Привет");
+        assert!(!has_glyph('日'));
+        let image = name_cover("日本語");
         assert_eq!(image.width(), SIZE);
         assert_eq!(image.height(), SIZE);
     }

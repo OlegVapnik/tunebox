@@ -28,6 +28,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::clock::Instant;
 use crate::{
     app::{App, Focus, Hit, not_animated},
+    art,
     graphics::INLINE_CELL,
     icons::icons,
     loader::{Graphic, Picture},
@@ -223,10 +224,11 @@ pub(super) fn placeholder_in(
     if let Some(picture) = app.placeholder_image(name, size, round) {
         if let Some(placement) = picture_in(frame, picture, (x, y), size, clip) {
             app.placements.push(placement);
-            // Latin initials are already drawn into the image at cover size; a text initial on
-            // top of them would read as a double letter. Other scripts keep the text version.
-            let ascii_initial = name.chars().find(|c| !c.is_whitespace()).is_some_and(|c| c.is_ascii_alphanumeric());
-            if !ascii_initial {
+            // Latin and Cyrillic initials are already drawn into the image at cover size; a text
+            // initial on top of them would read as a double letter. Other scripts keep text.
+            let drawn_in_image =
+                name.chars().find(|c| !c.is_whitespace()).is_some_and(|c| art::has_glyph(c.to_ascii_uppercase()));
+            if !drawn_in_image {
                 let (from, _) = theme::placeholder_colors(name);
                 placeholder_initial(frame.buffer_mut(), (x, y), size, clip, name, from);
             }
