@@ -2522,6 +2522,29 @@ impl App {
         }
     }
 
+    /// The track the keyboard selection rests on, if any: prefetching it makes Enter start
+    /// playback without waiting for a first resolve and context fetch.
+    pub fn selected_track_uri(&self) -> Option<String> {
+        match &self.view {
+            View::Tracks(v) => v.tracks.get(v.list.selected).map(|t| t.uri.clone()),
+            View::Search(v) => match v.selected() {
+                Some(SearchEntry::Track(t)) => Some(t.uri.clone()),
+                _ => None,
+            },
+            View::Queue(v) => match v.selected() {
+                Some(QueueRow::Playing(t) | QueueRow::Next { track: t, .. }) => Some(t.uri.clone()),
+                _ => None,
+            },
+            View::Home(v) => v.selected().map(|item| item.uri.clone()),
+            View::Artist(v) => match v.selected() {
+                Some(ArtistSelection::Track(t)) => Some(t.track.uri.clone()),
+                Some(ArtistSelection::Item(item)) => Some(item.uri.clone()),
+                None => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Moves the cursor to a clicked row, card or sidebar entry.
     fn select(&mut self, hit: Hit) {
         match hit {
@@ -3348,9 +3371,9 @@ impl App {
         }
         self.prefetch = queue;
 
-        // Prefetch the stream of the track under the mouse, so playing it later starts without
-        // waiting for yt-dlp. Debounced, so a resting cursor doesn't hammer the service.
-        if let Some(uri) = self.hovered_track_uri()
+        // Prefetch the selected track's stream, so pressing Enter starts without waiting for
+        // yt-dlp or a context fetch. The mouse cursor wins when it points at a different track.
+        if let Some(uri) = self.selected_track_uri().or_else(|| self.hovered_track_uri())
             && self.player().is_some()
             && backend::is_playable(&uri)
             && self

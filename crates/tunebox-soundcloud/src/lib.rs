@@ -781,7 +781,7 @@ fn track(value: &Value) -> Option<Track> {
             .or_else(|| value["duration"].as_u64())
             .unwrap_or(0)
             .min(u64::from(u32::MAX)) as u32,
-        image_url: value["artwork_url"].as_str().map(artwork),
+        image_url: artwork_url(&value),
     })
 }
 
@@ -799,7 +799,7 @@ fn playlist(value: &Value) -> Option<PlaylistInfo> {
         owner_name: user["username"].as_str().unwrap_or_default().to_owned(),
         collaborative: false,
         total: value["track_count"].as_u64().map(|count| count.min(u64::from(u32::MAX)) as u32),
-        image_url: value["artwork_url"].as_str().map(artwork),
+        image_url: artwork_url(&value),
     })
 }
 
@@ -818,7 +818,7 @@ fn album(value: &Value) -> Option<AlbumInfo> {
             .unwrap_or_default()
             .to_owned(),
         total: value["track_count"].as_u64().unwrap_or(0).min(u64::from(u32::MAX)) as u32,
-        image_url: value["artwork_url"].as_str().map(artwork),
+        image_url: artwork_url(&value),
     })
 }
 
@@ -860,6 +860,14 @@ fn songs_context(tracks: &[Track]) -> String {
 }
 
 /// Asks for a bigger cover than the one lists show.
+/// The artwork a track or playlist has, or the uploader's avatar when it has none.
+fn artwork_url(value: &serde_json::Value) -> Option<String> {
+    value["artwork_url"]
+        .as_str()
+        .or_else(|| value["user"]["avatar_url"].as_str())
+        .map(artwork)
+}
+
 fn artwork(url: &str) -> String {
     url.replace("-large.", "-t500x500.").replace("-badge.", "-t500x500.")
 }
