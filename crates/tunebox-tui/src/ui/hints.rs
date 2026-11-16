@@ -42,7 +42,9 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         return;
     }
     if let Some(pinned) = app.pinned.clone() {
-        return draw_pinned(buf, app, Rect { width, ..area }, &pinned);
+        if pinned.service.is_none() || pinned.service == app.shown_service() {
+            return draw_pinned(buf, app, Rect { width, ..area }, &pinned);
+        }
     }
 
     let mut x = area.x + 2;

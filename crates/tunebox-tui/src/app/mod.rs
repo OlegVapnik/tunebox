@@ -57,7 +57,7 @@ use crate::{
 /// Cover art size in the player bar, in cells (roughly square in most fonts).
 pub const COVER_SIZE: Size = Size { width: 10, height: 5 };
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(250);
-const STATUS_TTL: Duration = Duration::from_secs(4);
+const STATUS_TTL: Duration = Duration::from_secs(8);
 /// How long after the start tunebox waits before it asks for a star, so the first screen is up.
 const STAR_DELAY: Duration = Duration::from_secs(5);
 const SEEK_STEP_MS: i64 = 5_000;
@@ -405,6 +405,8 @@ pub struct Pinned {
     pub command: Option<String>,
     pub copied: bool,
     pub cause: Cause,
+    /// The service this problem belongs to, so it only shows on that service's tab.
+    pub service: Option<Service>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1214,7 +1216,7 @@ impl App {
             }
             PlayerEvent::Blocked { reason } => {
                 self.pinned =
-                    Some(Pinned { text: reason.clone(), command: None, copied: false, cause: Cause::Blocked });
+                    Some(Pinned { text: reason.clone(), command: None, copied: false, cause: Cause::Blocked, service: self.service() });
             }
             PlayerEvent::Playing { .. } => self.unpin(Cause::Blocked),
             _ => {}
@@ -4136,7 +4138,7 @@ impl App {
     pub(crate) fn error(&mut self, text: String) {
         // An expired sign-in stays, with the command that renews it.
         if let Some(command) = sign_in_command(&text) {
-            self.pinned = Some(Pinned { text, command: Some(command), copied: false, cause: Cause::SignIn });
+            self.pinned = Some(Pinned { text, command: Some(command), copied: false, cause: Cause::SignIn, service: self.service() });
             return;
         }
         self.status = Some(Status { text, error: true, since: Instant::now() });

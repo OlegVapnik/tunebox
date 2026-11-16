@@ -114,7 +114,11 @@ impl WebApi {
                     match delay {
                         Some(delay) if retries && attempt < MAX_ATTEMPTS => delay,
                         _ => {
-                            let body = serde_json::from_slice(&response.bytes().await?).unwrap_or(Value::Null);
+                            let bytes = response.bytes().await?;
+                            let body = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+                            if !status.is_success() {
+                                tracing::warn!("Spotify {path}: {status} {body}");
+                            }
                             return Ok(ApiResponse { status, body });
                         }
                     }

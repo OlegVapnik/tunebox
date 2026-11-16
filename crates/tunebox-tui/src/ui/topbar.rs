@@ -62,7 +62,12 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     if let Some(me) = &app.me
         && wide
     {
-        let name = format!("{}  {}", icons().artist, me.name);
+        let mut name = format!("{}  {}", icons().artist, me.name);
+        if app.shown_service() == Some(Service::Spotify)
+            && me.product.as_deref() == Some("free")
+        {
+            name.push_str("  · Free");
+        }
         let width = name.width() as u16;
         if right.saturating_sub(width) > search.right() + 2 {
             buf.set_string(right - width, row, name, Style::new().fg(p.muted));
@@ -130,30 +135,52 @@ fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: 
         return None;
     }
     let shown = app.shown_service();
-    let labels = |service: Service| {
-        let icon = icons::service(service);
-        let short = match service {
-            Service::Spotify => "Spotify",
-            Service::YouTubeMusic => "YouTube",
-            Service::SoundCloud => "SoundCloud",
-        };
-        let initials = match service {
-            Service::Spotify => "S",
-            Service::YouTubeMusic => "YT",
-            Service::SoundCloud => "SC",
-        };
-        let with_icon = |label: &str| if icon.is_empty() { label.to_owned() } else { format!("{icon}  {label}") };
-        let bare = if icon.is_empty() { initials } else { icon };
-        [with_icon(service.name()), with_icon(short), bare.to_owned()]
+    let icon_of = |service: Service| icons::service(service);
+    let short_of = |service: Service| match service {
+        Service::Spotify => "Spotify",
+        Service::YouTubeMusic => "YouTube",
+        Service::SoundCloud => "SoundCloud",
     };
-    let level = (0..3).find(|&level| {
-        let widths = services.iter().map(|&service| labels(service)[level].width() as u16 + 2 * padding + 1);
-        widths.sum::<u16>().saturating_sub(1) <= room
-    })?;
+    let initials_of = |service: Service| match service {
+        Service::Spotify => "S",
+        Service::YouTubeMusic => "YT",
+        Service::SoundCloud => "SC",
+    };
+    // The service that is open keeps its name; the others show only their icon, so the
+    // active one is the one you can read at a glance.
+    let text_for = |service: Service| {
+        let icon = icon_of(service);
+        if Some(service) == shown {
+            let short = short_of(service);
+            if icon.is_empty() { short.to_owned() } else { format!("{icon}  {short}") }
+        } else {
+            let initials = initials_of(service);
+            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
+        }
+    };
+    let full_width: u16 = services.iter().map(|&s| text_for(s).width() as u16 + 2 * padding).sum::<u16>().saturating_sub(1);
+    let use_names = full_width <= room;
+    // Fall back to icons only when even the active name does not fit.
+    let icon_only = !use_names && services.iter().map(|&s| {
+        let icon = icon_of(s);
+        let initials = initials_of(s);
+        let bare = if icon.is_empty() { initials } else { icon };
+        bare.width() as u16 + 2 * padding
+    }).sum::<u16>().saturating_sub(1) > room;
     let mut x = right;
     let mut first = right;
     for &service in services.iter().rev() {
-        let label = labels(service)[level].clone();
+        let label = if icon_only {
+            let icon = icon_of(service);
+            let initials = initials_of(service);
+            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
+        } else if use_names {
+            text_for(service)
+        } else {
+            let icon = icon_of(service);
+            let initials = initials_of(service);
+            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
+        };
         let width = label.width() as u16 + 2 * padding;
         let area = Rect::new(x.saturating_sub(width), y, width, 1).intersection(buf.area);
         let style = if Some(service) == shown {

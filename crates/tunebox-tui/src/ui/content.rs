@@ -146,6 +146,8 @@ fn tracks(
     let count = view.total.unwrap_or(view.tracks.len() as u32);
     let length = if view.loading {
         "…".to_owned()
+    } else if view.error.is_some() {
+        "—".to_owned()
     } else {
         text::total_duration(view.tracks.iter().map(|t| t.duration_ms as u64).sum())
     };
@@ -160,6 +162,11 @@ fn tracks(
             let meta = parts.into_iter().filter(|part| !part.is_empty()).collect::<Vec<_>>().join(" · ");
             ("ALBUM", a.name.clone(), meta)
         }
+    };
+    let meta = if let Some(err) = &view.error {
+        format!("✕  {err}")
+    } else {
+        meta
     };
     // The header and its divider need seven rows; below six list rows they are not worth it.
     if area.height < 13 {

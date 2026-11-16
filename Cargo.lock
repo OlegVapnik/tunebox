@@ -4583,7 +4583,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tunebox"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -4610,7 +4610,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-core"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "etcetera",
@@ -4629,7 +4629,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-mpv"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4644,7 +4644,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-os"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "block2",
  "dispatch2",
@@ -4665,7 +4665,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-player"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "librespot",
@@ -4679,7 +4679,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-soundcloud"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4694,7 +4694,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-spotify"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4719,7 +4719,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-tui"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -4754,7 +4754,7 @@ dependencies = [
 
 [[package]]
 name = "tunebox-ytmusic"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "async-trait",

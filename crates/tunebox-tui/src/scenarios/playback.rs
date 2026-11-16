@@ -241,7 +241,8 @@ async fn an_expired_sign_in_stays_until_closed() {
     h.fake(YOUTUBE).send(PlayerEvent::Unavailable { uri: "ytmusic:track:a1-2".into(), refused: false });
     h.settle().await;
     assert!(h.shows("A song couldn't load"), "{}", h.screen());
-    h.wait(Duration::from_secs(5)).await;
+    // The short-lived notice yields to the pinned problem after its 8s TTL.
+    h.wait(Duration::from_secs(9)).await;
     assert!(h.shows("tunebox login ytmusic"), "{}", h.screen());
 
     h.click_on("click to copy").await;

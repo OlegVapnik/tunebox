@@ -837,7 +837,7 @@ fn user(value: &Value) -> Result<User> {
         .map(|id| id.to_string())
         .or_else(|| value["id"].as_str().map(str::to_owned))
         .context("SoundCloud's account has no ID")?;
-    Ok(User { id, name: value["username"].as_str().unwrap_or_default().to_owned() })
+    Ok(User { id, name: value["username"].as_str().unwrap_or_default().to_owned(), product: None })
 }
 
 fn song_item(track: &Track) -> HomeItem {

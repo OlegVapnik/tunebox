@@ -59,7 +59,7 @@ async fn the_demo_says_it_plays_nothing() {
     assert!(h.shows("This is the demo: nothing plays here"));
     assert!(h.shows("Around the World"), "the song stays");
     assert!(h.shows("Playlist · Late Night Coding"), "and so does what it plays from:\n{}", h.screen());
-    h.wait(Duration::from_secs(5)).await;
+    h.wait(Duration::from_secs(9)).await;
     assert!(!h.shows("nothing plays here"), "the notice goes away");
 }
 

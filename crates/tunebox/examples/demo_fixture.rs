@@ -172,7 +172,7 @@ async fn main() -> Result<()> {
     let session = session::prepare(&paths)?.connect().await?;
     let pathfinder = Pathfinder::new(session.clone(), paths.pathfinder_hashes());
     let mut builder = Builder { api, found: HashMap::new() };
-    let user = User { id: slug(&plan.user), name: plan.user.clone() };
+    let user = User { id: slug(&plan.user), name: plan.user.clone(), product: None };
 
     println!("Albums");
     let mut albums = Vec::new();

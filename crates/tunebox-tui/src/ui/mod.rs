@@ -213,23 +213,26 @@ pub(super) fn placeholder_in(buf: &mut Buffer, (x, y): (u16, i32), size: Size, c
         return;
     }
     let (from, to) = theme::placeholder_colors(name);
-    let last = size.height.saturating_sub(1).max(1) as f32;
     let height = size.height as usize;
     // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
-    // placeholder then has the same silhouette as a masked image.
-    let (depth, inset) = if round { (2usize, 2u16) } else { (1usize, 1u16) };
+    // placeholder then has the same silhouette as a masked image. A two-step staircase
+    // reads as a smooth curve rather than a single octagonal notch.
     for row in 0..height {
         let screen = y + row as i32;
         if screen < clip.y as i32 || screen >= clip.bottom() as i32 {
             continue;
         }
-        let shade = from.mix(to, row as f32 / last);
-        let mut band = Rect::new(x, screen as u16, size.width, 1);
-        let edge = (row < depth || row + depth >= height) && height > 2 * depth;
-        if edge && band.width > 4 {
-            band = Rect::new(band.x + inset, screen as u16, band.width - 2 * inset, 1);
+        let shade = from.mix(to, row as f32 / (height.saturating_sub(1).max(1) as f32));
+        let inset = if round {
+            if row < 2 || row + 2 >= height { 2u16 } else if row < 3 || row + 3 >= height { 1 } else { 0 }
+        } else {
+            if row == 0 || row + 1 >= height { 2u16 } else if row == 1 || row + 2 >= height { 1 } else { 0 }
+        };
+        let width = size.width.saturating_sub(2 * inset);
+        if width == 0 {
+            continue;
         }
-        let band = band.intersection(clip).intersection(buf.area);
+        let band = Rect::new(x + inset, screen as u16, width, 1).intersection(clip).intersection(buf.area);
         if !band.is_empty() {
             buf.set_style(band, Style::new().bg(shade.into()));
         }
@@ -446,12 +449,12 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 3));
         let area = buf.area;
         placeholder(&mut buf, area, "morning run", false);
-        assert_ne!(buf[(1, 0)].bg, buf[(1, 2)].bg, "the gradient runs top to bottom");
+        assert_ne!(buf[(2, 0)].bg, buf[(2, 2)].bg, "the gradient runs top to bottom");
         assert_eq!(buf[(2, 1)].symbol(), "M", "the first letter, centered");
         // The same name always gets the same placeholder.
         let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));
         placeholder(&mut other, area, "morning run", true);
-        assert_eq!(buf[(4, 1)].bg, other[(4, 1)].bg);
+        assert_eq!(buf[(3, 1)].bg, other[(3, 1)].bg);
     }
 
     #[test]

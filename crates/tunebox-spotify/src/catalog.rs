@@ -37,7 +37,7 @@ const METADATA_CONCURRENCY: usize = 8;
 
 pub async fn me(api: &WebApi) -> Result<User> {
     let raw: RawUser = api.get_json("/me").await?;
-    Ok(User { name: raw.display_name.unwrap_or_else(|| raw.id.clone()), id: raw.id })
+    Ok(User { name: raw.display_name.unwrap_or_else(|| raw.id.clone()), id: raw.id, product: raw.product })
 }
 
 /// All playlists in the user's library, owned and followed.
@@ -398,6 +398,8 @@ struct RawPage<T> {
 struct RawUser {
     id: String,
     display_name: Option<String>,
+    #[serde(default)]
+    product: Option<String>,
 }
 
 #[derive(Deserialize)]

@@ -82,7 +82,7 @@ fn parse_me(page: &Value) -> Option<User> {
     let channel = ids.iter().filter_map(|id| id.as_str()).find(|id| id.starts_with("UC"));
     let handle = text(&header["channelHandle"]);
     let id = channel.map(str::to_owned).or_else(|| (!handle.is_empty()).then_some(handle)).unwrap_or(name.clone());
-    (!name.is_empty()).then_some(User { id, name })
+    (!name.is_empty()).then_some(User { id, name, product: None })
 }
 
 pub(crate) async fn playlists(api: &InnerTube, library: &Library) -> Result<Vec<PlaylistInfo>> {

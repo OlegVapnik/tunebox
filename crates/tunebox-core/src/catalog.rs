@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub product: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

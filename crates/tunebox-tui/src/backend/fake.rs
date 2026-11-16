@@ -308,7 +308,7 @@ impl Fake {
     // ── Catalog ──────────────────────────────────────────────────────────────────────────
 
     pub async fn me(&self) -> Result<User> {
-        Ok(User { id: "tester".into(), name: "Tester".into() })
+        Ok(User { id: "tester".into(), name: "Tester".into(), product: None })
     }
 
     /// A shelf of cards, and on YouTube Music chips and Quick picks too. A chip's Home has a
