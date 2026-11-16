@@ -97,6 +97,11 @@ impl Mpv {
                 "--title=${media-title}",
                 "--prefetch-playlist=yes",
                 "--gapless-audio=weak",
+                // Keep a little of the network stream ahead of the decoder, so a short stall
+                // in the connection doesn't cut the song off. Resolved URLs are direct media.
+                "--cache=yes",
+                "--cache-secs=20",
+                "--demuxer-readahead-secs=20",
                 "--keep-open=no",
                 "--msg-level=all=error",
             ])

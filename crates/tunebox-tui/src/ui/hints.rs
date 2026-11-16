@@ -51,7 +51,10 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     // Without the commands for what the service lacks, like DJ.
     let offered =
         |action: &Option<HintAction>| !matches!(action, Some(HintAction::Run(command)) if !app.offers(*command));
-    let hints: Vec<&Hint> = hints(app).iter().filter(|(_, _, action)| offered(action)).collect();
+    let mut hints: Vec<&Hint> = hints(app).iter().filter(|(_, _, action)| offered(action)).collect();
+    if app.view.has_error() {
+        hints.insert(0, &("r", "retry", Some(HintAction::Key(KeyCode::Char('r')))));
+    }
     for (key, label, action) in hints {
         let len = (key.width() + 1 + label.width()) as u16;
         if x + len > area.x + width {

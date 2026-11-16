@@ -1165,6 +1165,11 @@ impl App {
                 self.next_view_id += 1;
                 v.load(self.next_view_id, |id, source| self.loader.tracks(id, source));
             }
+            View::Search(v) if v.error.is_some() => {
+                v.error = None;
+                v.loading = true;
+                self.loader.search(v.id, v.query.trim().to_owned());
+            }
             _ => {}
         }
     }
@@ -2000,6 +2005,11 @@ impl App {
                 Some(command) if ctrl => self.run(command),
                 _ => self.on_search_input(key),
             }
+            return;
+        }
+        // `r` is repeat as usual, but retries a page that failed to load.
+        if key.code == KeyCode::Char('r') && self.view.has_error() {
+            self.reload_failed_view();
             return;
         }
         if let Some(command) = Command::from_key(&key) {

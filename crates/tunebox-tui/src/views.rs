@@ -794,6 +794,17 @@ impl View {
             View::Queue(v) => v.id,
         }
     }
+
+    /// A page that failed to load and can be retried with `r`.
+    pub fn has_error(&self) -> bool {
+        match self {
+            View::Home(v) => v.error.is_some(),
+            View::Artist(v) => v.error.is_some(),
+            View::Tracks(v) => v.error.is_some(),
+            View::Search(v) => v.error.is_some(),
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
