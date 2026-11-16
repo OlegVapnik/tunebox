@@ -179,56 +179,6 @@ impl SoundCloud {
                 });
             }
         }
-        if let Ok((playlists, _)) = self.search_playlists("popular", 24).await {
-            if !playlists.is_empty() {
-                shelves.push(Shelf {
-                    uri: "soundcloud:search:popular".into(),
-                    title: "Playlists to try".into(),
-                    strapline: String::new(),
-                    shortcuts: false,
-                    songs: false,
-                    play_all: None,
-                    items: playlists
-                        .iter()
-                        .map(|playlist| HomeItem {
-                            uri: playlist.uri.clone(),
-                            kind: ItemKind::Playlist,
-                            title: playlist.name.clone(),
-                            subtitle: playlist.owner_name.clone(),
-                            image_url: playlist.image_url.clone(),
-                            owner_id: playlist.owner_id.clone(),
-                            owner_name: playlist.owner_name.clone(),
-                            context_uri: playlist.uri.clone(),
-                        })
-                        .collect(),
-                });
-            }
-        }
-        if let Ok((_, albums)) = self.search_playlists("album", 24).await {
-            if !albums.is_empty() {
-                shelves.push(Shelf {
-                    uri: "soundcloud:search:album".into(),
-                    title: "Albums on SoundCloud".into(),
-                    strapline: String::new(),
-                    shortcuts: false,
-                    songs: false,
-                    play_all: None,
-                    items: albums
-                        .iter()
-                        .map(|album| HomeItem {
-                            uri: album.uri.clone(),
-                            kind: ItemKind::Album,
-                            title: album.name.clone(),
-                            subtitle: album.artists.join(", "),
-                            image_url: album.image_url.clone(),
-                            owner_id: String::new(),
-                            owner_name: String::new(),
-                            context_uri: album.uri.clone(),
-                        })
-                        .collect(),
-                });
-            }
-        }
         Ok(Home { greeting: String::new(), chips: Vec::new(), shelves })
     }
 

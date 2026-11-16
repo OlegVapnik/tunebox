@@ -46,6 +46,10 @@ impl App {
             if age > GREETING_FRESH {
                 home.greeting.clear();
             }
+            if service == Service::SoundCloud {
+                // SoundCloud Home no longer has these shelves; don't show them from an old cache.
+                home.shelves.retain(|shelf| !shelf.uri.starts_with("soundcloud:search:"));
+            }
             if let View::Home(v) = &mut self.view {
                 *v = HomeView::new(v.id, Some(home.clone()));
             }

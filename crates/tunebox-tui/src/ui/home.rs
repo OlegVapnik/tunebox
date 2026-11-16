@@ -12,6 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use super::{text, wordmark};
 use crate::{
     app::{App, Focus, Hit},
+    backend::Service,
     theme,
     views::{self, SONG_ROWS, View},
 };
@@ -115,7 +116,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     let focused = app.focus == Focus::Content;
     let frame_no = app.frame();
-    let service = app.shown_service().map(|service| service.name()).unwrap_or("music");
+    let shown_service = app.shown_service();
+    let service = shown_service.map(|service| service.name()).unwrap_or("music");
     let View::Home(view) = &mut app.view else { return };
 
     let Some(home) = &view.home else {
@@ -130,7 +132,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     // Everything scrolls together, greeting or chips included; positions are rows from the top.
     let heights: Vec<u16> = home.shelves.iter().map(|s| shelf_height(s, inner.width)).collect();
     let mut starts = Vec::with_capacity(heights.len());
-    let mut total: u16 = 3;
+    // SoundCloud has no greeting or chips; leave just one row of air above the first shelf.
+    let no_greeting = shown_service == Some(Service::SoundCloud);
+    let mut total: u16 = if no_greeting { 1 } else { 3 };
     for height in &heights {
         starts.push(total);
         total += height;
@@ -153,7 +157,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let scroll = view.scroll;
 
     let mut chip_hits = Vec::new();
-    if scroll == 0 {
+    if scroll == 0 && !no_greeting {
         let spinner = view.loading.then(|| Span::styled(format!("   {}", text::spinner(frame_no)), p.faint));
         if home.chips.is_empty() {
             let name = app.me.as_ref().and_then(|me| me.name.split_whitespace().next().map(str::to_owned));
