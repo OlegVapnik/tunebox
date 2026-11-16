@@ -14,51 +14,48 @@ use tunebox_spotify::{doctor, session, webapi::WebApi};
 pub use self::playback::{connect, play};
 use crate::{prompt, style};
 
-/// Where a Spotify app is made, and the redirect URI it needs. The port is the one the sign-in
-/// listens on by default.
-const DASHBOARD: &str = "https://developer.spotify.com/dashboard";
-const REDIRECT: &str = "http://127.0.0.1:8974/callback";
+/// Spotify's web player, where the `sp_dc` cookie lives.
+const WEB_PLAYER: &str = "https://open.spotify.com";
 
-/// Walks through making a Spotify app and saves its client ID. Returns the ID.
-fn setup_client_id(paths: &Paths) -> Result<String> {
+/// Walks the user through copying the `sp_dc` cookie from a signed-in browser and saves it.
+fn setup_sp_dc(paths: &Paths) -> Result<String> {
     if !prompt::interactive() {
         bail!(
-            "No Spotify client ID yet. Make an app at {DASHBOARD}, add {REDIRECT} as its redirect URI, then \
-             run `tunebox login spotify` again in a terminal. Or set TUNEBOX_SPOTIFY_CLIENT_ID."
+            "No Spotify sp_dc cookie yet. Sign in to {WEB_PLAYER} in a browser, copy the sp_dc cookie, then run \
+             `tunebox login spotify` again in a terminal. Or set TUNEBOX_SPOTIFY_SP_DC."
         );
     }
-    println!("  {} Spotify app", style::dim("0/2"));
-    println!("  A browser opens the Spotify developer dashboard.");
-    println!("  {} make an app, any name is fine", style::bold("1."));
-    println!("  {} add {} as its redirect URI", style::bold("2."), style::bold(REDIRECT));
-    println!("  {} tick {}, then save", style::bold("3."), style::bold("Web API"));
-    println!("  {}", style::dim("Settings holds the Client ID; it is 32 characters.\n"));
-    if open::that_detached(DASHBOARD).is_err() {
-        println!("  {}\n", style::dim(&format!("Open {DASHBOARD} yourself.")));
+    println!("  {} Spotify web player", style::dim("1/2"));
+    println!("  A browser opens open.spotify.com – sign in if needed.");
+    println!("  {} open Developer Tools (F12) → Application → Cookies → open.spotify.com", style::bold("1."));
+    println!("  {} find the {} cookie and copy its value", style::bold("2."), style::bold("sp_dc"));
+    println!("  {}", style::dim("Paste it below; it is saved to your config.\n"));
+    if open::that_detached(WEB_PLAYER).is_err() {
+        println!("  {}\n", style::dim(&format!("Open {WEB_PLAYER} yourself.")));
     }
     loop {
-        let Some(entered) = prompt::line("Client ID")? else {
-            bail!("No client ID entered; nothing was saved");
+        let Some(entered) = prompt::line("sp_dc")? else {
+            bail!("No cookie entered; nothing was saved");
         };
-        let id = entered.trim().to_ascii_lowercase();
-        if id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit()) {
-            tunebox_core::config::store(paths, "client_id", Some(tunebox_core::config::Value::from(id.clone())))?;
+        let cookie = entered.trim().to_owned();
+        if !cookie.is_empty() && !cookie.contains(char::is_whitespace) {
+            tunebox_core::config::store(paths, "sp_dc", Some(tunebox_core::config::Value::from(cookie.clone())))?;
             println!("  {} saved to {}\n", style::green("✓"), paths.config_file().display());
-            return Ok(id);
+            return Ok(cookie);
         }
-        println!("  {} a client ID is 32 hexadecimal characters; try again", style::red("✗"));
+        println!("  {} paste the value of the sp_dc cookie; try again", style::red("✗"));
     }
 }
 
-/// Signs in to the Web API with the user's own app, then to librespot for streaming.
+/// Signs in to the Web API with a web-player cookie, then to librespot for streaming.
 pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
-    let client_id = match config.client_id(paths) {
-        Ok(id) => id,
-        Err(_) => setup_client_id(paths)?,
+    let sp_dc = match config.sp_dc(paths) {
+        Ok(cookie) => cookie,
+        Err(_) => setup_sp_dc(paths)?,
     };
-    let api = WebApi::new(client_id, paths.webapi_token())?;
+    let api = WebApi::new(sp_dc, paths.webapi_token())?;
 
-    println!("\n  {} Web API (your app)", style::dim("1/2"));
+    println!("\n  {} Web API (web player)", style::dim("1/2"));
     if force || !api.is_logged_in().await {
         api.login().await?;
         println!("  {} connected\n", style::green("✓"));
@@ -99,25 +96,25 @@ fn one_line(err: &anyhow::Error) -> String {
 
 /// Whether both sign-ins are saved, the Web API's with the user's app and librespot's.
 pub async fn signed_in(paths: &Paths, config: &Config) -> Result<bool> {
-    let Ok(client_id) = config.client_id(paths) else { return Ok(false) };
-    let api = WebApi::new(client_id, paths.webapi_token())?;
+    let Ok(sp_dc) = config.sp_dc(paths) else { return Ok(false) };
+    let api = WebApi::new(sp_dc, paths.webapi_token())?;
     Ok(api.is_logged_in().await)
 }
 
 /// What `tunebox doctor` finds through the Web API and through librespot, each section handed
 /// to `report` as soon as it is done.
 pub async fn doctor(paths: &Paths, config: &Config, mut report: impl FnMut(Section)) -> Result<()> {
-    match config.client_id(paths) {
-        Ok(client_id) => {
-            let api = WebApi::new(client_id, paths.webapi_token())?;
+    match config.sp_dc(paths) {
+        Ok(sp_dc) => {
+            let api = WebApi::new(sp_dc, paths.webapi_token())?;
             let section = if api.is_logged_in().await {
                 doctor::web_api(&api).await
             } else {
-                not_logged_in("WEB API · your app")
+                not_logged_in("WEB API · web player")
             };
             report(section);
         }
-        Err(_) => report(not_logged_in("WEB API · your app")),
+        Err(_) => report(not_logged_in("WEB API · web player")),
     }
 
     let internal = match session::prepare(paths) {

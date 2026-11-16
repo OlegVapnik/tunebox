@@ -98,7 +98,7 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
 async fn play_free(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     let config = tunebox_core::config::Config::load(paths)?;
     let api =
-        std::sync::Arc::new(tunebox_spotify::webapi::WebApi::new(config.client_id(paths)?, paths.webapi_token())?);
+        std::sync::Arc::new(tunebox_spotify::webapi::WebApi::new(config.sp_dc(paths)?, paths.webapi_token())?);
     if !api.is_logged_in().await {
         bail!("Not signed in to Spotify – run `tunebox login spotify` first.");
     }

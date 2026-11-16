@@ -17,10 +17,11 @@ const RETRY_DELAY: Duration = Duration::from_millis(300);
 /// Longest rate-limit wait worth sitting out; longer ones are reported instead.
 const MAX_RETRY_AFTER: u64 = 10;
 
-/// Web API client for the user's own Spotify app; refreshes its token on demand.
+/// Web API client signed in with the `sp_dc` cookie of Spotify's web player. The token is
+/// spotify's own, so the API doesn't apply the "premium owner" rule of developer apps.
 pub struct WebApi {
     http: reqwest::Client,
-    client_id: String,
+    sp_dc: String,
     store: Secret,
     token: Mutex<Option<Token>>,
 }
@@ -41,23 +42,29 @@ impl ApiResponse {
 }
 
 impl WebApi {
-    pub fn new(client_id: impl Into<String>, store: Secret) -> Result<Self> {
+    pub fn new(sp_dc: impl Into<String>, store: Secret) -> Result<Self> {
+        let sp_dc = sp_dc.into();
         let http = tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build()?;
+        let cookie_hash = auth::cookie_hash(&sp_dc);
         let token = match store.read()? {
             Some(bytes) => {
-                Some(serde_json::from_slice(&bytes).context("Stored token corrupted – run `tunebox login`")?)
+                let token: Token =
+                    serde_json::from_slice(&bytes).context("Stored token corrupted – run `tunebox login`")?;
+                // An old OAuth token or a cookie that has since changed can't be reused.
+                (token.cookie_hash == cookie_hash).then_some(token)
             }
             None => None,
         };
-        Ok(Self { http, client_id: client_id.into(), store, token: Mutex::new(token) })
+        Ok(Self { http, sp_dc, store, token: Mutex::new(token) })
     }
 
     pub async fn is_logged_in(&self) -> bool {
         self.token.lock().await.is_some()
     }
 
+    /// Fetches a fresh web token so `is_logged_in` becomes true before any API call.
     pub async fn login(&self) -> Result<()> {
-        let token = auth::login(&self.http, &self.client_id).await?;
+        let token = auth::access_token(&self.http, &self.sp_dc).await?;
         self.persist(&token)?;
         *self.token.lock().await = Some(token);
         Ok(())
@@ -131,15 +138,22 @@ impl WebApi {
         }
     }
 
+    /// Reuses a fresh token, otherwise exchanges the `sp_dc` cookie for a new one. A failed
+    /// refresh clears the old token so the next call retries the exchange instead of 401s.
     async fn access_token(&self) -> Result<String> {
         let mut guard = self.token.lock().await;
-        let token = guard.as_ref().context("Not logged in to the Web API – run `tunebox login`")?;
-        if token.is_fresh() {
+        if let Some(token) = guard.as_ref()
+            && token.is_fresh()
+        {
             return Ok(token.access_token.clone());
         }
-        let refreshed = auth::refresh(&self.http, &self.client_id, &token.refresh_token)
-            .await
-            .context("Token refresh failed – run `tunebox login` again")?;
+        let refreshed = match auth::access_token(&self.http, &self.sp_dc).await {
+            Ok(token) => token,
+            Err(err) => {
+                *guard = None;
+                return Err(err).context("Spotify sign-in expired – run `tunebox login spotify`");
+            }
+        };
         self.persist(&refreshed)?;
         let access_token = refreshed.access_token.clone();
         *guard = Some(refreshed);

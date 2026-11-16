@@ -168,7 +168,7 @@ async fn main() -> Result<()> {
     let mut paths = Paths::resolve()?;
     let config = Config::load(&paths)?;
     paths.keychain = config.keychain()?;
-    let api = WebApi::new(config.client_id(&paths)?, paths.webapi_token())?;
+    let api = WebApi::new(config.sp_dc(&paths)?, paths.webapi_token())?;
     let session = session::prepare(&paths)?.connect().await?;
     let pathfinder = Pathfinder::new(session.clone(), paths.pathfinder_hashes());
     let mut builder = Builder { api, found: HashMap::new() };

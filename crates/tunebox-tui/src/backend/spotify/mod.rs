@@ -66,7 +66,7 @@ pub struct Account {
 
 impl Account {
     pub async fn open(paths: &Paths, config: &Config) -> Result<Self> {
-        let api = Arc::new(WebApi::new(config.client_id(paths)?, paths.webapi_token())?);
+        let api = Arc::new(WebApi::new(config.sp_dc(paths)?, paths.webapi_token())?);
         if !api.is_logged_in().await {
             bail!("Not logged in yet – run `tunebox login` first.");
         }

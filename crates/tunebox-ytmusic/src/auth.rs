@@ -254,16 +254,23 @@ impl SignIn {
         };
         found.client.api().set_identity(identity);
         let now = found.check().await.ok();
-        let same = match (&was, &now) {
-            // The channel or handle tells the accounts apart; the name alone doesn't.
-            (Some(was), Some(now)) => was.id == now.id || was.name == now.name,
-            _ => false,
-        };
-        if !same {
+        if !same_account(was, now.as_ref()) {
             tracing::debug!("the sign-in from {} isn't the same account any more", browser.name);
             return Ok(None);
         }
         Ok(Some(found))
+    }
+}
+
+/// Whether cookies re-read from the browser still belong to the account tunebox was acting as.
+/// A missing reference means no account was identified yet in this run (the first `me()` was
+/// refused because the saved cookies expired), so a successful check is accepted on its own.
+fn same_account(was: Option<&User>, now: Option<&User>) -> bool {
+    match (was, now) {
+        // The channel or handle tells the accounts apart; the name alone doesn't.
+        (Some(was), Some(now)) => was.id == now.id || was.name == now.name,
+        (None, Some(_)) => true,
+        _ => false,
     }
 }
 
@@ -392,6 +399,20 @@ mod tests {
         let root = std::env::temp_dir().join(format!("tunebox-ytm-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         Paths { config: root.join("config"), data: root.join("data"), cache: root.join("cache"), keychain: false }
+    }
+
+    #[test]
+    fn a_refresh_before_the_first_me_is_accepted() {
+        let user = User { id: "UCabc".into(), name: "Oleg".into(), product: None };
+        // The saved cookies are refused before any account was identified in this run.
+        assert!(same_account(None, Some(&user)));
+        assert!(same_account(Some(&user), Some(&user)));
+        // A different account in the browser must not replace the one tunebox was acting as.
+        let other = User { id: "UCxyz".into(), name: "Someone else".into(), product: None };
+        assert!(!same_account(Some(&user), Some(&other)));
+        // Cookies the browser no longer has are no good either.
+        assert!(!same_account(None, None));
+        assert!(!same_account(Some(&user), None));
     }
 
     #[test]

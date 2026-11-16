@@ -10,8 +10,10 @@ use crate::{paths::Paths, service::Service};
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    /// Client ID of the user's own app from developer.spotify.com.
+    /// Client ID of the user's own app from developer.spotify.com (kept for librespot streaming).
     pub client_id: Option<String>,
+    /// The `sp_dc` cookie of a browser signed in to Spotify's web player, used for Web API calls.
+    pub sp_dc: Option<String>,
     /// Seconds consecutive tracks overlap (0–12); off when missing.
     pub crossfade: Option<u64>,
     /// `"nerd"` or `"text"`; detected from the terminal when missing.
@@ -50,6 +52,9 @@ impl Config {
         };
         if let Ok(id) = std::env::var("TUNEBOX_CLIENT_ID") {
             config.client_id = Some(id);
+        }
+        if let Ok(cookie) = std::env::var("TUNEBOX_SPOTIFY_SP_DC") {
+            config.sp_dc = Some(cookie);
         }
         Ok(config)
     }
@@ -98,6 +103,24 @@ impl Config {
         bail!(
             "No client ID configured. Add it to {}:\n\n  client_id = \"…\"\n\nor set TUNEBOX_SPOTIFY_CLIENT_ID. \
              `tunebox login spotify` walks you through making a Spotify app.",
+            paths.config_file().display()
+        )
+    }
+
+    /// The `sp_dc` cookie of Spotify's web player, from the config or `TUNEBOX_SPOTIFY_SP_DC`.
+    pub fn sp_dc(&self, paths: &Paths) -> Result<String> {
+        if let Some(cookie) = self.sp_dc.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+            return Ok(cookie.to_owned());
+        }
+        if let Ok(cookie) = std::env::var("TUNEBOX_SPOTIFY_SP_DC") {
+            let cookie = cookie.trim();
+            if !cookie.is_empty() {
+                return Ok(cookie.to_owned());
+            }
+        }
+        bail!(
+            "No sp_dc cookie configured. Sign in to open.spotify.com in a browser, copy the sp_dc cookie, then \
+             add `sp_dc = \"…\"` to {} or run `tunebox login spotify`.",
             paths.config_file().display()
         )
     }

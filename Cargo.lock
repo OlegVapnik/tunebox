@@ -4705,7 +4705,6 @@ dependencies = [
  "open",
  "protobuf",
  "protobuf-json-mapping",
- "rand 0.10.3",
  "reqwest",
  "serde",
  "serde_json",

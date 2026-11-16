@@ -19,7 +19,6 @@ iana-time-zone.workspace = true
 open.workspace = true
 protobuf.workspace = true
 protobuf-json-mapping.workspace = true
-rand.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

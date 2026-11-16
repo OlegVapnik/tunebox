@@ -55,7 +55,6 @@ objc2-media-player = { version = "0.3", default-features = false, features = ["s
 open = "5"
 protobuf = "3"
 protobuf-json-mapping = "3"
-rand = "0.10"
 ratatui = "0.30"
 ratatui-image = { version = "11.1", default-features = false, features = ["crossterm"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
