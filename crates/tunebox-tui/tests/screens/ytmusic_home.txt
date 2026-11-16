@@ -9,28 +9,28 @@
    ≡  Your Library          ⤢    │ Quick picks                                          ▸ Play all  1–8 of 9   ‹   ›  ┃
                                  │                                                                                    ┃
    Playlists  Albums             │ ▀▀▀▀  YouTube Music Song 1                 ▀▀▀▀  YouTube Music Song 5              ┃
-                                 │ ▀Y▀▀  YouTube Music Band                   ▀Y▀▀  YouTube Music Band                ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
    ▄▄▄▄  Liked Songs             │                                                                                    ┃
    ▄▀▀▄  Playlist · 3 songs      │ ▀▀▀▀  YouTube Music Song 2                 ▀▀▀▀  YouTube Music Mix Song 1          ┃
-                                 │ ▀Y▀▀  YouTube Music Band                   ▀Y▀▀  YouTube Music Band                ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
    ▀▀▀▀  YouTube Music Mix       │                                                                                    ┃
-   ▀Y▀▀  Playlist · Tester       │ ▀▀▀▀  YouTube Music Song 3                 ▀▀▀▀  YouTube Music Mix Song 2          ┃
-                                 │ ▀Y▀▀  YouTube Music Band                   ▀Y▀▀  YouTube Music Band                ┃
+   ▀▀▀▀  Playlist · Tester       │ ▀▀▀▀  YouTube Music Song 3                 ▀▀▀▀  YouTube Music Mix Song 2          ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
    ▀▀▀▀  YouTube Music Album     │                                                                                    ┃
-   ▀Y▀▀  Album · YouTube Music…  │ ▀▀▀▀  YouTube Music Song 4                 ▀▀▀▀  YouTube Music Mix Song 3          ┃
-                                 │ ▀Y▀▀  YouTube Music Band                   ▀Y▀▀  YouTube Music Band                ┃
+   ▀▀▀▀  Album · YouTube Music…  │ ▀▀▀▀  YouTube Music Song 4                 ▀▀▀▀  YouTube Music Mix Song 3          ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
                                  │                                                                                    ┃
                                  │                                                                                    │
                                  │ MADE FOR YOU                                                                       │
                                  │ For you                                                                            │
                                  │                                                                                    │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
+                                 │ ▀▀    ▀▀ ▀▀▀▀▀         ▀▀    ▀▀  ▀▀▀▀                                              │
+                                 │ ▀▀▀   ▀▀▀▀▀▀▀▀         ▀▀    ▀▀▀▀▀▀▀▀                                              │
+                                 │ ▀▀▀▀▀▀▄▄▀▀▀▀▀▀         ▀▀▀▀▀▀▄▄▀▀▀▀▀▀                                              │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ▀▀▀▀▀▀▀▀▀▀   Nothing playing
+  ▀▀     ▀▀▀   Nothing playing
   ▀▀▀▀▀▀▀▀▀▀   Pick a song and press ↵
-  ▀▀▀▀T▀▀▀▀▀
+  ▀▀▀▀▀▀▀▀▀▀
   ▀▀▀▀▀▀▀▀▀▀
   ▀▀▀▀▀▀▀▀▀▀
   enter play   . actions   / search   ^K commands   ? help

@@ -9,28 +9,28 @@
    ≡  Your Library          ⤢    │ Quick picks                                          ▸ Play all  1–8 of 9   ‹   ›  ┃
                                  │                                                                                    ┃
    Playlists  Albums             │ ▀▀▀▀  YouTube Music Song 1                 ▀▀▀▀  YouTube Music Song 5              ┃
-                                 │ ▀Y▀▀  YouTube Music Band                   ▀Y▀▀  YouTube Music Band                ┃
+                                 │ ▀▀▀▀  YouTube Music Band                   ▀▀▀▀  YouTube Music Band                ┃
    ▄▄▄▄  Liked Songs             │                                                                                    ┃
    ▄▀▀▄  Playlist · 3 songs      ╭ ★ Enjoying tunebox? ───────────────────────────────╮Tube Music Mix Song 1          ┃
                                  │                                                    │Tube Music Band                ┃
    ▀▀▀▀  YouTube Music Mix       │  tunebox is free and made in spare time. If you    │                               ┃
-   ▀Y▀▀  Playlist · Tester       │  like it, a star on GitHub helps other people      │Tube Music Mix Song 2          ┃
+   ▀▀▀▀  Playlist · Tester       │  like it, a star on GitHub helps other people      │Tube Music Mix Song 2          ┃
                                  │  find it.                                          │Tube Music Band                ┃
    ▀▀▀▀  YouTube Music Album     │                                                    │                               ┃
-   ▀Y▀▀  Album · YouTube Music…  │           ★ Star on GitHub     No thanks           │Tube Music Mix Song 3          ┃
+   ▀▀▀▀  Album · YouTube Music…  │           ★ Star on GitHub     No thanks           │Tube Music Mix Song 3          ┃
                                  │                                                    │Tube Music Band                ┃
                                  │              enter choose · esc close              │                               ┃
                                  ╰────────────────────────────────────────────────────╯                               │
                                  │ MADE FOR YOU                                                                       │
                                  │ For you                                                                            │
                                  │                                                                                    │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
-                                 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                              │
+                                 │ ▀▀    ▀▀ ▀▀▀▀▀         ▀▀    ▀▀  ▀▀▀▀                                              │
+                                 │ ▀▀▀   ▀▀▀▀▀▀▀▀         ▀▀    ▀▀▀▀▀▀▀▀                                              │
+                                 │ ▀▀▀▀▀▀▄▄▀▀▀▀▀▀         ▀▀▀▀▀▀▄▄▀▀▀▀▀▀                                              │
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ▀▀▀▀▀▀▀▀▀▀   Nothing playing
+  ▀▀     ▀▀▀   Nothing playing
   ▀▀▀▀▀▀▀▀▀▀   Pick a song and press ↵
-  ▀▀▀▀T▀▀▀▀▀
+  ▀▀▀▀▀▀▀▀▀▀
   ▀▀▀▀▀▀▀▀▀▀
   ▀▀▀▀▀▀▀▀▀▀
   enter play   . actions   / search   ^K commands   ? help

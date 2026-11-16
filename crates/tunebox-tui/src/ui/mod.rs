@@ -223,8 +223,13 @@ pub(super) fn placeholder_in(
     if let Some(picture) = app.placeholder_image(name, size, round) {
         if let Some(placement) = picture_in(frame, picture, (x, y), size, clip) {
             app.placements.push(placement);
-            let (from, _) = theme::placeholder_colors(name);
-            placeholder_initial(frame.buffer_mut(), (x, y), size, clip, name, from);
+            // Latin initials are already drawn into the image at cover size; a text initial on
+            // top of them would read as a double letter. Other scripts keep the text version.
+            let ascii_initial = name.chars().find(|c| !c.is_whitespace()).is_some_and(|c| c.is_ascii_alphanumeric());
+            if !ascii_initial {
+                let (from, _) = theme::placeholder_colors(name);
+                placeholder_initial(frame.buffer_mut(), (x, y), size, clip, name, from);
+            }
         }
     }
 }
