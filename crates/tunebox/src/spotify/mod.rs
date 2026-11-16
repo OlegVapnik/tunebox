@@ -92,7 +92,7 @@ pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
         Ok(cookie) => cookie,
         Err(_) => setup_sp_dc(paths).await?,
     };
-    let api = WebApi::new(sp_dc, paths.webapi_token())?;
+    let api = WebApi::new(sp_dc.clone(), paths.webapi_token())?;
 
     println!("\n  {} Web API (web player)", style::dim("1/2"));
     if force || !api.is_logged_in().await {
@@ -102,10 +102,10 @@ pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
                 return Err(err);
             }
             println!(
-                "  {} A browser window opens; sign in to Spotify there. Waiting up to 5 minutes…",
+                "  {} A browser window opens with your saved sign-in; keep it until the token is read…",
                 style::dim("•")
             );
-            let (access_token, expires_at) = cdp::login(paths).await?;
+            let (access_token, expires_at) = cdp::login(paths, &sp_dc).await?;
             api.save_browser_token(access_token, expires_at).await?;
             println!("  {} connected through the browser\n", style::green("✓"));
         } else {
