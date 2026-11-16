@@ -22,8 +22,12 @@ const CTRL_Q: &[u8] = b"\x11";
 #[test]
 fn version_names_the_services() {
     let output = Command::new(env!("CARGO_BIN_EXE_tunebox")).arg("--version").output().unwrap();
-    let services: Vec<&str> = [(cfg!(feature = "spotify"), "spotify"), (cfg!(feature = "ytmusic"), "ytmusic")]
-        .into_iter()
+    let services: Vec<&str> = [
+        (cfg!(feature = "spotify"), "spotify"),
+        (cfg!(feature = "ytmusic"), "ytmusic"),
+        (cfg!(feature = "soundcloud"), "soundcloud"),
+    ]
+    .into_iter()
         .filter_map(|(built, name)| built.then_some(name))
         .collect();
     let services = if services.is_empty() { "demo only".to_owned() } else { services.join(", ") };

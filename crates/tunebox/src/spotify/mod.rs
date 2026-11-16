@@ -1,6 +1,7 @@
 //! The commands for Spotify: signing in, its checks for `tunebox doctor`, playing without the
 //! interface, and a few for development.
 
+mod cdp;
 mod playback;
 
 use anyhow::{Result, bail};
@@ -95,8 +96,21 @@ pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
 
     println!("\n  {} Web API (web player)", style::dim("1/2"));
     if force || !api.is_logged_in().await {
-        api.login().await?;
-        println!("  {} connected\n", style::green("✓"));
+        if let Err(err) = api.login().await {
+            println!("  {} {:#}", style::red("✗"), err);
+            if !prompt::interactive() || !prompt::confirm("Sign in through a Chromium browser window instead?", true)? {
+                return Err(err);
+            }
+            println!(
+                "  {} A browser window opens; sign in to Spotify there. Waiting up to 5 minutes…",
+                style::dim("•")
+            );
+            let (access_token, expires_at) = cdp::login(paths).await?;
+            api.save_browser_token(access_token, expires_at).await?;
+            println!("  {} connected through the browser\n", style::green("✓"));
+        } else {
+            println!("  {} connected\n", style::green("✓"));
+        }
     } else {
         println!("  {} already connected\n", style::green("✓"));
     }

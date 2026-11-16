@@ -70,6 +70,14 @@ impl WebApi {
         Ok(())
     }
 
+    /// Saves a token obtained by signing in with a real browser session.
+    pub async fn save_browser_token(&self, access_token: String, expires_at: u64) -> Result<()> {
+        let token = Token { access_token, expires_at, cookie_hash: auth::cookie_hash(&self.sp_dc) };
+        self.persist(&token)?;
+        *self.token.lock().await = Some(token);
+        Ok(())
+    }
+
     pub async fn get(&self, path: &str) -> Result<ApiResponse> {
         self.request(Method::GET, path, None).await
     }
