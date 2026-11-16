@@ -362,10 +362,12 @@ fn take_upload(cell: &mut Cell) -> Option<String> {
     Some(upload)
 }
 
-pub(super) const PLAY_BUTTON_WIDTH: u16 = 4;
+pub(super) const PLAY_BUTTON_WIDTH: u16 = 3;
 
-/// The play button of a hovered card, ending at column `right` in row `y`, with a cell clear of
-/// the cover's right edge so it does not read as part of the art.
+/// The play button of a hovered card, ending at column `right` in row `y`.
+///
+/// Callers pass the card's right edge, so the button sits flush with the artwork: clearing cells
+/// beside it would punch a rectangular hole in the cover.
 pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, hit: Hit) {
     let p = theme::palette();
     let area = Rect::new(right.saturating_sub(PLAY_BUTTON_WIDTH), y, PLAY_BUTTON_WIDTH, 1).intersection(buf.area);
@@ -374,7 +376,7 @@ pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, h
     // which would keep showing pieces of the picture around the icon.
     buf.set_string(area.x, y, " ".repeat(area.width as usize), Style::new().bg(accent));
     // A plain triangle: the Nerd Font codepoint may be missing from the user's font and then
-    // paints a dark tofu block. Two blank cells to its right absorb any glyph overhang.
+    // paints a dark tofu block. With three cells the icon sits in the middle one.
     buf.set_string(area.x + 1, y, "▸", Style::new().fg(p.bg).bg(accent));
     app.hits.push((area, hit));
 }

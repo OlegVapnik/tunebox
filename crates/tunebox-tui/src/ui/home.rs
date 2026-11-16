@@ -431,13 +431,7 @@ pub(super) fn draw_shelf(
         {
             let hit = Hit::CardPlay { shelf: layout.index, item: index };
             let button_row = y.saturating_sub(1);
-            super::play_button(frame.buffer_mut(), app, x + COVER.width - 2, button_row, hit);
-            // The cover's image would otherwise show through the gap to the right of the
-            // button as a black sliver; clear it with the pane background.
-            let buf = frame.buffer_mut();
-            for col in (x + COVER.width - 2)..(x + COVER.width) {
-                buf.set_string(col, button_row, " ", Style::new().bg(theme::palette().bg));
-            }
+            super::play_button(frame.buffer_mut(), app, x + COVER.width, button_row, hit);
         }
     }
 }
