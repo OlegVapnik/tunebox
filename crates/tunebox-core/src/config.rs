@@ -41,6 +41,34 @@ pub struct Config {
     pub services: Option<Vec<String>>,
 }
 
+/// Accepts a bare cookie value and the common forms copied out of a browser: `sp_dc=…`,
+/// `sp_dc: "…"`, `Cookie: sp_dc=…;` and values quoted more than once.
+fn normalize_cookie(raw: &str) -> String {
+    let mut value = raw.trim().to_owned();
+    for _ in 0..4 {
+        let trimmed = value.trim().trim_end_matches(';').trim();
+        let lower = trimmed.to_ascii_lowercase();
+        let stripped = ["cookie:", "sp_dc:", "sp_dc="]
+            .iter()
+            .find_map(|prefix| lower.strip_prefix(prefix).map(|_| &trimmed[prefix.len()..]))
+            .unwrap_or(trimmed);
+        let stripped = stripped.trim().trim_end_matches(';').trim();
+        let unquoted = if stripped.len() >= 2
+            && ((stripped.starts_with('"') && stripped.ends_with('"'))
+                || (stripped.starts_with('\'') && stripped.ends_with('\'')))
+        {
+            &stripped[1..stripped.len() - 1]
+        } else {
+            stripped
+        };
+        if unquoted == value {
+            break;
+        }
+        value = unquoted.to_owned();
+    }
+    value.trim().trim_end_matches(';').trim().to_owned()
+}
+
 impl Config {
     /// Reads `config.toml`; `TUNEBOX_CLIENT_ID` overrides the file.
     pub fn load(paths: &Paths) -> Result<Self> {
@@ -108,14 +136,16 @@ impl Config {
     }
 
     /// The `sp_dc` cookie of Spotify's web player, from the config or `TUNEBOX_SPOTIFY_SP_DC`.
+    /// Values copied from a browser's developer tools often carry the cookie's name, quotes or a
+    /// trailing semicolon; accept those and keep only the token itself.
     pub fn sp_dc(&self, paths: &Paths) -> Result<String> {
-        if let Some(cookie) = self.sp_dc.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
-            return Ok(cookie.to_owned());
+        if let Some(cookie) = self.sp_dc.as_deref().map(normalize_cookie).filter(|c| !c.is_empty()) {
+            return Ok(cookie);
         }
         if let Ok(cookie) = std::env::var("TUNEBOX_SPOTIFY_SP_DC") {
-            let cookie = cookie.trim();
+            let cookie = normalize_cookie(&cookie);
             if !cookie.is_empty() {
-                return Ok(cookie.to_owned());
+                return Ok(cookie);
             }
         }
         bail!(
@@ -234,6 +264,16 @@ mod tests {
         assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
         assert_eq!(fs::read_to_string(&real).unwrap(), "client_id = \"abc\"\ncovers = false\n");
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn clears_the_decorations_copied_with_a_cookie() {
+        assert_eq!(normalize_cookie("  AQAPR1ReWl0Z  "), "AQAPR1ReWl0Z");
+        assert_eq!(normalize_cookie("sp_dc:AQAPR1ReWl0Z"), "AQAPR1ReWl0Z");
+        assert_eq!(normalize_cookie("sp_dc=\"AQAPR1ReWl0Z\""), "AQAPR1ReWl0Z");
+        assert_eq!(normalize_cookie("sp_dc:'AQAPR1ReWl0Z'"), "AQAPR1ReWl0Z");
+        assert_eq!(normalize_cookie("Cookie: sp_dc=AQAPR1ReWl0Z;"), "AQAPR1ReWl0Z");
+        assert_eq!(normalize_cookie("\"sp_dc: 'AQAPR1ReWl0Z'\""), "AQAPR1ReWl0Z");
     }
 
     #[test]

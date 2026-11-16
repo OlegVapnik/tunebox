@@ -36,7 +36,9 @@ struct WebToken {
     expires_at_ms: u64,
 }
 
-/// Exchanges the `sp_dc` cookie for a short-lived Web API access token.
+/// Exchanges the `sp_dc` cookie for a short-lived Web API access token. Spotify's web player
+/// used to do this through `get_access_token`; when that endpoint refuses the request, try to
+/// read the session token from the rendered home page instead.
 pub(super) async fn access_token(http: &Client, sp_dc: &str) -> Result<Token> {
     check_cookie(sp_dc)?;
     let response = http
@@ -47,10 +49,11 @@ pub(super) async fn access_token(http: &Client, sp_dc: &str) -> Result<Token> {
         .await
         .context("Can't reach Spotify's web player")?;
     let status = response.status();
-    let body = response.text().await.unwrap_or_default();
     if !status.is_success() {
-        bail!("Spotify didn't accept the sp_dc cookie ({status}): update it with `tunebox login spotify`");
+        let _ = response.bytes().await;
+        return ssr_token(http, sp_dc).await.with_context(|| format!("Spotify's token endpoint returned {status}"));
     }
+    let body = response.text().await.unwrap_or_default();
     let token: WebToken =
         serde_json::from_str(&body).context("Spotify's web token response was unexpected – is sp_dc still valid?")?;
     if token.access_token.is_empty() {
@@ -61,6 +64,68 @@ pub(super) async fn access_token(http: &Client, sp_dc: &str) -> Result<Token> {
         expires_at: token.expires_at_ms / 1000,
         cookie_hash: cookie_hash(sp_dc),
     })
+}
+
+/// Looks for an access token in the session JSON the web page may embed. Older builds rendered
+/// `<script id="session" type="application/json">`; the current one fetches its token from
+/// JavaScript instead, so a missing token is reported as such rather than guessed.
+async fn ssr_token(http: &Client, sp_dc: &str) -> Result<Token> {
+    let html = http
+        .get("https://open.spotify.com/")
+        .header("Cookie", format!("sp_dc={}", sp_dc.trim()))
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .send()
+        .await
+        .context("Can't reach Spotify's home page")?
+        .error_for_status()
+        .context("Spotify's home page refused the request")?
+        .text()
+        .await
+        .context("Can't read Spotify's home page")?;
+    for marker in ["id=\"session\"", "id=\"__NEXT_DATA__\"", "id=\"appServerConfig\""] {
+        let Some(start) = html.find(marker) else { continue };
+        let Some(open) = html[start..].find('>') else { continue };
+        let body = &html[start + open + 1..];
+        let Some(end) = body.find("</script>") else { continue };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(body[..end].trim()) else { continue };
+        if let Some(access_token) = find_string(&json, "accessToken") {
+            let expires_at = find_u64(&json, "accessTokenExpirationTimestampMs").unwrap_or_else(|| unix_now() + 3600);
+            return Ok(Token { access_token, expires_at, cookie_hash: cookie_hash(sp_dc) });
+        }
+    }
+    bail!(
+        "Spotify's home page doesn't embed an access token any more, and its token endpoint refuses this \
+         request. Nothing can be signed in from sp_dc alone here. Use a client ID from a developer app owned \
+         by a Premium account (`tunebox login spotify`), or sign in with a real browser."
+    )
+}
+
+fn find_string(value: &serde_json::Value, key: &str) -> Option<String> {
+    match value {
+        serde_json::Value::Object(map) => map.iter().find_map(|(name, child)| {
+            if name == key {
+                child.as_str().map(str::to_owned).or_else(|| find_string(child, key))
+            } else {
+                find_string(child, key)
+            }
+        }),
+        serde_json::Value::Array(items) => items.iter().find_map(|child| find_string(child, key)),
+        _ => None,
+    }
+}
+
+fn find_u64(value: &serde_json::Value, key: &str) -> Option<u64> {
+    match value {
+        serde_json::Value::Object(map) => map.iter().find_map(|(name, child)| {
+            if name == key {
+                child.as_u64().or_else(|| child.as_str().and_then(|s| s.parse().ok())).or_else(|| find_u64(child, key))
+            } else {
+                find_u64(child, key)
+            }
+        }),
+        serde_json::Value::Array(items) => items.iter().find_map(|child| find_u64(child, key)),
+        _ => None,
+    }
 }
 
 /// Stable hash used only to notice a changed cookie; not a security measure.
@@ -97,6 +162,17 @@ mod tests {
         };
         assert_eq!(token.access_token, "tok");
         assert_eq!(token.expires_at, 1794854821);
+    }
+
+    #[test]
+    fn finds_a_token_in_an_embedded_session_object() {
+        let json: serde_json::Value = serde_json::from_str(
+            r#"{"props":{"session":{"accessToken":"tok","accessTokenExpirationTimestampMs":1794854821000}}}"#,
+        )
+        .unwrap();
+        assert_eq!(find_string(&json, "accessToken").as_deref(), Some("tok"));
+        assert_eq!(find_u64(&json, "accessTokenExpirationTimestampMs"), Some(1794854821000));
+        assert_eq!(find_string(&json, "notThere"), None);
     }
 
     #[test]
