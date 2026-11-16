@@ -859,15 +859,18 @@ fn songs_context(tracks: &[Track]) -> String {
     format!("soundcloud:songs:{}", paths.join(","))
 }
 
-/// Asks for a bigger cover than the one lists show.
-/// The artwork a track or playlist has, or the uploader's avatar when it has none.
+/// The artwork a track or playlist has. SoundCloud often leaves a playlist's own
+/// `artwork_url` empty and shows the first track's cover instead; if even that is
+/// missing, the uploader's avatar is the last resort.
 fn artwork_url(value: &serde_json::Value) -> Option<String> {
     value["artwork_url"]
         .as_str()
+        .or_else(|| value["tracks"][0]["artwork_url"].as_str())
         .or_else(|| value["user"]["avatar_url"].as_str())
         .map(artwork)
 }
 
+/// Asks for a bigger cover than the one lists show.
 fn artwork(url: &str) -> String {
     url.replace("-large.", "-t500x500.").replace("-badge.", "-t500x500.")
 }
@@ -935,6 +938,31 @@ mod tests {
         assert_eq!(
             artwork("https://i1.sndcdn.com/artworks-x-large.jpg"),
             "https://i1.sndcdn.com/artworks-x-t500x500.jpg"
+        );
+    }
+
+    #[test]
+    fn a_playlist_without_a_cover_uses_its_first_tracks_art() {
+        let value = serde_json::json!({
+            "artwork_url": null,
+            "user": {"avatar_url": "https://i1.sndcdn.com/avatars-u-large.jpg"},
+            "tracks": [
+                {"artwork_url": "https://i1.sndcdn.com/artworks-first-large.jpg"},
+                {"artwork_url": "https://i1.sndcdn.com/artworks-second-large.jpg"}
+            ]
+        });
+        assert_eq!(
+            artwork_url(&value).as_deref(),
+            Some("https://i1.sndcdn.com/artworks-first-t500x500.jpg")
+        );
+
+        let avatar_only = serde_json::json!({
+            "artwork_url": null,
+            "user": {"avatar_url": "https://i1.sndcdn.com/avatars-u-large.jpg"}
+        });
+        assert_eq!(
+            artwork_url(&avatar_only).as_deref(),
+            Some("https://i1.sndcdn.com/avatars-u-t500x500.jpg")
         );
     }
 
