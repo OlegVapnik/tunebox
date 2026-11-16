@@ -679,7 +679,7 @@ pub(super) fn draw_cover(
     if super::cover_in(frame, app, item.image_url.as_deref(), size, round, (x, y), size, clip) {
         return;
     }
-    super::placeholder_in(frame.buffer_mut(), (x, y), size, clip, &item.title, round);
+    super::placeholder_in(frame, app, (x, y), size, clip, &item.title, round);
 }
 
 #[cfg(test)]

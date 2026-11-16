@@ -131,38 +131,6 @@ pub fn confirm(question: &str, default: bool) -> Result<bool> {
     Ok(answer)
 }
 
-/// Reads a line, showing what is typed, until enter. `None` when cancelled or left empty.
-pub fn line(prompt: &str) -> Result<Option<String>> {
-    let mut out = std::io::stdout();
-    writeln!(out, "  {prompt}")?;
-    let raw = Raw::on()?;
-    crossterm::execute!(out, EnableBracketedPaste)?;
-    let mut text = String::new();
-    let show = |out: &mut std::io::Stdout, text: &str| -> Result<()> {
-        write!(out, "\r\x1b[2K  {} {text}", style::green("›"))?;
-        out.flush()?;
-        Ok(())
-    };
-    show(&mut out, &text)?;
-    let entered = loop {
-        match next_input()? {
-            Input::Paste(pasted) => text.push_str(pasted.trim()),
-            Input::Key(key) if cancels(&key) => break false,
-            Input::Key(KeyEvent { code: KeyCode::Enter, .. }) => break true,
-            Input::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-                text.pop();
-            }
-            Input::Key(KeyEvent { code: KeyCode::Char(c), .. }) => text.push(c),
-            Input::Key(_) => {}
-        }
-        show(&mut out, &text)?;
-    };
-    crossterm::execute!(out, DisableBracketedPaste)?;
-    drop(raw);
-    writeln!(out)?;
-    Ok(entered.then(|| text.trim().to_owned()).filter(|text| !text.is_empty()))
-}
-
 /// Reads a secret, pasted or typed, until enter, without showing it: only how long it is.
 /// `None` when cancelled.
 pub fn secret(prompt: &str) -> Result<Option<String>> {

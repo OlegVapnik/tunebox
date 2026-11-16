@@ -233,7 +233,7 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
 
     let thumb = Rect::new(area.x + 3, y, THUMB.width, THUMB.height);
     if !super::cover(frame, app, image_url.as_deref(), THUMB, round, thumb) {
-        super::placeholder(frame.buffer_mut(), thumb, &title, round);
+        super::placeholder(frame, app, thumb, &title, round);
     }
 
     let x = thumb.right() + 2;

@@ -5,7 +5,8 @@ mod playback;
 
 use anyhow::{Result, bail};
 use tunebox_core::{
-    config::Config,
+    browser,
+    config::{self, Config},
     doctor::{Check, Expect, Outcome, Section},
     paths::Paths,
 };
@@ -17,8 +18,16 @@ use crate::{prompt, style};
 /// Spotify's web player, where the `sp_dc` cookie lives.
 const WEB_PLAYER: &str = "https://open.spotify.com";
 
-/// Walks the user through copying the `sp_dc` cookie from a signed-in browser and saves it.
-fn setup_sp_dc(paths: &Paths) -> Result<String> {
+/// Keeps the cookie in the config, where the Web API finds it on every start.
+fn save_sp_dc(paths: &Paths, cookie: String) -> Result<String> {
+    config::store(paths, "sp_dc", Some(config::Value::from(cookie.clone())))?;
+    println!("  {} saved to {}\n", style::green("✓"), paths.config_file().display());
+    Ok(cookie)
+}
+
+/// Walks the user through getting the `sp_dc` cookie: first by reading a browser's cookie store,
+/// then, when that isn't possible, by pasting the value from Developer Tools.
+async fn setup_sp_dc(paths: &Paths) -> Result<String> {
     if !prompt::interactive() {
         bail!(
             "No Spotify sp_dc cookie yet. Sign in to {WEB_PLAYER} in a browser, copy the sp_dc cookie, then run \
@@ -26,24 +35,53 @@ fn setup_sp_dc(paths: &Paths) -> Result<String> {
         );
     }
     println!("  {} Spotify web player", style::dim("1/2"));
-    println!("  A browser opens open.spotify.com – sign in if needed.");
-    println!("  {} open Developer Tools (F12) → Application → Cookies → open.spotify.com", style::bold("1."));
-    println!("  {} find the {} cookie and copy its value", style::bold("2."), style::bold("sp_dc"));
-    println!("  {}", style::dim("Paste it below; it is saved to your config.\n"));
-    if open::that_detached(WEB_PLAYER).is_err() {
-        println!("  {}\n", style::dim(&format!("Open {WEB_PLAYER} yourself.")));
-    }
+    println!("  tunebox can read the sign-in from a browser, so there is no need to hunt for the cookie.\n");
+
+    let browsers = browser::browsers();
     loop {
-        let Some(entered) = prompt::line("sp_dc")? else {
-            bail!("No cookie entered; nothing was saved");
+        let mut items: Vec<String> = browsers.iter().map(|browser| browser.name.clone()).collect();
+        items.push("Manual entry".into());
+        let Some(choice) = prompt::pick("Select your browser to auto-extract login cookies", &items)? else {
+            bail!("No browser selected; nothing was saved");
+        };
+
+        if choice < browsers.len() {
+            let mut selected = browsers[choice].clone();
+            println!("  {}", style::dim(&format!("Reading {}'s cookies, which may ask for your keyring…", selected.name)));
+            match browser::cookie(paths, &mut selected, WEB_PLAYER, "spotify.com", "sp_dc").await {
+                Ok(Some(cookie)) => return save_sp_dc(paths, cookie),
+                Ok(None) => {
+                    println!("  {} {} isn't signed in to Spotify.", style::red("✗"), selected.name);
+                    if open::that_detached(WEB_PLAYER).is_err() {
+                        println!("  {}", style::dim(&format!("Open {WEB_PLAYER} yourself and sign in.")));
+                    }
+                    if prompt::confirm("Signed in now? Read the cookies again", true)? {
+                        continue;
+                    }
+                    println!("  {}", style::dim("Pick another browser or paste the cookie."));
+                }
+                Err(err) => {
+                    println!("  {} {}", style::red("✗"), style::red(&format!("{err:#}")));
+                    println!("  {}", style::dim("You can close the browser for a second, or paste the cookie instead."));
+                }
+            }
+            continue;
+        }
+
+        // Manual fallback: a portable browser or one whose cookies can't be read.
+        println!();
+        println!("  In a browser signed in to open.spotify.com, open Developer Tools (F12), then");
+        println!("  Application → Cookies → open.spotify.com, and copy the value of the {} cookie.", style::bold("sp_dc"));
+        let Some(entered) = prompt::secret("Paste it here and press enter:")? else {
+            println!("  {}", style::dim("cancelled"));
+            continue;
         };
         let cookie = entered.trim().to_owned();
-        if !cookie.is_empty() && !cookie.contains(char::is_whitespace) {
-            tunebox_core::config::store(paths, "sp_dc", Some(tunebox_core::config::Value::from(cookie.clone())))?;
-            println!("  {} saved to {}\n", style::green("✓"), paths.config_file().display());
-            return Ok(cookie);
+        if cookie.is_empty() || cookie.contains(char::is_whitespace) {
+            println!("  {} paste the value of the sp_dc cookie; try again", style::red("✗"));
+            continue;
         }
-        println!("  {} paste the value of the sp_dc cookie; try again", style::red("✗"));
+        return save_sp_dc(paths, cookie);
     }
 }
 
@@ -51,7 +89,7 @@ fn setup_sp_dc(paths: &Paths) -> Result<String> {
 pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
     let sp_dc = match config.sp_dc(paths) {
         Ok(cookie) => cookie,
-        Err(_) => setup_sp_dc(paths)?,
+        Err(_) => setup_sp_dc(paths).await?,
     };
     let api = WebApi::new(sp_dc, paths.webapi_token())?;
 

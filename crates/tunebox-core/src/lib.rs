@@ -3,6 +3,7 @@
 //! so a build without Spotify leaves librespot out entirely.
 
 pub mod artist;
+pub mod browser;
 pub mod catalog;
 pub mod config;
 pub mod connect;

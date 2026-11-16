@@ -2,6 +2,8 @@
 
 use image::{DynamicImage, Rgba, RgbaImage};
 
+use crate::theme;
+
 /// Pseudo-URL for the Liked Songs cover; the loader generates it instead of downloading.
 pub const LIKED_COVER: &str = "tunebox:liked";
 /// Pseudo-URL for items without a cover, such as new playlists.
@@ -41,6 +43,36 @@ fn heart_coverage(x: u32, y: u32) -> f32 {
         }
     }
     inside as f32 / (SAMPLES * SAMPLES) as f32
+}
+
+/// A smooth gradient picked by the item's name, with transparent rounded corners. The view
+/// keeps drawing the initial on top as text, so no font rasterizer is needed here.
+pub fn name_cover(name: &str) -> DynamicImage {
+    let (from, to) = theme::placeholder_colors(name);
+    let image = RgbaImage::from_fn(SIZE, SIZE, |x, y| {
+        let t = (y as f32 / SIZE as f32 * 0.85 + x as f32 / SIZE as f32 * 0.15).clamp(0.0, 1.0);
+        let channel = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
+        Rgba([channel(from.0, to.0), channel(from.1, to.1), channel(from.2, to.2), rounded_coverage(x, y)])
+    });
+    image.into()
+}
+
+/// Antialiased coverage of a rounded square: points within `radius` of the inner rectangle.
+fn rounded_coverage(x: u32, y: u32) -> u8 {
+    let radius = SIZE as f32 * 0.16;
+    let mut inside = 0;
+    for sx in 0..SAMPLES {
+        for sy in 0..SAMPLES {
+            let px = x as f32 + (sx as f32 + 0.5) / SAMPLES as f32;
+            let py = y as f32 + (sy as f32 + 0.5) / SAMPLES as f32;
+            let nearest_x = px.clamp(radius, SIZE as f32 - radius);
+            let nearest_y = py.clamp(radius, SIZE as f32 - radius);
+            if (px - nearest_x).powi(2) + (py - nearest_y).powi(2) <= radius * radius {
+                inside += 1;
+            }
+        }
+    }
+    (inside * 255 / (SAMPLES * SAMPLES)) as u8
 }
 
 /// Spotify's look for playlists without a cover: a dark square with a muted music note.

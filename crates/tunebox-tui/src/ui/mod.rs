@@ -201,14 +201,35 @@ fn tile(buf: &mut Buffer, (x, y): (u16, i32), size: Size, slot: Size, clip: Rect
 
 /// Stands in for a cover nobody has: a gradient picked by the name, with its first letter. A
 /// shelf of these reads as a designed placeholder rather than as a failed load.
-pub(super) fn placeholder(buf: &mut Buffer, area: Rect, name: &str, round: bool) {
-    placeholder_in(buf, (area.x, area.y as i32), area.as_size(), area, name, round);
+pub(super) fn placeholder(frame: &mut Frame, app: &mut App, area: Rect, name: &str, round: bool) {
+    placeholder_in(frame, app, (area.x, area.y as i32), area.as_size(), area, name, round);
 }
 
 /// Like [`placeholder`], for a slot at `(x, y)` that may reach past `clip` while scrolling: the
 /// gradient keeps its rows from the top of the slot, so a half-scrolled card shows the part of
 /// the placeholder that belongs there.
-pub(super) fn placeholder_in(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: Rect, name: &str, round: bool) {
+pub(super) fn placeholder_in(
+    frame: &mut Frame,
+    app: &mut App,
+    (x, y): (u16, i32),
+    size: Size,
+    clip: Rect,
+    name: &str,
+    round: bool,
+) {
+    // The cells are both the fallback while the image is encoded and the underlay when covers
+    // are off. The encoded version replaces them with a smooth gradient and antialiased corners.
+    placeholder_cells(frame.buffer_mut(), (x, y), size, clip, name, round);
+    if let Some(picture) = app.placeholder_image(name, size, round) {
+        if let Some(placement) = picture_in(frame, picture, (x, y), size, clip) {
+            app.placements.push(placement);
+            let (from, _) = theme::placeholder_colors(name);
+            placeholder_initial(frame.buffer_mut(), (x, y), size, clip, name, from);
+        }
+    }
+}
+
+fn placeholder_cells(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: Rect, name: &str, round: bool) {
     if size.width == 0 || size.height == 0 {
         return;
     }
@@ -237,6 +258,11 @@ pub(super) fn placeholder_in(buf: &mut Buffer, (x, y): (u16, i32), size: Size, c
             buf.set_style(band, Style::new().bg(shade.into()));
         }
     }
+    let (from, _) = theme::placeholder_colors(name);
+    placeholder_initial(buf, (x, y), size, clip, name, from);
+}
+
+fn placeholder_initial(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: Rect, name: &str, from: theme::Rgb) {
     let initial = name.chars().find(|c| !c.is_whitespace()).map(|c| c.to_uppercase().to_string()).unwrap_or_default();
     if initial.is_empty() || size.width < initial.width() as u16 {
         return;
@@ -329,19 +355,20 @@ fn take_upload(cell: &mut Cell) -> Option<String> {
     Some(upload)
 }
 
-pub(super) const PLAY_BUTTON_WIDTH: u16 = 3;
+pub(super) const PLAY_BUTTON_WIDTH: u16 = 4;
 
 /// The play button of a hovered card, ending at column `right` in row `y`, with a cell clear of
 /// the cover's right edge so it does not read as part of the art.
 pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, hit: Hit) {
     let p = theme::palette();
-    let icons = icons();
     let area = Rect::new(right.saturating_sub(PLAY_BUTTON_WIDTH), y, PLAY_BUTTON_WIDTH, 1).intersection(buf.area);
     let accent = app.accent.color();
     // Blank the cells rather than only recoloring them: over a cover they hold image cells,
     // which would keep showing pieces of the picture around the icon.
     buf.set_string(area.x, y, " ".repeat(area.width as usize), Style::new().bg(accent));
-    buf.set_string(area.x + 1, y, icons.play, Style::new().fg(p.bg).bg(accent));
+    // A plain triangle: the Nerd Font codepoint may be missing from the user's font and then
+    // paints a dark tofu block. Two blank cells to its right absorb any glyph overhang.
+    buf.set_string(area.x + 1, y, "▸", Style::new().fg(p.bg).bg(accent));
     app.hits.push((area, hit));
 }
 
@@ -448,12 +475,12 @@ mod tests {
     fn a_missing_cover_gets_a_gradient_and_its_first_letter() {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 3));
         let area = buf.area;
-        placeholder(&mut buf, area, "morning run", false);
+        placeholder_cells(&mut buf, (area.x, area.y as i32), area.as_size(), area, "morning run", false);
         assert_ne!(buf[(2, 0)].bg, buf[(2, 2)].bg, "the gradient runs top to bottom");
         assert_eq!(buf[(2, 1)].symbol(), "M", "the first letter, centered");
         // The same name always gets the same placeholder.
         let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));
-        placeholder(&mut other, area, "morning run", true);
+        placeholder_cells(&mut other, (area.x, area.y as i32), area.as_size(), area, "morning run", true);
         assert_eq!(buf[(3, 1)].bg, other[(3, 1)].bg);
     }
 
@@ -462,7 +489,7 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 4));
         let area = buf.area;
         // A six-row slot scrolled up by two: the screen starts at the slot's third row.
-        placeholder_in(&mut buf, (0, -2), Size::new(6, 6), area, "morning run", false);
+        placeholder_cells(&mut buf, (0, -2), Size::new(6, 6), area, "morning run", false);
         assert_ne!(buf[(0, 0)].bg, Color::Reset, "the visible part is painted");
         assert_eq!(buf[(0, 3)].bg, Color::Reset, "the rounded bottom corner is cleared");
     }

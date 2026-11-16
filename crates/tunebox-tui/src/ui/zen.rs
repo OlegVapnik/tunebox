@@ -120,10 +120,9 @@ fn draw_cover(frame: &mut Frame, app: &mut App, area: Rect) {
     match placed {
         Some(placement) => app.placements.extend(placement),
         None => {
-            let buf = frame.buffer_mut();
             // A designed placeholder instead of a stray note icon, consistent with every
             // other cover slot in the app.
-            super::placeholder(buf, area, &name, false);
+            super::placeholder(frame, app, area, &name, false);
         }
     }
     app.hits.push((area, Hit::Cover));

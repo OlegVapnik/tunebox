@@ -240,7 +240,8 @@ pub struct Loader {
 /// An image to decode: downloaded bytes, or artwork tunebox draws itself.
 enum ImageSource {
     Downloaded(Vec<u8>),
-    Drawn(fn() -> image::DynamicImage),
+    /// Artwork drawn by tunebox, e.g. a generated name cover. Boxed so it can capture the name.
+    Drawn(Arc<dyn Fn() -> image::DynamicImage + Send + Sync>),
 }
 
 impl Loader {
@@ -518,6 +519,27 @@ impl Loader {
         });
     }
 
+    /// Encodes a generated name cover: a smooth gradient and letter, rounded by `mask` like a
+    /// real cover. No download and no network; caching is handled by the app's image slots.
+    pub fn placeholder(&self, key: String, name: String, size: Size, round: bool, drawn: Arc<AtomicU64>) {
+        self.spawn(move |this| async move {
+            let result = async {
+                let _turn = this.encode_turns.acquire().await?;
+                if drawn.load(Ordering::Relaxed) < this.frames_drawn.load(Ordering::Relaxed) {
+                    return Ok(None);
+                }
+                let draw: Arc<dyn Fn() -> image::DynamicImage + Send + Sync> = Arc::new(move || art::name_cover(&name));
+                this.encode_image(ImageSource::Drawn(draw), size, mask(round)).await.map(|(picture, ())| Some(picture))
+            }
+            .await;
+            this.send(match result {
+                Ok(Some(picture)) => DataEvent::Image { key, result: Ok(picture) },
+                Ok(None) => DataEvent::ImageSkipped { key },
+                Err(err) => DataEvent::Image { key, result: Err(format!("{err:#}")) },
+            });
+        });
+    }
+
     /// Loads an image the interface is likely to show soon, like [`Loader::image`] but one of
     /// two at a time, download included, and whether on screen or not.
     pub fn prefetch_image(&self, key: String, url: String, size: Size, round: bool) {
@@ -670,10 +692,10 @@ impl Loader {
 
     async fn fetch_image(&self, url: &str) -> Result<ImageSource> {
         Ok(match url {
-            art::LIKED_COVER => ImageSource::Drawn(art::liked_cover),
-            art::PLACEHOLDER_COVER => ImageSource::Drawn(art::placeholder_cover),
+            art::LIKED_COVER => ImageSource::Drawn(Arc::new(art::liked_cover)),
+            art::PLACEHOLDER_COVER => ImageSource::Drawn(Arc::new(art::placeholder_cover)),
             // Tests stay offline: every other cover is the placeholder.
-            _ if cfg!(test) => ImageSource::Drawn(art::placeholder_cover),
+            _ if cfg!(test) => ImageSource::Drawn(Arc::new(art::placeholder_cover)),
             _ => ImageSource::Downloaded(self.download_image(url).await?),
         })
     }

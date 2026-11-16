@@ -12,6 +12,7 @@ use crate::{
     datacache,
     fx::Effects,
     preferences::Setting,
+    queue::Provider,
     state::{self, LastTrack, Page, SavedView, Selection, State},
     views::{HomeView, ListCursor, TrackSource, TrackView, View},
 };
@@ -197,9 +198,12 @@ impl App {
         let selection = page.selection;
         match page.view {
             SavedView::Home => {
+                // Start at the first card of the first shelf, not at the index left by the last
+                // run: feeds change while tunebox is closed, so an old index can name a different
+                // card – often one in the bottom row – or fall out of range.
                 if let View::Home(v) = &mut self.view {
-                    v.shelf = selection.shelf;
-                    v.item = selection.item;
+                    v.shelf = 0;
+                    v.item = 0;
                 }
             }
             SavedView::Library { filter } => {
@@ -266,6 +270,13 @@ impl App {
             cover_url_large: t.cover_url_large.clone(),
             context: self.last_context.clone(),
             position_ms: self.now.position_ms(),
+            queued: self
+                .queue
+                .next
+                .iter()
+                .filter(|upcoming| upcoming.provider == Provider::Queue)
+                .map(|upcoming| upcoming.uri.clone())
+                .collect(),
         });
         // While another device plays, the shown volume is that device's, not tunebox's.
         let volume = if self.now.device.is_none() { Some(self.now.volume) } else { self.restored_volume };

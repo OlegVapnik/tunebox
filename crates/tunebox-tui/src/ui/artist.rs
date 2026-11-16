@@ -44,30 +44,36 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let playing_uri = app.now.track.as_ref().map(|t| t.uri.clone());
     let playing = app.now.playing;
     let loading_uri = app.now.pending.as_ref().and_then(|p| p.uri.clone());
-    let View::Artist(view) = &mut app.view else { return };
-
-    let Some(page) = &view.page else {
+    let name = match &app.view {
+        View::Artist(view) => view.name.clone(),
+        _ => return,
+    };
+    if matches!(&app.view, View::Artist(view) if view.page.is_none()) {
         // Laid out like the loaded header, so nothing moves when the page arrives: an empty
         // portrait, the name beside it and the status where the stats will be.
-        let buf = frame.buffer_mut();
         let portrait = Rect::new(inner.x, inner.y, PORTRAIT.width, PORTRAIT.height).intersection(inner);
-        super::placeholder(buf, portrait, &view.name, true);
+        super::placeholder(frame, app, portrait, &name, true);
+        let status = match &app.view {
+            View::Artist(view) => match &view.error {
+                Some(err) => (format!("✕  {err}"), Style::new().fg(p.danger)),
+                None => (format!("{}  Loading…", text::spinner(frame_no)), Style::new().fg(p.muted)),
+            },
+            _ => unreachable!(),
+        };
         let text_x = inner.x + PORTRAIT.width + 3;
         let width = inner.right().saturating_sub(text_x) as usize;
-        let status = match &view.error {
-            Some(err) => (format!("✕  {err}"), Style::new().fg(p.danger)),
-            None => (format!("{}  Loading…", text::spinner(frame_no)), Style::new().fg(p.muted)),
-        };
         let lines = [
             ("ARTIST".to_owned(), Style::new().fg(p.faint).bold()),
-            (view.name.clone(), Style::new().fg(p.text).bold()),
+            (name, Style::new().fg(p.text).bold()),
             status,
         ];
         for (y, (line, style)) in (inner.y + 1..inner.bottom()).zip(lines) {
-            buf.set_string(text_x, y, text::truncate(&line, width), style);
+            frame.buffer_mut().set_string(text_x, y, text::truncate(&line, width), style);
         }
         return;
-    };
+    }
+    let View::Artist(view) = &mut app.view else { return };
+    let Some(page) = &view.page else { unreachable!() };
 
     // Virtual layout: header, "Popular" with its tracks, then the shelves. The heading has a
     // blank row before its tracks, like shelf titles before their covers.
@@ -142,7 +148,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         if !super::cover_in(frame, app, header.1.as_deref(), PORTRAIT, true, slot, PORTRAIT, inner) {
             let rows = (header_y + PORTRAIT.height as i32 - inner.y as i32).min(PORTRAIT.height as i32) as u16;
             let top = header_y.max(inner.y as i32) as u16;
-            super::placeholder(frame.buffer_mut(), Rect::new(inner.x, top, PORTRAIT.width, rows), &header.0, true);
+            super::placeholder(frame, app, Rect::new(inner.x, top, PORTRAIT.width, rows), &header.0, true);
         }
         let text_x = inner.x + PORTRAIT.width + 3;
         let width = inner.right().saturating_sub(text_x) as usize;

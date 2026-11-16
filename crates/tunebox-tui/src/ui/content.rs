@@ -90,7 +90,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some((url, name)) = &cover {
         let slot = Rect::new(inner.x, inner.y, HEADER_COVER.width, HEADER_COVER.height);
         if !super::cover(frame, app, url.as_deref(), HEADER_COVER, false, slot) {
-            super::placeholder(frame.buffer_mut(), slot, name, false);
+            super::placeholder(frame, app, slot, name, false);
         }
     }
 
@@ -127,7 +127,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     };
     for (slot, url, round, name) in thumbs {
         if !super::cover(frame, app, url.as_deref(), THUMB, round, slot) {
-            super::placeholder(frame.buffer_mut(), slot, &name, round);
+            super::placeholder(frame, app, slot, &name, round);
         }
     }
 }

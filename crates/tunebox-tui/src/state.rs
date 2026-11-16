@@ -141,6 +141,9 @@ pub struct LastTrack {
     /// Playlist, album or artist the track played in.
     pub context: Option<String>,
     pub position_ms: u32,
+    /// Songs the user queued themselves, after the ones from the context. Re-added on resume.
+    #[serde(default)]
+    pub queued: Vec<String>,
 }
 
 /// Missing or unreadable state just means a fresh start.
@@ -195,6 +198,15 @@ mod tests {
         assert_eq!((state.page.selection.index, state.page.sidebar_selected), (2, 3));
         assert_eq!(state.page.library_filter, LibraryFilter::Albums);
         assert_eq!(state.volume, Some(30000));
+    }
+
+    #[test]
+    fn a_state_from_before_queue_persistence_still_loads() {
+        let old = r#"{"view":{"kind":"home"},"last_track":{"uri":"ytmusic:video:1","name":"One",
+            "artists":[],"artist_uris":[],"album":"","album_uri":null,"duration_ms":1000,
+            "cover_url":null,"cover_url_large":null,"context":null,"position_ms":42}}"#;
+        let state: State = serde_json::from_str(old).unwrap();
+        assert_eq!(state.last_track.unwrap().queued, Vec::<String>::new());
     }
 
     #[test]

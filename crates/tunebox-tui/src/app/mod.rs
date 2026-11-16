@@ -814,6 +814,7 @@ impl App {
             cover_url_large: playing.cover_url_large.clone(),
             context: playing.context.clone(),
             position_ms: playing.position_ms,
+            queued: Vec::new(),
         };
         self.now.restore(&last);
         self.now.set_playing(true);
@@ -2751,7 +2752,18 @@ impl App {
             Command::PlayPause if self.resume.is_some() && self.is_connected() => {
                 if let Some(last) = self.resume.take() {
                     let uri = last.uri.clone();
-                    if self.start_on(&uri, |p| p.resume(last.context, last.uri, last.position_ms)) {
+                    if self.start_on(&uri, move |p| {
+                        p.resume(last.context, last.uri, last.position_ms)?;
+                        // The player rebuilds its queue from the context, so put back the songs
+                        // the user queued by hand before quitting.
+                        if !last.queued.is_empty() {
+                            p.clear_queue()?;
+                            for queued in last.queued {
+                                p.add_to_queue(&queued)?;
+                            }
+                        }
+                        Ok(())
+                    }) {
                         self.now.start(Some(uri));
                     }
                 }
@@ -3407,6 +3419,31 @@ impl App {
                 let drawn = Arc::new(AtomicU64::new(self.draws));
                 self.images.insert(key.clone(), ImageSlot::Loading(drawn.clone()));
                 self.loader.image(key.clone(), url.to_owned(), size, round, drawn);
+            }
+        }
+        match self.images.get(&key) {
+            Some(ImageSlot::Ready(picture)) => Some(picture),
+            _ => None,
+        }
+    }
+
+    /// A generated cover for an item with no artwork, cached in the same slots as real covers.
+    /// The smooth gradient and rounded corners are encoded as an image; the view draws the
+    /// initial on top as text.
+    pub fn placeholder_image(&mut self, name: &str, size: Size, round: bool) -> Option<&Picture> {
+        if !self.prefs.covers {
+            return None;
+        }
+        let key = format!("name-cover:{name}:{}x{}:{round}", size.width, size.height);
+        self.image_used.insert(key.clone(), Instant::now());
+        match self.images.get(&key) {
+            Some(ImageSlot::Loading(drawn)) => drawn.store(self.draws, Ordering::Relaxed),
+            Some(ImageSlot::Ready(_)) => {}
+            Some(ImageSlot::Failed(at)) if at.elapsed() < IMAGE_RETRY => {}
+            None | Some(ImageSlot::Failed(_)) => {
+                let drawn = Arc::new(AtomicU64::new(self.draws));
+                self.images.insert(key.clone(), ImageSlot::Loading(drawn.clone()));
+                self.loader.placeholder(key.clone(), name.to_owned(), size, round, drawn);
             }
         }
         match self.images.get(&key) {

@@ -201,8 +201,10 @@ async fn from_default_browser(
 async fn pick_browser(paths: &Paths) -> Result<Option<(auth::SignIn, Option<auth::Browser>)>> {
     let mut browsers = auth::browsers();
     let mut items: Vec<String> = browsers.iter().map(|browser| browser.name.clone()).collect();
-    items.push("Another way: paste a Cookie header".into());
-    let Some(choice) = prompt::pick("Sign in with", &items)? else { return Ok(None) };
+    items.push("Manual entry".into());
+    let Some(choice) = prompt::pick("Select your browser to auto-extract login cookies", &items)? else {
+        return Ok(None);
+    };
     if choice < browsers.len() {
         let mut browser = browsers.swap_remove(choice);
         println!("  {}", style::dim(&format!("Reading {}'s cookies, which may ask for your keyring…", browser.name)));

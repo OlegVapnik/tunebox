@@ -159,6 +159,7 @@ mod tests {
             cover_url_large: Some("https://i.scdn.co/large".into()),
             context: None,
             position_ms,
+            queued: Vec::new(),
         });
         now
     }

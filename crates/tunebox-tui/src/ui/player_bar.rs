@@ -36,7 +36,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Some(placement) => app.placements.extend(placement),
         None => {
             let name = app.now.track.as_ref().map(|track| track.name.clone()).unwrap_or_else(|| "tunebox".into());
-            super::placeholder(frame.buffer_mut(), cover, &name, false);
+            super::placeholder(frame, app, cover, &name, false);
         }
     }
     app.hits.push((cover, Hit::Cover));

@@ -54,13 +54,15 @@ const fn fork(ids: &'static [&'static str], name: &'static str, reader: &'static
 
 #[cfg(target_os = "macos")]
 const KNOWN: &[Known] = &[
+    // The four people are most likely to be signed in to come first: the login menu shows them
+    // at 1–4, with manual entry last.
+    known(&["org.mozilla.firefox"], "Firefox", "firefox", "Library/Application Support/Firefox"),
     known(&["com.google.chrome"], "Google Chrome", "chrome", "Library/Application Support/Google/Chrome"),
+    known(&["com.microsoft.edgemac"], "Microsoft Edge", "edge", "Library/Application Support/Microsoft Edge"),
     known(&["com.brave.browser"], "Brave", "brave", "Library/Application Support/BraveSoftware/Brave-Browser"),
     known(&["org.chromium.chromium"], "Chromium", "chromium", "Library/Application Support/Chromium"),
-    known(&["com.microsoft.edgemac"], "Microsoft Edge", "edge", "Library/Application Support/Microsoft Edge"),
     known(&["com.vivaldi.vivaldi"], "Vivaldi", "vivaldi", "Library/Application Support/Vivaldi"),
     known(&["com.operasoftware.opera"], "Opera", "opera", "Library/Application Support/com.operasoftware.Opera"),
-    known(&["org.mozilla.firefox"], "Firefox", "firefox", "Library/Application Support/Firefox"),
     known(&["com.apple.safari"], "Safari", "safari", "Library/Containers/com.apple.Safari"),
     fork(&["app.zen-browser.zen"], "Zen", "firefox", "Library/Application Support/zen"),
     fork(
@@ -72,16 +74,18 @@ const KNOWN: &[Known] = &[
 ];
 #[cfg(not(target_os = "macos"))]
 const KNOWN: &[Known] = &[
-    known(&["chromium.desktop", "chromium-browser.desktop"], "Chromium", "chromium", ".config/chromium"),
+    // The four people are most likely to be signed in to come first: the login menu shows them
+    // at 1–4, with manual entry last.
+    known(&["firefox.desktop"], "Firefox", "firefox", ".mozilla/firefox"),
+    known(&["firefox.desktop"], "Firefox", "firefox", ".config/mozilla/firefox"),
+    known(&["google-chrome.desktop"], "Google Chrome", "chrome", ".config/google-chrome"),
+    known(&["microsoft-edge.desktop"], "Microsoft Edge", "edge", ".config/microsoft-edge"),
     known(&["brave-browser.desktop", "brave.desktop"], "Brave", "brave", ".config/BraveSoftware/Brave-Browser"),
     // Omarchy's Brave, which keeps its profiles apart from Brave's.
     fork(&["brave-origin.desktop"], "Brave Origin", "brave", ".config/BraveSoftware/Brave-Origin"),
-    known(&["google-chrome.desktop"], "Google Chrome", "chrome", ".config/google-chrome"),
-    known(&["microsoft-edge.desktop"], "Microsoft Edge", "edge", ".config/microsoft-edge"),
+    known(&["chromium.desktop", "chromium-browser.desktop"], "Chromium", "chromium", ".config/chromium"),
     known(&["vivaldi-stable.desktop", "vivaldi.desktop"], "Vivaldi", "vivaldi", ".config/vivaldi"),
     known(&["opera.desktop"], "Opera", "opera", ".config/opera"),
-    known(&["firefox.desktop"], "Firefox", "firefox", ".mozilla/firefox"),
-    known(&["firefox.desktop"], "Firefox", "firefox", ".config/mozilla/firefox"),
     fork(&["zen.desktop", "zen-browser.desktop"], "Zen", "firefox", ".zen"),
     fork(&["librewolf.desktop"], "LibreWolf", "firefox", ".librewolf"),
     fork(&["floorp.desktop"], "Floorp", "firefox", ".floorp"),

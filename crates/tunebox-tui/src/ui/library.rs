@@ -141,7 +141,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
         let (title, subtitle, image_url, round) = sidebar::describe(app, entry);
         if !super::cover_in(frame, app, image_url.as_deref(), COVER, round, (x, y), COVER, grid) {
-            super::placeholder_in(frame.buffer_mut(), (x, y), COVER, grid, &title, round);
+            super::placeholder_in(frame, app, (x, y), COVER, grid, &title, round);
         }
         let playing = is_playing(app, entry);
         let title_style = home::card_title_style(accent, playing, selected);
