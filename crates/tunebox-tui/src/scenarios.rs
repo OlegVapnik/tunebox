@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crossterm::event::KeyCode::{self, Char, Down, Enter, Esc};
 
-use crate::harness::Harness;
+use crate::{app::Hit, backend::Service, harness::Harness};
 
 mod playback;
 
@@ -18,6 +18,26 @@ async fn starts_at_home() {
     assert!(h.shows("Good evening"));
     assert!(h.shows("Around the World"), "the demo's song is in the player bar");
     h.assert_screen("home");
+}
+
+#[tokio::test]
+async fn a_narrow_window_keeps_the_service_switch_out_of_the_search_field() {
+    let mut h = Harness::fakes(&[Service::Spotify, Service::YouTubeMusic, Service::SoundCloud]).await;
+    for width in [40u16, 50, 60, 70, 80, 90, 100, 120] {
+        h.resize(width, 30).await;
+        h.redraw();
+        let search = h
+            .app
+            .hits
+            .iter()
+            .find_map(|(area, hit)| matches!(hit, Hit::SearchInput).then_some(*area))
+            .expect("the search field is a hit target");
+        for (area, hit) in &h.app.hits {
+            if matches!(hit, Hit::Service(_)) {
+                assert!(area.x >= search.right(), "{width} columns: {hit:?} covers the search field");
+            }
+        }
+    }
 }
 
 #[tokio::test]

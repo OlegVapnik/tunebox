@@ -23,9 +23,16 @@ use crate::{
 pub const HEIGHT: u16 = 4;
 /// A square-ish button with its icon in the middle cell.
 const BUTTON_WIDTH: u16 = 5;
-/// The search field in a small window keeps this much room for its prompt before the update
-/// button takes any.
-const COMPACT_SEARCH_MIN: u16 = 30;
+/// A search field narrower than this is no longer useful; the right-hand controls give way first.
+const MIN_SEARCH: u16 = 10;
+
+#[derive(Clone, Copy)]
+enum ServiceLabels {
+    /// Active service with its name, the others with their icon or initials.
+    Mixed,
+    /// Icons or initials for every service.
+    Icons,
+}
 
 pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let p = theme::palette();
@@ -47,13 +54,24 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
 
     let back = button(buf, app, x, row, 2, icons().chevron_left, Hit::Hint(HintAction::Back), app.can_go_back());
     let home = button(buf, app, back.right() + 1, row, 2, icons().home, Hit::Command(Command::Home), true);
-    let width = search_width.min(area.right().saturating_sub(home.right() + 3));
-    let search = Rect::new(home.right() + 1, row, width, 1);
+    let search_x = home.right() + 1;
+    // Reserve room for the right-hand controls before sizing the search field, otherwise the
+    // service switch is drawn over the search prompt as the window shrinks.
+    let switch_min = switch_width(app, 2, ServiceLabels::Icons);
+    let mut update_min = update_width(app, 2);
+    let mut width = search_width
+        .min(area.right().saturating_sub(search_x + 2))
+        .min(area.right().saturating_sub(3 + update_min + switch_min + 2).saturating_sub(search_x));
+    if width < MIN_SEARCH {
+        update_min = 0;
+        width = search_width.min(area.right().saturating_sub(search_x + 2));
+    }
+    let search = Rect::new(search_x, row, width, 1);
     search_field(buf, app, search, 2);
 
     // Right of the search field: the update button, the service switch, then the user's name.
     let mut right = area.right().saturating_sub(3);
-    if let Some(button) = update_button(buf, app, right, row, 2, right.saturating_sub(search.right() + 2)) {
+    if let Some(button) = update_button(buf, app, right, row, 2, update_min) {
         right = button.x.saturating_sub(2);
     }
     if let Some(switch) = service_switch(buf, app, right, row, 2, right.saturating_sub(search.right() + 2)) {
@@ -83,14 +101,23 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
         button(buf, app, area.x + 1, area.y, 1, icons().chevron_left, Hit::Hint(HintAction::Back), app.can_go_back());
     let home = button(buf, app, back.right() + 1, area.y, 1, icons().home, Hit::Command(Command::Home), true);
     let end = area.right().saturating_sub(1);
-    let room = |end: u16| end.saturating_sub(home.right() + 1 + COMPACT_SEARCH_MIN);
-    let mut search_end = update_button(buf, app, end, area.y, 1, room(end)).map_or(end, |button| button.x);
-    let switch_end = search_end.saturating_sub(1);
-    if let Some(switch) = service_switch(buf, app, switch_end, area.y, 1, room(switch_end)) {
-        search_end = switch.x.saturating_sub(1);
+    let search_x = home.right() + 1;
+    let switch_min = switch_width(app, 1, ServiceLabels::Icons);
+    let mut update_min = update_width(app, 1);
+    let mut search_end = end.saturating_sub(update_min + switch_min + 2);
+    if search_end < search_x + MIN_SEARCH {
+        update_min = 0;
+        search_end = end.saturating_sub(2);
     }
-    let search = Rect::new(home.right() + 1, area.y, search_end.saturating_sub(home.right() + 1), 1);
+    let right = update_button(buf, app, end, area.y, 1, update_min).map_or(end, |button| button.x.saturating_sub(1));
+    service_switch(buf, app, right, area.y, 1, right.saturating_sub(search_end + 1));
+    let search = Rect::new(search_x, area.y, search_end.saturating_sub(search_x), 1);
     search_field(buf, app, search, 1);
+}
+
+/// The smallest possible update button: just its icon and the padding around it.
+fn update_width(app: &App, padding: u16) -> u16 {
+    if app.update.is_some() { icons().update.width() as u16 + 2 * padding } else { 0 }
 }
 
 /// The update button, its right edge at `right`, with as much of its label as fits into `room`
@@ -125,65 +152,58 @@ fn update_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u
     Some(area)
 }
 
-/// The music services in use side by side, the one shown lit, each a button that shows its
-/// pages; its right edge at `right`, as wide as fits into `room` columns: names with their
-/// icons, else short names, else icons alone. Draws nothing with a single service.
-fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u16, room: u16) -> Option<Rect> {
-    let p = theme::palette();
-    let services = app.services();
-    if services.len() < 2 {
-        return None;
-    }
-    let shown = app.shown_service();
-    let icon_of = |service: Service| icons::service(service);
-    let short_of = |service: Service| match service {
-        Service::Spotify => "Spotify",
-        Service::YouTubeMusic => "YouTube",
-        Service::SoundCloud => "SoundCloud",
-    };
-    let initials_of = |service: Service| match service {
+/// The label a service gets in the switch. The service that is open keeps its name, the others
+/// show only their icon, so the active one is the one you can read at a glance.
+fn service_label(app: &App, service: Service, labels: ServiceLabels) -> String {
+    let icon = icons::service(service);
+    let initials = match service {
         Service::Spotify => "S",
         Service::YouTubeMusic => "YT",
         Service::SoundCloud => "SC",
     };
-    // The service that is open keeps its name; the others show only their icon, so the
-    // active one is the one you can read at a glance.
-    let text_for = |service: Service| {
-        let icon = icon_of(service);
-        if Some(service) == shown {
-            let short = short_of(service);
-            if icon.is_empty() { short.to_owned() } else { format!("{icon}  {short}") }
-        } else {
-            let initials = initials_of(service);
-            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
-        }
+    if matches!(labels, ServiceLabels::Icons) || Some(service) != app.shown_service() {
+        return if icon.is_empty() { initials.to_owned() } else { icon.to_owned() };
+    }
+    let short = match service {
+        Service::Spotify => "Spotify",
+        Service::YouTubeMusic => "YouTube",
+        Service::SoundCloud => "SoundCloud",
     };
-    let full_width: u16 = services.iter().map(|&s| text_for(s).width() as u16 + 2 * padding).sum::<u16>().saturating_sub(1);
-    let use_names = full_width <= room;
-    // Fall back to icons only when even the active name does not fit.
-    let icon_only = !use_names && services.iter().map(|&s| {
-        let icon = icon_of(s);
-        let initials = initials_of(s);
-        let bare = if icon.is_empty() { initials } else { icon };
-        bare.width() as u16 + 2 * padding
-    }).sum::<u16>().saturating_sub(1) > room;
+    if icon.is_empty() { short.to_owned() } else { format!("{icon}  {short}") }
+}
+
+/// The width of the service switch with either full or icon-only labels, including the gaps.
+fn switch_width(app: &App, padding: u16, labels: ServiceLabels) -> u16 {
+    app.services()
+        .iter()
+        .map(|&service| service_label(app, service, labels).width() as u16 + 2 * padding)
+        .sum::<u16>()
+        .saturating_sub(1)
+}
+
+/// The music services in use side by side, the one shown lit, each a button that shows its
+/// pages; its right edge at `right`. Uses names when they fit, else icons; draws nothing if even
+/// the icons would spill into whatever is left of `room`.
+fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u16, room: u16) -> Option<Rect> {
+    let p = theme::palette();
+    if app.services().len() < 2 {
+        return None;
+    }
+    let labels = if switch_width(app, padding, ServiceLabels::Mixed) <= room {
+        ServiceLabels::Mixed
+    } else {
+        ServiceLabels::Icons
+    };
+    if switch_width(app, padding, labels) > room {
+        return None;
+    }
     let mut x = right;
     let mut first = right;
-    for &service in services.iter().rev() {
-        let label = if icon_only {
-            let icon = icon_of(service);
-            let initials = initials_of(service);
-            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
-        } else if use_names {
-            text_for(service)
-        } else {
-            let icon = icon_of(service);
-            let initials = initials_of(service);
-            if icon.is_empty() { initials.to_owned() } else { icon.to_owned() }
-        };
+    for &service in app.services().iter().rev() {
+        let label = service_label(app, service, labels);
         let width = label.width() as u16 + 2 * padding;
         let area = Rect::new(x.saturating_sub(width), y, width, 1).intersection(buf.area);
-        let style = if Some(service) == shown {
+        let style = if Some(service) == app.shown_service() {
             Style::new().fg(app.accent.color()).bold().underlined()
         } else if app.failed_to_start(service) {
             Style::new().fg(p.faint)
@@ -192,7 +212,7 @@ fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: 
         };
         buf.set_style(area, Style::new().bg(p.raised));
         buf.set_string(area.x + padding, y, label, style);
-        if Some(service) != shown {
+        if Some(service) != app.shown_service() {
             app.hits.push((area, Hit::Service(service)));
         }
         first = area.x;
