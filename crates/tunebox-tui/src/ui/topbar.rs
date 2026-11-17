@@ -23,6 +23,11 @@ use crate::{
 pub const HEIGHT: u16 = 4;
 /// A square-ish button with its icon in the middle cell.
 const BUTTON_WIDTH: u16 = 5;
+/// Empty columns between the search field and the service switch: without them the active
+/// service's raised background touches the search field and looks part of it.
+pub(crate) const SEARCH_GAP: u16 = 4;
+/// Empty columns between the update button and the service switch.
+const UPDATE_GAP: u16 = 2;
 /// A search field narrower than this is no longer useful; the right-hand controls give way first.
 const MIN_SEARCH: u16 = 10;
 
@@ -56,25 +61,30 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let home = button(buf, app, back.right() + 1, row, 2, icons().home, Hit::Command(Command::Home), true);
     let search_x = home.right() + 1;
     // Reserve room for the right-hand controls before sizing the search field, otherwise the
-    // service switch is drawn over the search prompt as the window shrinks.
+    // service switch is drawn over the search prompt as the window shrinks. The switch sits at
+    // `switch_right`, leaving SEARCH_GAP empty columns after the search field.
     let switch_min = switch_width(app, 2, ServiceLabels::Icons);
+    let right_edge = area.right().saturating_sub(3);
+    let fit = |update_min: u16| -> u16 {
+        let switch_right = if update_min > 0 { right_edge.saturating_sub(update_min + UPDATE_GAP) } else { right_edge };
+        switch_right.saturating_sub(search_x + SEARCH_GAP + switch_min)
+    };
     let mut update_min = update_width(app, 2);
-    let mut width = search_width
-        .min(area.right().saturating_sub(search_x + 2))
-        .min(area.right().saturating_sub(3 + update_min + switch_min + 2).saturating_sub(search_x));
-    if width < MIN_SEARCH {
+    let mut width = search_width.min(area.right().saturating_sub(search_x + 2)).min(fit(update_min));
+    if width < MIN_SEARCH && update_min > 0 {
         update_min = 0;
-        width = search_width.min(area.right().saturating_sub(search_x + 2));
+        width = search_width.min(area.right().saturating_sub(search_x + 2)).min(fit(0));
     }
     let search = Rect::new(search_x, row, width, 1);
     search_field(buf, app, search, 2);
 
     // Right of the search field: the update button, the service switch, then the user's name.
-    let mut right = area.right().saturating_sub(3);
-    if let Some(button) = update_button(buf, app, right, row, 2, update_min) {
-        right = button.x.saturating_sub(2);
+    let switch_right = if update_min > 0 { right_edge.saturating_sub(update_min + UPDATE_GAP) } else { right_edge };
+    if update_min > 0 {
+        update_button(buf, app, right_edge, row, 2, update_min);
     }
-    if let Some(switch) = service_switch(buf, app, right, row, 2, right.saturating_sub(search.right() + 2)) {
+    let mut right = switch_right;
+    if let Some(switch) = service_switch(buf, app, right, row, 2, right.saturating_sub(search.right() + SEARCH_GAP)) {
         right = switch.x.saturating_sub(2);
     }
     if let Some(me) = &app.me
@@ -103,14 +113,21 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     let end = area.right().saturating_sub(1);
     let search_x = home.right() + 1;
     let switch_min = switch_width(app, 1, ServiceLabels::Icons);
+    let fit = |update_min: u16| -> u16 {
+        let switch_right = if update_min > 0 { end.saturating_sub(update_min + UPDATE_GAP) } else { end };
+        switch_right.saturating_sub(search_x).saturating_sub(SEARCH_GAP + switch_min)
+    };
     let mut update_min = update_width(app, 1);
-    let mut search_end = end.saturating_sub(update_min + switch_min + 2);
-    if search_end < search_x + MIN_SEARCH {
+    let mut search_end = search_x + fit(update_min);
+    if search_end < search_x + MIN_SEARCH && update_min > 0 {
         update_min = 0;
-        search_end = end.saturating_sub(2);
+        search_end = search_x + fit(0);
     }
-    let right = update_button(buf, app, end, area.y, 1, update_min).map_or(end, |button| button.x.saturating_sub(1));
-    service_switch(buf, app, right, area.y, 1, right.saturating_sub(search_end + 1));
+    let switch_right = if update_min > 0 { end.saturating_sub(update_min + UPDATE_GAP) } else { end };
+    if update_min > 0 {
+        update_button(buf, app, end, area.y, 1, update_min);
+    }
+    service_switch(buf, app, switch_right, area.y, 1, switch_right.saturating_sub(search_end + SEARCH_GAP));
     let search = Rect::new(search_x, area.y, search_end.saturating_sub(search_x), 1);
     search_field(buf, app, search, 1);
 }

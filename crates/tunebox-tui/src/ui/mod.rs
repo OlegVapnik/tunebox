@@ -11,7 +11,7 @@ mod settings;
 mod sidebar;
 mod star;
 mod text;
-mod topbar;
+pub(crate) mod topbar;
 mod wordmark;
 mod zen;
 

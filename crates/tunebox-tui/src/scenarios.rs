@@ -34,7 +34,10 @@ async fn a_narrow_window_keeps_the_service_switch_out_of_the_search_field() {
             .expect("the search field is a hit target");
         for (area, hit) in &h.app.hits {
             if matches!(hit, Hit::Service(_)) {
-                assert!(area.x >= search.right(), "{width} columns: {hit:?} covers the search field");
+                assert!(
+                    area.x >= search.right() + super::ui::topbar::SEARCH_GAP,
+                    "{width} columns: {hit:?} touches the search field"
+                );
             }
         }
     }

@@ -4,6 +4,33 @@ All notable changes to tunebox. The format follows [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-17
+
+SoundCloud becomes a full service next to Spotify and YouTube Music, songs start sooner, and the shell gets a calmer, steadier look.
+
+### Added
+
+- **SoundCloud.** Sign in from your browser with one command, browse charts and search, see liked songs, playlists and albums, and switch to it with <kbd>S</kbd>. A playlist without its own cover uses the first song's artwork, then the uploader's picture.
+- **Cookies read from your browser.** `tunebox login spotify` and `tunebox login ytmusic` offer Firefox and Chromium browsers first; yt-dlp handles locked databases and keyrings. Spotify can also open a Chromium window, inject your `sp_dc` and take the token the web player gets for itself when its token endpoint refuses a plain request.
+- **Saved queue.** The songs you queued, and your place in them, come back after a restart.
+- **`r` retries a failed page.** Home, artist, tracks, search and playlists can be reloaded from the keyboard.
+- **Generated covers.** Missing artwork becomes a smooth gradient image with a large initial drawn into it, for Latin and Cyrillic names, sent through the same image pipeline as real covers.
+
+### Changed
+
+- **Spotify's Web API** now signs in through your own web-player session (`sp_dc`) instead of a developer app whose owner must have Premium. When Spotify blocks the token endpoint, `tunebox login spotify` opens a browser window and captures the web player's own token.
+- **A calmer look.** Catppuccin Mocha colors, one mauve accent, clearer weight and spacing, quieter hints, a 2×2 labelled navigation grid, and more polished Now Playing and Queue pages.
+- **Faster starts.** Resolved stream URLs are cached on disk, the selected track is prefetched as you move the cursor or mouse, and mpv buffers ahead. Pressing Enter no longer waits for yt-dlp on a track you have already hovered.
+- **YouTube Music sign-in heals itself.** Cookies are re-read from the browser that supplied them, for the same account. A failed try is retried after 30 seconds instead of waiting for a restart.
+- **SoundCloud Home** shows only Trending now — no greeting, "Playlists to try" or "Albums on SoundCloud" — and keeps the service buttons clear of the search field in narrow windows.
+
+### Fixed
+
+- Card titles wrap by whole words, one-letter SoundCloud subtitles are hidden, and the play button is centred without a dark hole beside it.
+- Selection is a dark wash with an accent bar; a playing track is marked with the accent and ♪; the highlighted card is the first one again.
+- Service buttons no longer merge with the search field. Errors show `—` instead of `0 songs · 0 min`, and a sign-in problem appears only on its own service.
+- YouTube Music's refresh works before the first profile request and tolerates a browser whose cookie store is briefly locked.
+
 ## [0.5.2] - 2026-11-10
 
 YouTube Music's Home looks and works as in its own apps, and tunebox asks once for a star.
@@ -166,7 +193,8 @@ The first release.
 - **Session restore.** The page, the selection and the last track come back after a restart.
 - **Installer.** It sets everything up step by step.
 
-[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/OlegVapnik/tunebox/compare/v0.5.2...v0.5.4
 [0.5.2]: https://github.com/OlegVapnik/tunebox/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/OlegVapnik/tunebox/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/OlegVapnik/tunebox/compare/v0.4.0...v0.5.0
