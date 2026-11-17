@@ -18,11 +18,18 @@ use crate::{
 pub struct YtMusicSource {
     client: YtMusic,
     cache_dir: Option<PathBuf>,
+    /// YouTube asks unsigned yt-dlp requests to prove they aren't a bot; the saved sign-in
+    /// answers that check.
+    cookies: Option<PathBuf>,
 }
 
 impl YtMusicSource {
     pub fn new(client: YtMusic, paths: &Paths) -> Self {
-        Self { client, cache_dir: Some(paths.cache.join("ytmusic").join("yt-dlp")) }
+        Self {
+            client,
+            cache_dir: Some(paths.cache.join("ytmusic").join("yt-dlp")),
+            cookies: Some(paths.ytmusic_cookies().file().to_path_buf()),
+        }
     }
 }
 
@@ -103,7 +110,7 @@ impl PlaybackSource for YtMusicSource {
 
     async fn resolve(&self, key: String) -> Result<Stream> {
         let url = format!("https://music.youtube.com/watch?v={key}");
-        ytdlp::resolve(&url, self.cache_dir.clone(), "YouTube Music").await
+        ytdlp::resolve_with(&url, self.cache_dir.clone(), "YouTube Music", self.cookies.as_deref()).await
     }
 
     async fn autoplay(&self, seed: String) -> Result<Vec<Track>> {

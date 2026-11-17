@@ -243,6 +243,6 @@ pub async fn doctor(paths: &Paths, mut report: impl FnMut(Section)) -> Result<()
     let client = YtMusic::new(paths)?;
     report(doctor::programs().await);
     report(doctor::innertube(&client).await);
-    report(doctor::playback().await);
+    report(doctor::playback_with(Some(paths.ytmusic_cookies().file())).await);
     Ok(())
 }

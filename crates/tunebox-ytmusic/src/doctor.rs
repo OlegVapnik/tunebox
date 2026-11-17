@@ -1,7 +1,11 @@
 //! Checks what YouTube Music needs: the programs playback runs on, InnerTube, the sign-in, and
 //! a stream URL actually resolving, as `tunebox doctor` sections.
 
-use std::{process::Stdio, time::Duration};
+use std::{
+    path::Path,
+    process::Stdio,
+    time::Duration,
+};
 
 use anyhow::{Result, bail};
 use tokio::process::Command;
@@ -89,11 +93,16 @@ pub async fn innertube(client: &YtMusic) -> Section {
 
 /// A stream URL resolves, which needs yt-dlp, deno and YouTube to agree.
 pub async fn playback() -> Section {
+    playback_with(None).await
+}
+
+/// As `playback`, with the saved sign-in so YouTube's bot check doesn't refuse the stream.
+pub async fn playback_with(cookies: Option<&Path>) -> Section {
     let check = timed("Stream URL (yt-dlp)", Expect::Available, async {
         let started = std::time::Instant::now();
         let video = TRACK.trim_start_matches("ytmusic:track:");
         let url = format!("https://music.youtube.com/watch?v={video}");
-        let stream = tunebox_mpv::ytdlp::resolve(&url, None, "YouTube Music").await?.url;
+        let stream = tunebox_mpv::ytdlp::resolve_with(&url, None, "YouTube Music", cookies).await?.url;
         let itag = url::Url::parse(&stream)
             .ok()
             .and_then(|url| url.query_pairs().find(|(k, _)| k == "itag").map(|(_, v)| v.into_owned()));

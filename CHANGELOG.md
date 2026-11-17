@@ -4,6 +4,15 @@ All notable changes to tunebox. The format follows [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-17
+
+YouTube Music playback uses the sign-in you already have, so YouTube's bot check stops blocking songs.
+
+### Fixed
+
+- **YouTube Music streams** are now resolved by yt-dlp with your saved cookies. Without them YouTube asked this connection to prove it wasn't a bot and refused every song; with them the same request succeeds. Signed-out playback still works when there is no saved sign-in.
+- `tunebox doctor` checks the stream with the same cookies, so it reports playback the way the player sees it.
+
 ## [0.5.4] - 2026-11-17
 
 SoundCloud becomes a full service next to Spotify and YouTube Music, songs start sooner, and the shell gets a calmer, steadier look.
@@ -193,7 +202,8 @@ The first release.
 - **Session restore.** The page, the selection and the last track come back after a restart.
 - **Installer.** It sets everything up step by step.
 
-[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/OlegVapnik/tunebox/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/OlegVapnik/tunebox/compare/v0.5.2...v0.5.4
 [0.5.2]: https://github.com/OlegVapnik/tunebox/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/OlegVapnik/tunebox/compare/v0.5.0...v0.5.1

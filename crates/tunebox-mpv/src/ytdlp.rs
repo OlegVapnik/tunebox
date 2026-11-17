@@ -5,7 +5,7 @@ use std::{
     collections::hash_map::DefaultHasher,
     fs,
     hash::{Hash, Hasher},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Stdio,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -56,6 +56,18 @@ impl Stream {
 /// A disk cache (under `cache_dir/stream-cache`) keeps resolved URLs around so a song that
 /// played before doesn't cost another yt-dlp run; entries expire with the URL.
 pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) -> Result<Stream> {
+    resolve_with(target, cache_dir, service, None).await
+}
+
+/// `resolve` with the signed-in cookies of a service, when it has any. YouTube refuses
+/// streams to unsigned requests from many home connections, and its bot check asks for
+/// exactly these cookies.
+pub async fn resolve_with(
+    target: &str,
+    cache_dir: Option<PathBuf>,
+    service: &str,
+    cookies: Option<&Path>,
+) -> Result<Stream> {
     // Try the disk cache first.
     if let Some(dir) = &cache_dir
         && let Some(stream) = read_cache(dir, target)
@@ -68,6 +80,9 @@ pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) ->
     command.args(["--no-config", "--no-playlist", "--no-warnings", "--quiet", "--no-progress", "-f", "bestaudio/best", "-g"]);
     if let Some(dir) = &cache_dir {
         command.arg("--cache-dir").arg(dir);
+    }
+    if let Some(file) = cookies.filter(|file| file.is_file()) {
+        command.arg("--cookies").arg(file);
     }
     command.arg(target).stdin(Stdio::null()).kill_on_drop(true);
     let output = match tokio::time::timeout(TIMEOUT, command.output()).await {
