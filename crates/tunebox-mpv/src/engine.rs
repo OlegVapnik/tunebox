@@ -475,7 +475,10 @@ impl Engine {
             }
         } else if self.source.is_track(&context) {
             let key = self.source.key(&context);
-            self.resolve(&key);
+            // A selection may already have prefetched this stream; don't resolve it twice.
+            if !self.streams.get(&key).is_some_and(Stream::fresh) {
+                self.resolve(&key);
+            }
         }
         if let Some(shuffle) = shuffle.filter(|on| *on != self.queue.shuffle) {
             self.emit(PlayerEvent::ShuffleChanged { shuffle });

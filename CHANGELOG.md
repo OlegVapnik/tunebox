@@ -4,6 +4,16 @@ All notable changes to tunebox. The format follows [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-17
+
+Songs start sooner, especially the first one you pick from YouTube Music's Home.
+
+### Changed
+
+- **Prefetch follows what you select.** Moving the cursor starts resolving that song's stream in 50 ms instead of 300 ms. For a YouTube Music song shown as its radio, the prefetch uses the song itself rather than the radio playlist, so yt-dlp gets a head start before you press Enter.
+- **SoundCloud asks for a track once.** A track resolved while browsing is reused when it starts and when its context is rebuilt, instead of asking `/resolve` two or three times. The player also reuses an already prefetched stream instead of resolving it again.
+- Added a test that a YouTube Music Home song is prefetched by its track URI.
+
 ## [0.5.5] - 2026-11-17
 
 YouTube Music playback uses the sign-in you already have, so YouTube's bot check stops blocking songs.
@@ -202,7 +212,8 @@ The first release.
 - **Session restore.** The page, the selection and the last track come back after a restart.
 - **Installer.** It sets everything up step by step.
 
-[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/OlegVapnik/tunebox/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/OlegVapnik/tunebox/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/OlegVapnik/tunebox/compare/v0.5.2...v0.5.4
 [0.5.2]: https://github.com/OlegVapnik/tunebox/compare/v0.5.1...v0.5.2

@@ -16,7 +16,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -40,6 +40,8 @@ const PAGE: u32 = 50;
 const CLIENT_ID_AGE: Duration = Duration::from_secs(6 * 60 * 60);
 /// Enough for a long listening history, and then some.
 const MAX_LIKES: usize = 5_000;
+/// Browsing and playback ask for the same track minutes apart; keep its profile this long.
+const RESOLVED_TTL: Duration = Duration::from_secs(30);
 
 /// What `tracks` lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +66,8 @@ struct Inner {
     client_id: Mutex<Option<String>>,
     client_id_file: PathBuf,
     liked: Mutex<Option<HashSet<String>>>,
+    /// Tracks resolved while browsing, reused by the stream and context lookups on play.
+    resolved: Mutex<HashMap<String, (Value, Instant)>>,
     /// Whether SoundCloud has refused the sign-in, so requests go out without it.
     expired: AtomicBool,
 }
@@ -88,6 +92,7 @@ impl SoundCloud {
                 client_id: Mutex::new(None),
                 client_id_file: paths.cache.join("soundcloud").join("client_id"),
                 liked: Mutex::new(None),
+                resolved: Mutex::new(HashMap::new()),
                 expired: AtomicBool::new(false),
             }),
         })
@@ -586,7 +591,16 @@ impl SoundCloud {
         } else {
             bail!("Not a SoundCloud link: {uri}");
         };
-        self.get("/resolve", &[("url", &page)]).await
+        // The same track is resolved when it is shown, when it starts, and when its context is
+        // rebuilt. Browsing and playback share this client, so one answer serves all three.
+        if let Some((value, at)) = self.inner.resolved.lock().await.get(&page)
+            && at.elapsed() < RESOLVED_TTL
+        {
+            return Ok(value.clone());
+        }
+        let value = self.get("/resolve", &[("url", &page)]).await?;
+        self.inner.resolved.lock().await.insert(page, (value.clone(), Instant::now()));
+        Ok(value)
     }
 
     /// A `client_id` from the cache, the environment, or the site's JavaScript.

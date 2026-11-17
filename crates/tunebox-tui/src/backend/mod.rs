@@ -329,7 +329,7 @@ impl Player {
             #[cfg(feature = "soundcloud")]
             Player::SoundCloud(player) => player.prefetch(uri),
             #[cfg(test)]
-            Player::Fake(_) => Ok(()),
+            Player::Fake(player) => player.prefetch(uri),
         }
     }
 

@@ -36,6 +36,7 @@ struct Inner {
 #[derive(Default)]
 struct State {
     commands: Vec<String>,
+    prefetches: Vec<String>,
     liked: HashSet<String>,
     playing: Option<Playing>,
     /// Home fails to load from now on.
@@ -195,6 +196,17 @@ impl Fake {
         let at = track_uri.as_ref().map(|t| format!(" at {t}")).unwrap_or_default();
         self.record(format!("play {context_uri}{at}"));
         self.start(context_uri, track_uri.as_deref(), 0)
+    }
+
+    /// Records the stream the app resolves ahead of time, like the real players' prefetch.
+    pub fn prefetch(&self, uri: &str) -> Result<()> {
+        self.state().prefetches.push(uri.to_owned());
+        Ok(())
+    }
+
+    /// Streams resolved ahead of time, separately from the commands that change playback.
+    pub fn prefetches(&self) -> Vec<String> {
+        self.state().prefetches.clone()
     }
 
     pub fn resume(&self, context: Option<String>, track: String, position_ms: u32) -> Result<()> {

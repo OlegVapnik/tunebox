@@ -150,8 +150,11 @@ async fn youtube_music_home_has_chips_and_quick_picks() {
     assert!(h.shows(" Relax ") && h.shows("Quick picks") && h.shows("MADE FOR YOU"), "{}", h.screen());
     h.assert_screen("ytmusic_home");
 
-    // Down the first column, then to the next one: the song plays at once.
-    h.press(Down).await.press(Char('l')).await.press(Enter).await;
+    // Down the first column, then to the next one: its stream is resolved while the cursor
+    // rests there, so Enter has a head start over yt-dlp.
+    h.press(Down).await.press(Char('l')).await;
+    assert!(h.fake(YOUTUBE).prefetches().iter().any(|uri| uri == "ytmusic:track:p1-1"));
+    h.press(Enter).await;
     assert_eq!(h.fake(YOUTUBE).commands(), ["play ytmusic:track:p1-1"]);
     assert!(h.player_bar().contains("YouTube Music Mix Song 1"), "{}", h.player_bar());
 

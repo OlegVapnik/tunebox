@@ -2509,12 +2509,13 @@ impl App {
                 View::Home(v) => {
                     let home = v.home.as_ref()?;
                     let shelf = home.shelves.get(shelf)?;
-                    shelf.items.get(item).map(|i| i.uri.clone())
+                    // A song's card is its radio, but the stream is for the song itself.
+                    shelf.items.get(item).and_then(|i| i.is_song().then(|| i.context_uri.clone()))
                 }
                 View::Artist(v) => {
                     let page = v.page.as_ref()?;
                     let shelf = page.shelves.get(shelf)?;
-                    shelf.items.get(item).map(|i| i.uri.clone())
+                    shelf.items.get(item).and_then(|i| i.is_song().then(|| i.context_uri.clone()))
                 }
                 _ => None,
             },
@@ -2535,10 +2536,10 @@ impl App {
                 Some(QueueRow::Playing(t) | QueueRow::Next { track: t, .. }) => Some(t.uri.clone()),
                 _ => None,
             },
-            View::Home(v) => v.selected().map(|item| item.uri.clone()),
+            View::Home(v) => v.selected().and_then(|item| item.is_song().then(|| item.context_uri.clone())),
             View::Artist(v) => match v.selected() {
                 Some(ArtistSelection::Track(t)) => Some(t.track.uri.clone()),
-                Some(ArtistSelection::Item(item)) => Some(item.uri.clone()),
+                Some(ArtistSelection::Item(item)) => item.is_song().then(|| item.context_uri.clone()),
                 None => None,
             },
             _ => None,
@@ -3372,14 +3373,19 @@ impl App {
         self.prefetch = queue;
 
         // Prefetch the selected track's stream, so pressing Enter starts without waiting for
-        // yt-dlp or a context fetch. The mouse cursor wins when it points at a different track.
-        if let Some(uri) = self.selected_track_uri().or_else(|| self.hovered_track_uri())
+        // yt-dlp or a context fetch. Keyboard selection starts almost at once; a resting mouse
+        // keeps the longer debounce so moving it across a list doesn't spawn a resolve per cell.
+        let target = self
+            .selected_track_uri()
+            .map(|uri| (uri, Duration::from_millis(50)))
+            .or_else(|| self.hovered_track_uri().map(|uri| (uri, Duration::from_millis(300))));
+        if let Some((uri, debounce)) = target
             && self.player().is_some()
             && backend::is_playable(&uri)
             && self
                 .track_prefetch
                 .as_ref()
-                .map_or(true, |(last, when)| last != &uri || when.elapsed() >= Duration::from_millis(300))
+                .map_or(true, |(last, when)| last != &uri || when.elapsed() >= debounce)
         {
             if let Some(player) = self.player() {
                 let _ = player.prefetch_track(&uri);
