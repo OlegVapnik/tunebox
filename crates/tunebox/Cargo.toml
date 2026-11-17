@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "A Spotify client for the terminal"
+description = "A terminal music player for Spotify, YouTube Music and SoundCloud"
 
 # The music services built in; a release ships one build per choice. Without any, only
 # `tunebox demo` runs.

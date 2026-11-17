@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <b>Spotify and YouTube Music in your terminal.</b><br>
+  <b>Spotify, YouTube Music and SoundCloud in your terminal.</b><br>
   Plays on its own, with Home, Spotify's DJ, synced lyrics, real cover art and a mouse that works everywhere.
 </p>
 
@@ -24,13 +24,19 @@
   <sub>Recorded from <code>tunebox demo</code>, which needs no account. The covers are Spotify's; the library is made up.</sub>
 </p>
 
-tunebox plays Spotify and YouTube Music in the terminal, one of them or both side by side. It plays the music itself, with no official app in the background: Spotify through librespot, as a Spotify Connect device you can pick from your phone, and YouTube Music through mpv, with or without an account. It looks and works like the desktop client you know: your Home feed, your library in a sidebar, cover art, synced lyrics, and on Spotify the DJ talking between tracks.
+> [!IMPORTANT]
+> **Spotify playback needs Premium and your own free Spotify developer app.** YouTube Music and SoundCloud need no paid account. Spotify setup takes a few minutes the first time; see [Setup](#setup).
+
+tunebox plays Spotify, YouTube Music and SoundCloud in the terminal, one of them or several side by side. It plays the music itself, with no official app in the background: Spotify through librespot, as a Spotify Connect device you can pick from your phone; YouTube Music and SoundCloud through mpv, with or without an account. It looks and works like the desktop client you know: your Home feed, your library in a sidebar, cover art, synced lyrics, and on Spotify the DJ talking between tracks.
+
+Installers and release packages ship Spotify, YouTube Music or both. SoundCloud is included in source builds (and in a default `cargo install`); see [SoundCloud](#soundcloud).
 
 ## Features
 
 - **Plays on its own.** Spotify plays through librespot, and tunebox is a Spotify Connect device. It controls your other devices too, and follows them live. YouTube Music plays through mpv, which tunebox starts and stops itself, with no gap between songs.
-- **Spotify, YouTube Music or both.** Install one, or both side by side: <kbd>S</kbd> or the switch in the top bar shows the other's Home, library and pages, as you left them.
+- **Spotify, YouTube Music or both.** Install one, or both side by side: <kbd>S</kbd> or the switch in the top bar shows the other's Home, library and pages, as you left them. SoundCloud is a third service in source builds.
 - **YouTube Music without an account.** Home, search, every page, lyrics and song radios work signed out. Sign in with your browser for your library and likes.
+- **SoundCloud, too.** In source builds, browse charts, playlists and tracks, import your `oauth_token` from the browser, and play through mpv. See [SoundCloud](#soundcloud).
 - **YouTube Music's Home, as in its apps.** Moods like Relax or Workout narrow it down, and Quick picks show as songs that play at once, or all in a row.
 - **Home and the DJ.** Your shelves and mixes, and on Spotify Made For You and the DJ with its voice between tracks. Ask the DJ for something, as in Spotify's apps, or let it pick something different. Crossfade if you like.
 - **Your library.** Playlists, albums, artists, and on Spotify podcasts, in a sidebar or as a full page with covers.
@@ -88,6 +94,25 @@ curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh 
 ```
 
 The installer first asks what you listen to: Spotify, YouTube Music, or both. Each comes as a build of its own, so a YouTube Music install carries no Spotify code, and the other way around. Then it checks your system, puts the latest release in `~/.local/bin`, and walks you through the [setup](#setup). For Spotify that's your Spotify app, its client ID and signing in. For YouTube Music it's mpv, yt-dlp and deno, which it offers to install with your package manager, and an optional sign-in. On [Omarchy](https://omarchy.org) it also offers tunebox's [bar widget, theme, menu entries and launcher](#omarchy). Run it again to switch; tunebox offers new releases itself, see [updates](#updates).
+
+<details>
+<summary>Manual install from a release, with a checksum</summary>
+
+If you'd rather not pipe a script into bash, download the release yourself and check it:
+
+```sh
+TARGET=x86_64-unknown-linux-gnu   # or aarch64-apple-darwin, etc.
+BASE=https://github.com/OlegVapnik/tunebox/releases/latest/download
+curl -fsSLO "$BASE/tunebox-$TARGET.tar.gz"
+curl -fsSLO "$BASE/tunebox-$TARGET.tar.gz.sha256"
+sha256sum -c tunebox-$TARGET.tar.gz.sha256   # on macOS: shasum -a 256 -c ...
+tar -xzf tunebox-$TARGET.tar.gz
+install -m755 tunebox ~/.local/bin/tunebox
+```
+
+`tunebox-full-$TARGET.tar.gz` has Spotify and YouTube Music; `tunebox-spotify-*` and `tunebox-ytmusic-*` have one each. The `.sha256` files are published next to them.
+
+</details>
 
 Package managers have the same three builds:
 
@@ -167,6 +192,13 @@ Signed out, Home, search, artist, album and playlist pages, lyrics and song radi
 On Linux, yt-dlp reads the keyring of Chrome, Brave and other Chromium-based browsers with Python's secretstorage: the installer offers it, and the Arch packages bring it along.
 
 `tunebox login ytmusic --force` signs in again, with another account if you like. `tunebox logout ytmusic` forgets the sign-in, and YouTube Music plays without an account again. A sign-in or sign-out shows the next time tunebox starts.
+
+### SoundCloud
+
+SoundCloud is available in source builds (`cargo install --git https://github.com/OlegVapnik/tunebox --locked tunebox`, which enables all three services by default); the release installers don't offer it yet. It browses charts and playlists without an account and plays tracks through mpv.
+
+1. Optional: run `tunebox login soundcloud`. tunebox borrows the `oauth_token` from a browser signed in to SoundCloud with yt-dlp and keeps only that cookie. Without it you can still browse and play public tracks.
+2. Run `tunebox doctor` to check the service and a stream, then `tunebox`.
 
 ## Keys
 
@@ -287,6 +319,12 @@ No. Outside its own apps, Spotify streams only to Premium accounts.
 </details>
 
 <details>
+<summary><b>Are the internal APIs and browser cookies risk-free?</b></summary>
+
+No. Spotify's internal APIs, InnerTube and yt-dlp are not public, are not affiliated with tunebox, and can change or be blocked at any time. tunebox does not bypass Spotify's subscription checks or DRM: Spotify playback needs Premium and your own app. Browser cookies are a signed-in session, so treat them like a password. Use at your own risk.
+</details>
+
+<details>
 <summary><b>Do I need YouTube Premium?</b></summary>
 
 No. YouTube Music plays without any account, and signing in only adds your library and likes: tunebox gets every song's stream the same way either way, without your sign-in.
@@ -295,13 +333,19 @@ No. YouTube Music plays without any account, and signing in only adds your libra
 <details>
 <summary><b>Why mpv and yt-dlp?</b></summary>
 
-YouTube protects its audio streams with challenges that only a JavaScript runtime can solve. yt-dlp solves them, with deno, and an older yt-dlp gets no streams at all, so keep it up to date. mpv plays what yt-dlp finds, and tunebox hands it the next song ahead of time, so there's no gap. tunebox starts mpv in the background without your `mpv.conf` or scripts, and mpv quits with tunebox, even when tunebox crashes.
+YouTube protects its audio streams with challenges that only a JavaScript runtime can solve. yt-dlp solves them, with deno, and an older yt-dlp gets no streams at all, so keep it up to date. mpv plays what yt-dlp finds, and tunebox hands it the next song ahead of time, so there's no gap. tunebox starts mpv in the background without your `mpv.conf` or scripts, and mpv quits with tunebox, even when tunebox crashes. If a stream fails, `tunebox doctor` prints the mpv, yt-dlp and deno versions and tests a real stream; update yt-dlp first.
 </details>
 
 <details>
 <summary><b>Is signing in to YouTube Music with my browser's cookies safe?</b></summary>
 
-`tunebox login ytmusic` has yt-dlp export the browser's cookies into a private folder, keeps only youtube.com's, and deletes the export right away. They stay in `~/.local/share/tunebox/ytmusic/cookies.txt`, which only you can read, or in the macOS Keychain with `credentials = "keychain"`. tunebox sends them only to music.youtube.com, with its own requests there; streams, covers and lyrics from LRCLIB load without them. They are a signed-in session like the browser's, so treat the file like a password. `tunebox logout ytmusic` deletes it.
+`tunebox login ytmusic` has yt-dlp export the browser's cookies into a private folder (mode 0700), keeps only youtube.com's, and deletes the export right away. They stay in `~/.local/share/tunebox/ytmusic/cookies.txt`, created with mode 0600, or in the macOS Keychain with `credentials = "keychain"`. The permissions and the fact that a sign-out or another sign-in can't be undone by a stale cookie are covered by tests. tunebox sends the cookies only to music.youtube.com, with its own requests there; streams, covers and lyrics from LRCLIB load without them. They are a signed-in session like the browser's, so treat the file like a password. `tunebox logout ytmusic` deletes it.
+</details>
+
+<details>
+<summary><b>Why does macOS ask about Keychain after every update?</b></summary>
+
+Release binaries are not code-signed, so Keychain treats each update as a new app. Sign-ins stay in files by default; if you set `credentials = "keychain"` you will get that prompt once per update.
 </details>
 
 <details>
@@ -313,7 +357,7 @@ On GNOME, KDE and other desktops with media controls they work right away, throu
 <details>
 <summary><b>What does tunebox send where?</b></summary>
 
-Requests to Spotify and YouTube Music, for the services you use, and to [LRCLIB](https://lrclib.net) for lyrics they don't have. For YouTube Music, yt-dlp and mpv fetch the streams from YouTube. tunebox also asks GitHub for new releases, unless `update_check = false`. Nothing else: no telemetry, no server of its own.
+Requests to the services you use: Spotify, YouTube Music and SoundCloud, plus [LRCLIB](https://lrclib.net) for lyrics they don't have. For YouTube Music, yt-dlp and mpv fetch the streams from YouTube. tunebox also asks GitHub for new releases, unless `update_check = false`. Nothing else: no telemetry, no server of its own.
 </details>
 
 <details>
@@ -322,6 +366,10 @@ Requests to Spotify and YouTube Music, for the services you use, and to [LRCLIB]
 Spotify playback runs through a [fork of librespot](https://github.com/OlegVapnik/librespot/tree/tunebox) that adds the DJ and crossfade from two open upstream pull requests. Your library and search come from the Web API through your own app. Home, artist pages and the DJ use Spotify's internal APIs, the same ones its own apps use.
 
 YouTube Music's pages, search, lyrics and your library come from InnerTube, the API music.youtube.com itself uses. yt-dlp finds each song's stream, and mpv plays it.
+
+SoundCloud's charts, playlists and tracks come from its api-v2. Streams come from SoundCloud itself when available, otherwise from yt-dlp, and mpv plays them; sign-in is an `oauth_token` read from your browser.
+
+Spotify playback depends on a vendored fork of librespot carrying two open upstream PRs ([DJ](https://github.com/librespot-org/librespot/pull/1797), [crossfade](https://github.com/librespot-org/librespot/pull/1756)). If upstream rejects them, the plan is to keep the fork pinned and rebased for as long as it builds; if that stops being practical, DJ and crossfade will be removed or disabled rather than leaving playback broken. The rest of Spotify support does not depend on those PRs.
 
 Spotify's internal APIs and InnerTube are not public and may change without notice.
 </details>
@@ -335,6 +383,5 @@ tunebox is not affiliated with Spotify or YouTube. It is [MIT](LICENSE) licensed
 ---
 
 <p align="center"><sub>
-  <b>Was this repo created with the help of AI?</b> Yes.<br>
-  <b>Do I care, as long as it works?</b> No.
+  Tests run in CI on Linux and macOS, and dependencies are checked with <code>cargo deny</code>. Please report problems in the <a href="https://github.com/OlegVapnik/tunebox/issues">issue tracker</a>.
 </sub></p>

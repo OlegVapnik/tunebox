@@ -4,6 +4,16 @@ All notable changes to tunebox. The format follows [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-18
+
+Documentation and repository metadata now describe the project honestly.
+
+### Changed
+
+- The repository description says **Spotify (Premium), YouTube Music and SoundCloud** instead of the misleading "Spotify (free via YouTube)". The README now documents SoundCloud as a source-build service, puts the Spotify Premium/developer-app requirement near the top, and explains the risks of internal APIs, browser cookies and unsigned macOS builds.
+- Added a manual install-from-release section with checksum verification, notes about `tunebox doctor` for outdated yt-dlp, the vendored librespot maintenance plan, and cookie file permissions (0600/0700) with a pointer to the tests.
+- Replaced the closing AI slogan with a note about CI tests, `cargo deny` and the issue tracker.
+
 ## [0.5.6] - 2026-11-17
 
 Songs start sooner, especially the first one you pick from YouTube Music's Home.
@@ -212,7 +222,8 @@ The first release.
 - **Session restore.** The page, the selection and the last track come back after a restart.
 - **Installer.** It sets everything up step by step.
 
-[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/OlegVapnik/tunebox/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/OlegVapnik/tunebox/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/OlegVapnik/tunebox/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/OlegVapnik/tunebox/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/OlegVapnik/tunebox/compare/v0.5.2...v0.5.4
