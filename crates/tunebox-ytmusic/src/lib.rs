@@ -19,9 +19,12 @@ mod search;
 mod source;
 mod watch;
 
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use anyhow::Result;
@@ -65,8 +68,10 @@ struct Inner {
     library: Library,
     /// Where the sign-in is kept, to read it from the browser again; `None` for one that isn't.
     paths: Option<Paths>,
-    /// Whether the sign-in was read from the browser again in this run, once at most.
-    refreshed: AtomicBool,
+    /// When the sign-in was last read from the browser again, so a failed try can be retried.
+    last_refresh: Mutex<Option<Instant>>,
+    /// Whether the last refresh was refused or couldn't be read: the message says so.
+    refresh_failed: AtomicBool,
     /// The account the sign-in acted as, to tell another one's cookies apart.
     last_user: Mutex<Option<User>>,
 }
@@ -82,10 +87,21 @@ macro_rules! signed_in {
     };
 }
 
+/// How soon a failed refresh may be tried again: a browser's cookie store can be locked for a
+/// moment, and a sign-in that comes back later shouldn't need a restart.
+const REFRESH_COOLDOWN: Duration = Duration::from_secs(30);
+
+/// Whether enough time has passed since the last try to read the browser again.
+fn refresh_due(last: Option<Instant>, now: Instant) -> bool {
+    last.is_none_or(|at| now.duration_since(at) >= REFRESH_COOLDOWN)
+}
+
 /// Whether YouTube has stopped taking the saved sign-in, rather than anything else going wrong.
 fn refused(err: &anyhow::Error) -> bool {
+    let message = err.to_string();
     matches!(innertube::status(err), Some(reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN))
-        || err.to_string().contains("doesn't accept the saved sign-in")
+        || message.contains("doesn't accept the saved sign-in")
+        || message.contains("sign-in has expired")
 }
 
 impl YtMusic {
@@ -108,7 +124,8 @@ impl YtMusic {
                 http,
                 library: Library::default(),
                 paths,
-                refreshed: AtomicBool::new(false),
+                last_refresh: Mutex::new(None),
+                refresh_failed: AtomicBool::new(false),
                 last_user: Mutex::new(None),
             }),
         })
@@ -133,60 +150,81 @@ impl YtMusic {
         }
     }
 
-    /// Where a refusal can't be mended by reading the browser again — the sign-in was pasted,
-    /// or saved by 0.5.2 or older, and says nothing about where it came from — says what to do.
+    /// Where a refusal can't be mended by reading the browser again, says what to do: the
+    /// sign-in was pasted, saved by 0.5.2 or older, or the browser's cookies no longer work.
     fn sign_in_hint(&self, err: anyhow::Error) -> anyhow::Error {
-        if refused(&err) && self.inner.api.browser().is_none() {
-            err.context(
+        if !refused(&err) {
+            return err;
+        }
+        match self.inner.api.browser() {
+            None => err.context(
                 "This sign-in doesn't say which browser it came from, so it can't be read again: \
                  run `tunebox login ytmusic --force` once",
-            )
-        } else {
-            err
+            ),
+            Some(_) if self.inner.refresh_failed.load(Ordering::Relaxed) => err.context(
+                "Couldn't refresh the YouTube Music sign-in from the browser: \
+                 run `tunebox login ytmusic --force` once",
+            ),
+            Some(_) => err,
         }
     }
 
-    /// Reads the sign-in from the browser it came from again, once per run, when YouTube has
-    /// stopped taking the cookies that were copied: a browser that goes on using its sign-in
-    /// gets new cookies for it. They are kept only when they are still the same account's, told
-    /// by its channel or handle; otherwise the sign-in before stays and asks to be made again.
-    /// Whether the call that failed is worth repeating.
+    /// Reads the sign-in from the browser it came from again, with a short cooldown, when
+    /// YouTube has stopped taking the cookies that were copied: a browser that goes on using its
+    /// sign-in gets new cookies for it. They are kept only when they are still the same account's,
+    /// told by its channel or handle; otherwise the sign-in before stays. A failed try is retried
+    /// later, so a locked cookie store or a browser that was shut for a moment doesn't need a
+    /// restart. Whether the call that failed is worth repeating.
     async fn refresh_sign_in(&self, err: &anyhow::Error) -> bool {
         let (Some(paths), Some(spec)) = (&self.inner.paths, self.inner.api.browser()) else { return false };
         if !refused(err) {
             return false;
         }
-        // Once per run: a browser that is shut, or signed out there, isn't asked again and again.
-        if self.inner.refreshed.swap(true, Ordering::Relaxed) {
+        let allowed = {
+            let mut last = self.inner.last_refresh.lock().unwrap();
+            if !refresh_due(*last, Instant::now()) {
+                false
+            } else {
+                *last = Some(Instant::now());
+                true
+            }
+        };
+        if !allowed {
             return false;
         }
-        let Some(identity) = self.inner.api.identity() else { return false };
+        let Some(identity) = self.inner.api.identity() else {
+            self.inner.refresh_failed.store(true, Ordering::Relaxed);
+            return false;
+        };
         let was = self.inner.last_user.lock().unwrap().clone();
         let mut browser = auth::Browser { name: spec.clone(), spec };
-        match auth::SignIn::refresh(paths, &mut browser, was.as_ref(), identity).await {
-            Ok(Some(found)) => {
-                if found.save(paths).is_err() {
-                    return false;
-                }
-                match paths.ytmusic_cookies().read() {
+        let outcome = match auth::SignIn::refresh(paths, &mut browser, was.as_ref(), identity).await {
+            Ok(Some(found)) => match found.save(paths) {
+                Ok(()) => match paths.ytmusic_cookies().read() {
                     Ok(Some(bytes)) => {
                         self.inner.api.replace_sign_in(&String::from_utf8_lossy(&bytes));
                         tracing::info!("the YouTube Music sign-in was read from {} again", browser.name);
-                        true
+                        Some(true)
                     }
-                    Ok(None) => false,
+                    Ok(None) => None,
                     Err(err) => {
                         tracing::warn!("reading the refreshed YouTube Music sign-in: {err:#}");
-                        false
+                        None
                     }
+                },
+                Err(err) => {
+                    tracing::warn!("keeping the YouTube Music sign-in from the browser: {err:#}");
+                    None
                 }
-            }
-            Ok(None) => false,
+            },
+            Ok(None) => None,
             Err(err) => {
                 tracing::debug!("the YouTube Music sign-in wasn't read from the browser again: {err:#}");
-                false
+                None
             }
-        }
+        };
+        self.inner.refresh_failed.store(outcome.is_none(), Ordering::Relaxed);
+        outcome.unwrap_or(false)
     }
 
     /// Which of the browser's accounts the sign-in acts as, with its address; `None` when
@@ -297,5 +335,28 @@ impl YtMusic {
 
     pub(crate) fn api(&self) -> &InnerTube {
         &self.inner.api
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_refusal_is_told_apart_from_other_errors() {
+        assert!(refused(&anyhow::anyhow!(
+            "The YouTube Music sign-in has expired – run `tunebox login ytmusic` again"
+        )));
+        assert!(refused(&anyhow::anyhow!("YouTube doesn't accept the saved sign-in any more")));
+        assert!(!refused(&anyhow::anyhow!("YouTube Music didn't answer (browse)")));
+    }
+
+    #[test]
+    fn a_failed_refresh_is_retried_after_a_cooldown() {
+        let now = Instant::now();
+        assert!(refresh_due(None, now));
+        assert!(!refresh_due(Some(now), now));
+        assert!(!refresh_due(Some(now - REFRESH_COOLDOWN + Duration::from_secs(1)), now));
+        assert!(refresh_due(Some(now - REFRESH_COOLDOWN), now));
     }
 }
