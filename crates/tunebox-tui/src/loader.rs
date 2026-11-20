@@ -628,8 +628,7 @@ impl Loader {
                 return Err(anyhow::anyhow!("featureless cover"));
             }
             let extra = process(&mut image);
-            let _ = keep_source;
-            let source = Some(Arc::new(image.clone()));
+            let source = keep_source.then(|| Arc::new(image.clone()));
             let (graphic, terminal_bytes) = match picker.protocol_type() {
                 ProtocolType::Kitty => {
                     let font = picker.font_size();
