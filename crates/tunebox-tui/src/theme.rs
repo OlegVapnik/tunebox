@@ -127,6 +127,9 @@ impl Accent {
     }
 
     pub fn selection(&self) -> Color {
+        if let Some((from, to)) = cover_gradient() {
+            return from.mix(to, 0.35).into();
+        }
         Rgb::of(palette().bg).mix(Rgb::of(palette().raised), 0.25).into()
     }
 
@@ -135,7 +138,20 @@ impl Accent {
     }
 }
 
+static COVER_GRADIENT: std::sync::Mutex<Option<(Rgb, Rgb)>> = std::sync::Mutex::new(None);
+
+pub fn set_cover_gradient(colors: Option<(Rgb, Rgb)>) {
+    *COVER_GRADIENT.lock().unwrap() = colors;
+}
+
+pub fn cover_gradient() -> Option<(Rgb, Rgb)> {
+    *COVER_GRADIENT.lock().unwrap()
+}
+
 pub fn placeholder_colors(name: &str) -> (Rgb, Rgb) {
+    if let Some(colors) = cover_gradient() {
+        return colors;
+    }
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in name.as_bytes() {
         hash ^= u64::from(*byte);

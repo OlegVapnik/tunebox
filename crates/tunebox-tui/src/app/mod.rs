@@ -1537,7 +1537,21 @@ impl App {
         }
     }
 
+    fn update_cover_gradient(&mut self) {
+        let colors = if self.now.playing {
+            self.now.cover.as_ref().and_then(|cover| {
+                cover.picture.source.as_ref().and_then(|image| {
+                    crate::theme::dominant_color(image).map(|color| (crate::theme::cover_accent(color), color))
+                })
+            })
+        } else {
+            None
+        };
+        crate::theme::set_cover_gradient(colors);
+    }
+
     pub fn on_tick(&mut self) -> bool {
+        self.update_cover_gradient();
         let mut redraw = false;
 
         if self.settings_checked.elapsed() >= SETTINGS_INTERVAL {
