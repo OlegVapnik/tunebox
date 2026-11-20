@@ -1,5 +1,3 @@
-//! Lyrics: YouTube Music's time-synced ones (only its Android app gets those), its plain ones,
-//! then LRCLIB's.
 
 use anyhow::Result;
 use serde_json::{Value, json};
@@ -64,7 +62,6 @@ fn parse_plain(page: &Value) -> Option<Lyrics> {
     Some(Lyrics { synced: false, lines, provider: provider(&text(&shelf["footer"])) })
 }
 
-/// `Source: LyricFind` → `LyricFind`.
 fn provider(source: &str) -> String {
     let name = source.strip_prefix("Source:").unwrap_or(source).trim();
     if name.is_empty() { "YouTube Music".into() } else { name.to_owned() }

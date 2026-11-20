@@ -1,4 +1,3 @@
-//! "Your Library": filter tabs and library items with thumbnails.
 
 use ratatui::{
     Frame,
@@ -20,14 +19,10 @@ use crate::{
 };
 
 const THUMB: Size = Size { width: 4, height: 2 };
-/// Two text lines next to the thumbnail, plus a gap.
 const ENTRY_ROWS: u16 = 3;
-/// Rows above the list: the navigation, the title and the filter tabs.
 const LIST_TOP: u16 = 8;
-/// Places stand two to a row, so the labels fit under a narrow sidebar.
 const NAV_COLUMNS: u16 = 2;
 
-/// Where the sidebar's navigation goes, and how to tell it is there already.
 fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
     let (home, search, queue, settings) = (
         matches!(app.view, View::Home(_)),
@@ -43,9 +38,6 @@ fn nav(app: &App) -> Vec<(Command, &'static str, &'static str, bool)> {
     ]
 }
 
-/// The places to go: Home and Search, then Queue and Settings, above the library. Returns their
-/// click areas. A sidebar too narrow for the labels keeps the icons alone, so no place is ever
-/// left out.
 fn navigation(
     buf: &mut ratatui::buffer::Buffer,
     x: u16,
@@ -91,7 +83,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let accent = app.accent.color();
     let page_open = matches!(app.view, View::Library(_));
 
-    // Home, Search, Queue and Settings, so the sidebar is where the mouse goes for a place to be.
     let places = navigation(frame.buffer_mut(), area.x + 3, area.y + 1, area.right().saturating_sub(2), app, accent);
     app.hits.extend(places.into_iter().map(|(rect, command)| (rect, Hit::Command(command))));
 
@@ -133,7 +124,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         let y = list.y + row as u16 * ENTRY_ROWS;
         entry(frame, app, area, y, position + NavItem::FIXED, entries[position]);
     }
-    // The next screenful of thumbnails, so scrolling down finds them loaded.
     for position in ahead {
         let (_, _, image_url, round) = describe(app, entries[position]);
         app.prefetch(image_url.as_deref(), THUMB, round);
@@ -142,10 +132,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     super::scrollbar(frame.buffer_mut(), area.right() - 1, list.y, list.height, entries.len(), app.nav.offset, fits);
 }
 
-/// Text tabs: the active one bold with an accent underline. Returns their click areas.
-///
-/// Tabs that don't fit hide behind a chevron at either end; clicking one selects the next
-/// hidden filter in that direction. The active tab always stays in view.
 pub(super) fn tabs(
     buf: &mut ratatui::buffer::Buffer,
     x: u16,
@@ -157,18 +143,14 @@ pub(super) fn tabs(
 ) -> Vec<(Rect, LibraryFilter)> {
     let p = theme::palette();
     const GAP: u16 = 2;
-    /// A chevron plus the gap between it and the tabs.
     const CHEVRON: u16 = 2;
     let widths: Vec<u16> = filters.iter().map(|f| f.label().width() as u16).collect();
-    // Width of tabs `range` side by side.
     let span = |range: std::ops::Range<usize>| -> u16 {
         let count = range.len() as u16;
         widths[range].iter().sum::<u16>() + GAP * count.saturating_sub(1)
     };
     let room = right.saturating_sub(x);
     let active_index = filters.iter().position(|f| *f == active).unwrap_or(0);
-    // Start as far left as possible while the active tab still fits, with room for the
-    // chevrons it takes.
     let mut start = 0;
     if span(0..filters.len()) > room {
         while start < active_index {
@@ -190,7 +172,6 @@ pub(super) fn tabs(
         x += CHEVRON;
     }
     for (index, &filter) in filters.iter().enumerate().skip(start) {
-        // The rest fit as they are, or this tab must leave room for the chevron.
         let limit = if x + span(index..filters.len()) <= right { right } else { right.saturating_sub(CHEVRON) };
         let width = widths[index];
         if x + width > limit {
@@ -219,7 +200,6 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
     if cursor {
         frame.buffer_mut().set_style(row, Style::new().bg(app.accent.selection()));
     }
-    // A bar in the padding marks the cursor, and a shorter one what is open under it.
     if cursor || open {
         let (glyph, style) = if cursor {
             ("▌", Style::new().fg(app.accent.color()))
@@ -237,11 +217,8 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
     }
 
     let x = thumb.right() + 2;
-    // What is playing shows in the accent color with a moving equalizer, like Spotify's speaker.
     let playing = (app.now.playing || app.now.device.is_some())
         && app.playing_context().is_some_and(|context| app.entry_uri(entry).as_deref() == Some(context));
-    // Text stays out of the last column, where the scrollbar goes. The equalizer ends a column
-    // before it, and only the title row makes room for it.
     let width = area.right().saturating_sub(x + 1) as usize;
     let title_width = area.right().saturating_sub(x + if playing { 6 } else { 1 }) as usize;
     let title_style = match (playing, open) {
@@ -259,7 +236,6 @@ fn entry(frame: &mut Frame, app: &mut App, area: Rect, y: u16, index: usize, ent
     app.hits.push((row, Hit::Nav(index)));
 }
 
-/// Title, subtitle, cover URL and whether the cover is round.
 pub(super) fn describe(app: &App, entry: LibraryEntry) -> (String, String, Option<String>, bool) {
     match entry {
         LibraryEntry::Liked => {
@@ -299,7 +275,6 @@ mod tests {
     const ALL_KINDS: [LibraryFilter; 4] =
         [LibraryFilter::Playlists, LibraryFilter::Albums, LibraryFilter::Artists, LibraryFilter::Podcasts];
 
-    /// Tabs as drawn in the 32-column sidebar, with the text of their row.
     fn sidebar_tabs(active: LibraryFilter) -> (Vec<(Rect, LibraryFilter)>, String) {
         let mut buf = Buffer::empty(Rect::new(0, 0, 32, 1));
         let hits = tabs(&mut buf, 3, 0, 30, &ALL_KINDS, active, Color::Reset);

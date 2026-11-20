@@ -1,4 +1,3 @@
-//! Media keys and the system's Now Playing for `tunebox play` and `tunebox connect`.
 
 use std::{sync::Arc, time::Duration};
 
@@ -15,7 +14,6 @@ pub enum Event {
     Artwork { url: String, bytes: Arc<[u8]> },
 }
 
-/// Follows the player and shows it in the system's media controls, where there are any.
 pub struct Media {
     controls: Option<Controls>,
     state: State,
@@ -25,7 +23,6 @@ pub struct Media {
 }
 
 impl Media {
-    /// The receiver yields requests from the system and loaded covers, for [`Media::on_event`].
     pub fn new() -> (Self, UnboundedReceiver<Event>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let controls = Controls::new({
@@ -68,7 +65,6 @@ impl Media {
         }
     }
 
-    /// Shows a loaded cover; requests from the system go to the player through `control`.
     pub fn on_event(&mut self, event: Event, control: impl FnOnce(Command) -> Result<()>) {
         match event {
             Event::Command(command) => {
@@ -88,7 +84,6 @@ impl Media {
     }
 
     fn load_artwork(&mut self, current: &CurrentTrack) {
-        // A cover still loading for the previous track must not land on this one.
         self.artwork_url = current.cover_url_large.clone();
         let Some(url) = self.artwork_url.clone() else { return };
         let (http, tx) = (self.http.clone(), self.tx.clone());

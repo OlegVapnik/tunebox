@@ -1,6 +1,3 @@
-//! Where the interface's colors come from: tunebox's own, Omarchy's theme or the terminal's, as
-//! the Colors setting says, with `theme.toml` from the config folder over them. Follows
-//! Omarchy's theme and the file as they change, without a restart.
 
 use std::{
     fs,
@@ -16,19 +13,15 @@ use crate::{
     theme::{Palette, Rgb},
 };
 
-/// How often to look at `theme.toml` again.
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
-/// What the terminal answered at startup when asked for its colors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalColors {
     pub background: Rgb,
-    /// Some terminals tell only their background.
     pub foreground: Option<Rgb>,
 }
 
 impl TerminalColors {
-    /// The colors among what the terminal answered; `None` without its background.
     pub fn from_capabilities(capabilities: &[Capability]) -> Option<Self> {
         let background = capabilities.iter().find_map(|capability| match capability {
             Capability::Background(r, g, b) => Some(Rgb(*r, *g, *b)),
@@ -41,8 +34,6 @@ impl TerminalColors {
         Some(Self { background, foreground })
     }
 
-    /// The palette for these colors: shades mixed like an Omarchy theme's. Without the text
-    /// color, tunebox's own text on a dark background and its background color on a light one.
     fn palette(self) -> Palette {
         let foreground = self.foreground.unwrap_or(if self.background.is_light() {
             Rgb::of(Palette::DEFAULT.bg)
@@ -53,21 +44,16 @@ impl TerminalColors {
     }
 }
 
-/// The palette to draw with, and when it changes.
 pub struct Colors {
     choice: ColorChoice,
-    /// The terminal's palette, when it told its colors.
     terminal: Option<Palette>,
-    /// Omarchy's theme and its palette as last read; `None` without Omarchy.
     omarchy: Option<(omarchy::ThemeWatch, Option<Palette>)>,
     custom: CustomFile,
-    /// Whether the palette may differ from the one [`Colors::poll`] returned last.
     stale: bool,
     shown: Option<Palette>,
 }
 
 impl Colors {
-    /// `config` is the folder `theme.toml` is looked for in.
     pub fn new(choice: ColorChoice, terminal: Option<TerminalColors>, config: &Path) -> Self {
         let omarchy = if cfg!(target_os = "linux") { omarchy::ThemeWatch::new() } else { None };
         Self {
@@ -85,14 +71,10 @@ impl Colors {
         self.choice = choice;
     }
 
-    /// Whether the terminal told its colors at startup.
     pub fn knows_terminal(&self) -> bool {
         self.terminal.is_some()
     }
 
-    /// The palette the first time, then again whenever it changed: by the setting, Omarchy's
-    /// theme or `theme.toml`. Looks at the files at most every second, so it may be called on
-    /// every tick.
     pub fn poll(&mut self) -> Option<Palette> {
         if let Some((watch, palette)) = &mut self.omarchy
             && let Some(theme) = watch.poll()
@@ -126,11 +108,9 @@ impl Colors {
     }
 }
 
-/// `theme.toml`, read again whenever it changes.
 struct CustomFile {
     path: PathBuf,
     checked: Option<Instant>,
-    /// When the file last changed, as of the last look; `None` before the first look.
     seen: Option<Option<SystemTime>>,
     text: Option<String>,
 }
@@ -140,7 +120,6 @@ impl CustomFile {
         Self { path, checked: None, seen: None, text: None }
     }
 
-    /// Whether the file changed since the last look, which is at most every [`CHECK_INTERVAL`].
     fn poll(&mut self) -> bool {
         if self.checked.is_some_and(|at| at.elapsed() < CHECK_INTERVAL) {
             return false;
@@ -164,7 +143,6 @@ mod tests {
 
     use super::*;
 
-    /// Ubuntu's terminal: aubergine with white text.
     const UBUNTU: TerminalColors =
         TerminalColors { background: Rgb(0x30, 0x0a, 0x24), foreground: Some(Rgb(255, 255, 255)) };
 
@@ -177,7 +155,6 @@ mod tests {
 
     fn colors(choice: ColorChoice, terminal: Option<TerminalColors>, config: &Path) -> Colors {
         let mut colors = Colors::new(choice, terminal, config);
-        // Whatever theme the machine running the tests has.
         colors.omarchy = None;
         colors
     }
@@ -241,7 +218,6 @@ mod tests {
         assert_eq!(palette.text, Color::Rgb(255, 255, 255), "the rest from the terminal");
 
         fs::write(&file, "bg = \"#101010\"\naccent = \"#ff8800\"\n").unwrap();
-        // The modification time may be the same within the second; a new look reads it.
         colors.custom.checked = None;
         colors.custom.seen = None;
         let palette = colors.poll().unwrap();

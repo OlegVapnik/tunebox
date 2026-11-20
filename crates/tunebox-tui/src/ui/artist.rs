@@ -1,4 +1,3 @@
-//! Artist page: header with portrait and stats, popular tracks, then shelves.
 
 use ratatui::{
     Frame,
@@ -20,7 +19,6 @@ use crate::{
 };
 
 const PORTRAIT: Size = Size { width: 14, height: 7 };
-/// Portrait plus a gap.
 const HEADER_ROWS: u16 = PORTRAIT.height + 1;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -49,8 +47,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         _ => return,
     };
     if matches!(&app.view, View::Artist(view) if view.page.is_none()) {
-        // Laid out like the loaded header, so nothing moves when the page arrives: an empty
-        // portrait, the name beside it and the status where the stats will be.
         let portrait = Rect::new(inner.x, inner.y, PORTRAIT.width, PORTRAIT.height).intersection(inner);
         super::placeholder(frame, app, portrait, &name, true);
         let status = match &app.view {
@@ -75,8 +71,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let View::Artist(view) = &mut app.view else { return };
     let Some(page) = &view.page else { unreachable!() };
 
-    // Virtual layout: header, "Popular" with its tracks, then the shelves. The heading has a
-    // blank row before its tracks, like shelf titles before their covers.
     let tracks_top = HEADER_ROWS + 3;
     let shelves_top = tracks_top + page.top_tracks.len() as u16 + 2;
     let track_count = page.top_tracks.len();
@@ -89,7 +83,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     };
     let total = shelves_top + page.shelves.len() as u16 * SHELF_ROWS;
     if !view.detached {
-        // Keep the header visible while the first tracks are selected.
         let anchor = if view.row < 3 { 0 } else { selected_top };
         if anchor < view.scroll {
             view.scroll = anchor;
@@ -125,7 +118,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 index: track_count + index,
                 y,
                 title: shelf.title.clone(),
-                // Artist pages keep every shelf the same height: cards, without a strapline.
                 strapline: String::new(),
                 shortcuts: false,
                 songs: false,
@@ -141,7 +133,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let tracks: Vec<_> = page.top_tracks.iter().map(|t| (t.track.clone(), t.playcount)).collect();
     let (row, item) = (view.row, view.item);
 
-    // Header: round portrait with name and stats beside it; scrolls out of view row by row.
     let header_y = inner.y as i32 - scroll as i32;
     if header_y + HEADER_ROWS as i32 > inner.y as i32 {
         let slot = (inner.x, header_y);

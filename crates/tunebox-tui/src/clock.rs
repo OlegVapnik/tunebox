@@ -1,5 +1,3 @@
-//! The time the interface goes by. In tests it stands still until the test moves it on, so
-//! debounces, timeouts and animations end exactly when a test says.
 
 #[cfg(test)]
 pub use frozen::{Instant, advance};
@@ -14,13 +12,11 @@ mod frozen {
         time::Duration,
     };
 
-    // Per thread, as each test runs on a runtime of its own thread.
     thread_local! {
         static START: std::time::Instant = std::time::Instant::now();
         static AHEAD: Cell<Duration> = const { Cell::new(Duration::ZERO) };
     }
 
-    /// Moves this thread's clock on.
     pub fn advance(by: Duration) {
         AHEAD.set(AHEAD.get() + by);
     }

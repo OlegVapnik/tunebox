@@ -1,6 +1,3 @@
-//! The Home feed. music.youtube.com sends a few shelves first and more as the page scrolls;
-//! tunebox asks for a few more pages straight away so Home has as many shelves as Spotify's.
-//! Above the shelves are chips for moods like "Relax", which show a Home of their own.
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
@@ -11,18 +8,11 @@ use crate::{
     parse::{self, PLAYLIST, SONGS, TRACK, find, list, str_at, text},
 };
 
-/// Home asks for more pages until it has this many shelves…
 const MIN_SHELVES: usize = 10;
-/// …but no more pages than this.
 const MAX_PAGES: usize = 5;
-/// The chip of podcasts, which tunebox can't play on YouTube Music. Titles are English, since
-/// tunebox asks for English.
 const PODCASTS: &str = "Podcasts";
-/// The order of the mood chips, so their places stay put between visits; chips not named here
-/// follow in whatever order the service sent them.
 const CHIP_ORDER: &[&str] = &["Energize", "Relax", "Workout", "Commute", "Focus", "Party", "Sleep"];
 
-/// Home, or the Home of the chip with this ID.
 pub(crate) async fn home(api: &InnerTube, chip: Option<&str>) -> Result<Home> {
     let mut body = json!({ "browseId": "FEmusic_home" });
     if let Some(chip) = chip {
@@ -38,7 +28,6 @@ pub(crate) async fn home(api: &InnerTube, chip: Option<&str>) -> Result<Home> {
         pages += 1;
         let page = match api.continuation("browse", &next).await {
             Ok(page) => page,
-            // What arrived so far is still a Home.
             Err(err) => {
                 tracing::warn!("more of Home: {err:#}");
                 break;
@@ -51,7 +40,6 @@ pub(crate) async fn home(api: &InnerTube, chip: Option<&str>) -> Result<Home> {
     Ok(Home { greeting: String::new(), chips, shelves })
 }
 
-/// The chips above Home's shelves; `asked` is the ID of the chip Home was asked for.
 fn parse_chips(sections: &Value, asked: Option<&str>) -> Vec<Chip> {
     let chips = sections.pointer("/header/chipCloudRenderer/chips").unwrap_or(&Value::Null);
     let mut chips: Vec<Chip> = list(chips)
@@ -68,7 +56,6 @@ fn parse_chips(sections: &Value, asked: Option<&str>) -> Vec<Chip> {
     chips
 }
 
-/// The shelves of a section list; ones with nothing tunebox can show are left out.
 pub(crate) fn parse_shelves(sections: &Value) -> Vec<Shelf> {
     list(&sections["contents"]).iter().filter_map(shelf).filter(|shelf| !shelf.items.is_empty()).collect()
 }
@@ -84,12 +71,10 @@ fn shelf(section: &Value) -> Option<Shelf> {
         return None;
     }
     let items: Vec<_> = list(&carousel["contents"]).iter().filter_map(parse::home_item).collect();
-    // Quick picks and the like: songs in columns, rather than cards.
     let songs = carousel.get("numItemsPerColumn").is_some() && items.iter().all(|item| item.is_song());
     let play = header.pointer("/moreContentButton/buttonRenderer/navigationEndpoint/watchEndpoint");
     let play_all = play.and_then(|play| match str_at(play, "/playlistId") {
         Some(playlist) => Some(format!("{PLAYLIST}{playlist}")),
-        // A list made up for the shelf: its songs, in order.
         None => {
             let videos: Vec<_> = items.iter().filter_map(|item| item.context_uri.strip_prefix(TRACK)).collect();
             (!videos.is_empty()).then(|| format!("{SONGS}{}", videos.join(",")))

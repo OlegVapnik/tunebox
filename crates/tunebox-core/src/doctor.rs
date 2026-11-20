@@ -1,5 +1,3 @@
-//! `tunebox doctor`'s findings, the same for every service: each probes what it can reach and
-//! reports it in these, and the command prints them all alike.
 
 use std::time::Duration;
 
@@ -11,9 +9,7 @@ const TIMEOUT: Duration = Duration::from_secs(15);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Expect {
     Available,
-    /// Spotify removed this for Development Mode apps; a failure is the expected result.
     Removed,
-    /// Nice to have; a failure is no problem.
     Optional,
 }
 
@@ -36,12 +32,10 @@ pub struct Section {
     pub checks: Vec<Check>,
 }
 
-/// Runs a probe that should succeed, giving up after a while; its answer is the detail shown.
 pub async fn timed(name: &str, probe: impl Future<Output = Result<String>>) -> Check {
     Check { name: name.into(), expect: Expect::Available, outcome: outcome(TIMEOUT, probe).await }
 }
 
-/// What a probe found, or why it failed; one still running after `timeout` failed.
 pub async fn outcome(timeout: Duration, probe: impl Future<Output = Result<String>>) -> Outcome {
     match tokio::time::timeout(timeout, probe).await {
         Ok(Ok(detail)) => Outcome::Ok(detail),
@@ -50,8 +44,6 @@ pub async fn outcome(timeout: Duration, probe: impl Future<Output = Result<Strin
     }
 }
 
-/// What every service relies on besides itself: LRCLIB, where lyrics come from when the
-/// service has none.
 pub async fn external() -> Section {
     let check = timed("Lyrics (LRCLIB)", async {
         let results: Value = reqwest::Client::builder()

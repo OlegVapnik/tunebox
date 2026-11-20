@@ -1,6 +1,3 @@
-//! Audio output on macOS that follows the system's default output, like Apple's own apps:
-//! playback moves over when AirPods or headphones connect or another output gets picked, and
-//! pauses when the output in use goes away instead of carrying on through the speakers.
 
 use std::{
     sync::{
@@ -28,27 +25,19 @@ use rodio::{
 use tokio::sync::mpsc::UnboundedSender;
 use tunebox_os::audio::OutputWatch;
 
-/// Audio queued ahead, about half a second, like librespot's own rodio output.
 const QUEUED_CHUNKS: usize = 26;
-/// How long stopping may wait for queued audio to play out.
 const DRAIN_LIMIT: Duration = Duration::from_secs(1);
-/// After the output in use went away, audio stays silent until the player stops, or this
-/// long in case nothing pauses it.
 const SILENT_AFTER_LOSS: Duration = Duration::from_secs(3);
 const POLL: Duration = Duration::from_millis(10);
-/// How often to try again to open an output after opening one failed, as freshly connected
-/// Bluetooth headphones may refuse at first.
 const OPEN_RETRY: Duration = Duration::from_secs(1);
 
 pub struct FollowingSink {
     host: cpal::Host,
     output: Option<Output>,
-    /// Set when the default output changed or the stream failed; checked before each write.
     stale: Arc<AtomicBool>,
     _watch: OutputWatch,
     silent_until: Option<Instant>,
     lost: UnboundedSender<String>,
-    /// When to try opening an output again, while there is none.
     reopen_at: Option<Instant>,
 }
 
@@ -59,8 +48,6 @@ struct Output {
 }
 
 impl FollowingSink {
-    /// Names of outputs that go away during playback are sent to `lost`. `None` when changes
-    /// of the default output can't be watched.
     pub fn new(lost: UnboundedSender<String>) -> Option<Self> {
         let stale = Arc::new(AtomicBool::new(false));
         let watch = OutputWatch::new({
@@ -73,8 +60,6 @@ impl FollowingSink {
         Some(Self { host, output, stale, _watch: watch, silent_until: None, lost, reopen_at })
     }
 
-    /// Moves to the default output when it changed or the stream failed. While playing, an
-    /// output that went away gets reported, so playback pauses instead of moving on.
     fn follow(&mut self, playing: bool) {
         if !self.stale.swap(false, Ordering::Relaxed) {
             return;
@@ -90,7 +75,6 @@ impl FollowingSink {
         self.reopen();
     }
 
-    /// Opens the default output. A failure is logged once, not on every retry.
     fn reopen(&mut self) {
         self.output = match open_default(&self.host, &self.stale) {
             Ok(output) => {
@@ -111,7 +95,6 @@ impl FollowingSink {
     fn is_present(&self, name: &str) -> bool {
         match self.host.output_devices() {
             Ok(mut devices) => devices.any(|device| device.name().is_ok_and(|n| n == name)),
-            // Can't tell; better not to pause for nothing.
             Err(_) => true,
         }
     }
@@ -127,7 +110,6 @@ impl Sink for FollowingSink {
         if self.output.is_none() {
             self.stale.store(true, Ordering::Relaxed);
         }
-        // Starting again was asked for, so it plays wherever the default output is now.
         self.follow(false);
         if let Some(output) = &self.output {
             output.sink.play();
@@ -138,7 +120,6 @@ impl Sink for FollowingSink {
     fn stop(&mut self) -> SinkResult<()> {
         self.silent_until = None;
         if let Some(output) = &self.output {
-            // Lets the queued audio play out, unless the output changed in the meantime.
             let deadline = Instant::now() + DRAIN_LIMIT;
             while !output.sink.empty() && !self.stale.load(Ordering::Relaxed) && Instant::now() < deadline {
                 thread::sleep(POLL);
@@ -156,17 +137,14 @@ impl Sink for FollowingSink {
             samples.fill(0.0);
         }
         let Some(output) = &self.output else {
-            // Opening failed: the next write tries again once it's due.
             if self.reopen_at.is_some_and(|at| Instant::now() >= at) {
                 self.stale.store(true, Ordering::Relaxed);
             }
-            // Nowhere to play: keep the pace, so playback doesn't race ahead.
             let frames = samples.len() as f64 / f64::from(NUM_CHANNELS);
             thread::sleep(Duration::from_secs_f64(frames / f64::from(SAMPLE_RATE)));
             return Ok(());
         };
         output.sink.append(SamplesBuffer::new(NUM_CHANNELS.into(), SAMPLE_RATE, samples));
-        // A stream that stopped never drains; its replacement comes with the next write.
         while output.sink.len() > QUEUED_CHUNKS && !self.stale.load(Ordering::Relaxed) {
             thread::sleep(POLL);
         }
@@ -206,7 +184,6 @@ fn open_default(host: &cpal::Host, stale: &Arc<AtomicBool>) -> Result<Output> {
     Ok(Output { name, sink, _stream: stream })
 }
 
-/// Stereo at Spotify's 44.1 kHz where the device has it, else at the device's own rate.
 fn stereo_config(device: &cpal::Device) -> Result<StreamConfig> {
     let default = device.default_output_config()?;
     let config = device
@@ -230,7 +207,6 @@ mod tests {
         AudioPacket::Samples(vec![0.0; 2048])
     }
 
-    /// A playing sink, or `None` on machines without an audio output.
     fn playing() -> Option<(FollowingSink, UnboundedReceiver<String>)> {
         let (tx, rx) = mpsc::unbounded_channel();
         let mut sink = FollowingSink::new(tx).expect("macOS reports changes of the default output");
@@ -239,7 +215,6 @@ mod tests {
         Some((sink, rx))
     }
 
-    /// Makes the output in use look like headphones that were just unplugged.
     fn unplug(sink: &mut FollowingSink) {
         sink.output.as_mut().unwrap().name = "Headphones that went away".into();
         sink.stale.store(true, Ordering::Relaxed);

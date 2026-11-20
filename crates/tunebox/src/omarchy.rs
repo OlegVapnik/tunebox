@@ -1,8 +1,3 @@
-//! `tunebox omarchy`: tunebox as part of Omarchy. A widget in the bar, colors that follow the
-//! theme, entries in the Omarchy menu, a launcher, and on request Super+Shift+M.
-//!
-//! Everything it adds is either a file of tunebox's own or a block between marker comments in a
-//! file of the user's, so `remove` takes out exactly that and leaves the rest as it was.
 
 use std::{
     collections::HashMap,
@@ -28,20 +23,14 @@ const PLUGIN: [(&str, &str); 4] = [
     ("Marquee.qml", include_str!("../../../integrations/omarchy/plugin/Marquee.qml")),
 ];
 const ICON: &str = include_str!("../../../integrations/omarchy/tunebox.svg");
-/// The theme templates earlier releases put in place, which `install` brings up to date and
-/// `remove` takes out as unedited. When the template changes, its old text goes here.
 const OLDER_TEMPLATES: &[&str] = &[];
-/// Next to the clock, which stays in the middle of the bar.
 const PLACEMENT: &str = r#"{"section":"center","after":"omarchy.clock"}"#;
-/// How long a freshly copied plugin may take until the shell knows it.
 const SHELL_SCAN: Duration = Duration::from_secs(5);
 
 const BEGIN: &str = "tunebox: begin";
 const END: &str = "tunebox: end";
-/// Says so in the block when tunebox created the whole file, which then goes with the block.
 const CREATED: &str = "tunebox created this file";
 
-/// Marks the desktop entry as the one `install` wrote.
 const DESKTOP_MARK: &str = "X-tunebox-omarchy=true";
 const DESKTOP_ENTRY: &str = "\
 [Desktop Entry]
@@ -72,24 +61,17 @@ o.bind("SUPER + SHIFT + M", "Music", { tui = "tunebox", focus = true })
 
 #[derive(Subcommand)]
 pub enum Action {
-    /// Add the bar widget, the theme's colors, the menu entries and the launcher
     Install {
-        /// Also make Super+Shift+M open tunebox instead of Spotify
         #[arg(long)]
         bind_music_key: bool,
-        /// Don't ask: everything, Super+Shift+M included unless your own config binds it
         #[arg(short, long)]
         yes: bool,
     },
-    /// Take out everything `install` added
     Remove,
-    /// Show what is set up; exits with 1 when nothing is
     Status,
 }
 
 pub fn run(action: Action) -> Result<()> {
-    // From the exit code of `status`, the installer tells whether to offer the setup or to
-    // bring it up to date.
     let Some(omarchy) = Omarchy::find() else {
         println!("\n  {} Omarchy not found, so there is nothing to set up.\n", style::dim("–"));
         if matches!(action, Action::Status) {
@@ -109,28 +91,20 @@ pub fn run(action: Action) -> Result<()> {
     }
 }
 
-/// What a step did, or why it had nothing to do.
 enum Step {
     Done(String),
     Nothing(String),
 }
 
-/// What `install` does about Super+Shift+M.
 enum MusicKey {
-    /// Makes it open tunebox.
     Bind,
-    /// Leaves it to Spotify, as Omarchy has it.
     Leave,
-    /// Leaves it as the user's own config file binds it.
     Theirs(PathBuf),
 }
 
-/// Where Omarchy keeps what tunebox adds to it.
 struct Omarchy {
     home: PathBuf,
-    /// `~/.local/state/omarchy`, with the current theme.
     state: PathBuf,
-    /// Omarchy itself, for the themes it ships.
     path: PathBuf,
 }
 
@@ -202,8 +176,6 @@ impl Omarchy {
         Ok(())
     }
 
-    /// Shows what is set up; returns whether anything is. An edited theme template doesn't
-    /// count, as `remove` leaves it.
     fn status(&self) -> bool {
         println!("\n  {}\n", style::bold("tunebox for Omarchy"));
         let shell = shell_plugins();
@@ -263,7 +235,6 @@ impl Omarchy {
                 style::bold("omarchy plugin enable tunebox.nowplaying")
             )));
         }
-        // The shell scans in the background; until it is done it doesn't know the widget yet.
         let deadline = Instant::now() + SHELL_SCAN;
         loop {
             match shell(&["putBarWidget", PLUGIN_ID, PLACEMENT]).as_deref() {
@@ -283,7 +254,6 @@ impl Omarchy {
                 taken_out = shell(&["setPluginEnabled", PLUGIN_ID, "false"]).as_deref() == Some("ok");
             }
             Some(_) => {}
-            // Without the shell, the bar's layout gets edited directly.
             None => taken_out = drop_from_shell_config(&self.config().join("shell.json"))?,
         }
         if !dir.exists() {
@@ -296,7 +266,6 @@ impl Omarchy {
 
     fn install_theme(&self) -> Result<Step> {
         let path = self.template();
-        // A template the user edited stays as it is, and is the one rendered.
         let edited = match fs::read_to_string(&path) {
             Ok(template) => (!is_stock_template(&template)).then_some(template),
             Err(err) if err.kind() == io::ErrorKind::NotFound => None,
@@ -310,7 +279,6 @@ impl Omarchy {
         if self.theme_ships_colors(&name) {
             return Ok(Step::Done(format!("follows the theme{yours}; {name} brings colors for tunebox")));
         }
-        // Rendered now, so the colors don't have to wait for the next theme switch.
         let colors = self.state.join("current/theme/colors.toml");
         let variables = omarchy_variables(&colors)
             .unwrap_or_else(|| theme::variables(&fs::read_to_string(&colors).unwrap_or_default()));
@@ -322,11 +290,9 @@ impl Omarchy {
     fn remove_theme(&self) -> Result<Step> {
         let path = self.template();
         if fs::read_to_string(&path).is_ok_and(|template| !is_stock_template(&template)) {
-            // Omarchy goes on rendering it for every theme, and tunebox goes on following it.
             return Ok(Step::Nothing(format!("{} has your changes, so it stays", path.display())));
         }
         let had_template = remove_file(&path)?;
-        // The theme's own file stays; the one rendered from the template goes with it.
         let rendered = !self.theme_ships_colors(&self.theme_name()) && remove_file(&self.rendered())?;
         Ok(removed(had_template || rendered, "the template"))
     }
@@ -347,7 +313,6 @@ impl Omarchy {
         if entry.exists() && !is_ours(&entry) {
             return Ok(Step::Nothing(format!("{} is your own, so it stays", entry.display())));
         }
-        // An icon of the user's own stays, and the entry shows that one.
         let icon = self.icon();
         if fs::symlink_metadata(&icon).is_err() {
             write_if_changed(&icon, ICON)?;
@@ -364,7 +329,6 @@ impl Omarchy {
         remove_file(&self.desktop_entry())?;
         if is_our_icon(&self.icon()) {
             remove_file(&self.icon())?;
-            // The folders `install` may have made for it, where nothing else is in them.
             for dir in self.icon().ancestors().skip(1).take(2) {
                 let _ = fs::remove_dir(dir);
             }
@@ -380,13 +344,11 @@ impl Omarchy {
         if bound == current {
             return Ok(Step::Done("opens tunebox".into()));
         }
-        // Errors the config had before aren't the binding's.
         let before = config_errors();
         write_if_changed(&path, &bound)?;
         let Some(before) = before else {
             return Ok(Step::Done("opens tunebox from your next login".into()));
         };
-        // Hyprland would read the file again by itself; reloading now is to hear about a mistake.
         let _ = Command::new("hyprctl").arg("reload").output();
         let after = config_errors().unwrap_or_default();
         if let Some(error) = after.iter().find(|error| !before.contains(error)) {
@@ -401,9 +363,6 @@ impl Omarchy {
         remove_block_from(&self.bindings(), "--").map(|done| removed(done, "the binding"))
     }
 
-    /// Whether to make Super+Shift+M open tunebox. Bound before, it stays bound without asking
-    /// again. Omarchy's, which opens Spotify, goes when told to or when the user says yes; one of
-    /// the user's own only when they say yes.
     fn music_key(&self, bind: bool, yes: bool) -> MusicKey {
         if fs::read_to_string(self.bindings()).is_ok_and(|text| has_block(&text, "--")) {
             return MusicKey::Bind;
@@ -420,7 +379,6 @@ impl Omarchy {
         }
     }
 
-    /// The file of the user's Hyprland config that binds Super+Shift+M itself, if one does.
     fn own_music_key(&self) -> Option<PathBuf> {
         let mut files: Vec<PathBuf> = fs::read_dir(self.bindings().parent()?)
             .ok()?
@@ -435,8 +393,6 @@ impl Omarchy {
         fs::read_to_string(self.state.join("current/theme.name")).map(|name| name.trim().to_owned()).unwrap_or_default()
     }
 
-    /// Whether the theme comes with a `tunebox.toml` of its own, which Omarchy keeps over the
-    /// template's.
     fn theme_ships_colors(&self, name: &str) -> bool {
         !name.is_empty()
             && [self.config().join("themes"), self.path.join("themes")]
@@ -445,12 +401,10 @@ impl Omarchy {
     }
 }
 
-/// Whether `template` is one tunebox put in place, rather than one the user edited.
 fn is_stock_template(template: &str) -> bool {
     template == theme::TEMPLATE || OLDER_TEMPLATES.contains(&template)
 }
 
-/// Whether Lua config `text` binds Super+Shift+M, outside comments and tunebox's block.
 fn binds_music_key(text: &str) -> bool {
     let mut ours = false;
     text.lines().map(str::trim_start).any(|line| {
@@ -464,21 +418,18 @@ fn binds_music_key(text: &str) -> bool {
     })
 }
 
-/// The first string in a line of Lua.
 fn first_string(code: &str) -> Option<&str> {
     let start = code.find(['"', '\''])?;
     let (quote, rest) = code[start..].split_at(1);
     Some(&rest[..rest.find(quote)?])
 }
 
-/// Whether keys such as "SUPER + SHIFT + M" are Super+Shift+M, in any order or case.
 fn is_music_key(keys: &str) -> bool {
     let mut keys: Vec<String> = keys.split(['+', ' ']).filter(|key| !key.is_empty()).map(str::to_uppercase).collect();
     keys.sort();
     keys == ["M", "SHIFT", "SUPER"]
 }
 
-/// The errors Hyprland found in its config, a line each; `None` where it isn't running.
 fn config_errors() -> Option<Vec<String>> {
     env::var_os("HYPRLAND_INSTANCE_SIGNATURE")?;
     let output = Command::new("hyprctl").arg("configerrors").output().ok()?;
@@ -489,7 +440,6 @@ fn config_errors() -> Option<Vec<String>> {
         .then(|| errors.lines().map(str::trim).filter(|line| !line.is_empty()).map(Into::into).collect())
 }
 
-/// Asks a question to answer with yes, no by default; no answer without a terminal.
 fn ask(question: &str) -> bool {
     if !io::stdin().is_terminal() {
         return false;
@@ -516,12 +466,10 @@ fn skipped(name: &str, detail: &str) {
     println!("  {}", style::dim(&format!("–  {name:<16}{detail}")));
 }
 
-/// What `remove` says about something it took out, or found nothing of.
 fn removed(done: bool, what: &str) -> Step {
     if done { Step::Done("removed".into()) } else { Step::Nothing(format!("{what} wasn't there")) }
 }
 
-/// Asks the running Omarchy shell; `None` without one.
 fn shell(args: &[&str]) -> Option<String> {
     let output = Command::new("omarchy-shell").arg("shell").args(args).output().ok()?;
     output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
@@ -531,14 +479,11 @@ fn shell_plugins() -> Option<String> {
     shell(&["listPlugins"]).filter(|plugins| plugins.starts_with('['))
 }
 
-/// Whether the shell's plugin list has `id` in the bar.
 fn plugin_enabled(plugins: &str, id: &str) -> bool {
     let Ok(serde_json::Value::Array(plugins)) = serde_json::from_str(plugins) else { return false };
     plugins.iter().any(|plugin| plugin["id"] == id && plugin["enabled"] == true)
 }
 
-/// Takes the widget out of `shell.json` while the shell isn't running, with jq, which Omarchy
-/// edits it with too and which keeps the order of everything else. Returns whether it was there.
 fn drop_from_shell_config(path: &Path) -> Result<bool> {
     let Ok(config) = fs::read_to_string(path) else { return Ok(false) };
     if !config.contains(PLUGIN_ID) {
@@ -555,7 +500,6 @@ fn drop_from_shell_config(path: &Path) -> Result<bool> {
     Ok(true)
 }
 
-/// The theme's variables the way Omarchy's templates see them, from Omarchy itself.
 fn omarchy_variables(colors: &Path) -> Option<HashMap<String, String>> {
     let output = Command::new("omarchy-theme-color").arg("--file").arg(colors).arg("--all").output().ok()?;
     let variables: HashMap<_, _> = String::from_utf8_lossy(&output.stdout)
@@ -566,16 +510,12 @@ fn omarchy_variables(colors: &Path) -> Option<HashMap<String, String>> {
     (output.status.success() && !variables.is_empty()).then_some(variables)
 }
 
-/// The menu file with tunebox's entries in it: a file of tunebox's own where there was none,
-/// else the user's with the entries right after its opening brace, which keeps every comma
-/// of theirs valid.
 fn add_menu_entries(current: Option<&str>) -> Result<String> {
     let Some(current) = current else {
         return Ok(format!(
             "{{\n  // {BEGIN}. `tunebox omarchy remove` takes these out again; {CREATED}.\n{MENU_ENTRIES}  // {END}\n}}\n"
         ));
     };
-    // A file tunebox created stays one, so that `remove` takes it away whole.
     let created = if current.lines().any(|line| line.contains(BEGIN) && line.contains(CREATED)) {
         format!("; {CREATED}")
     } else {
@@ -586,8 +526,6 @@ fn add_menu_entries(current: Option<&str>) -> Result<String> {
     let mut placed = false;
     for line in current.split_inclusive('\n') {
         out.push_str(line);
-        // Comments only ever take whole lines here, so the first brace outside one opens the
-        // file's object.
         if !placed && !line.trim_start().starts_with("//") && line.contains('{') {
             let (before, after) = line.split_at(line.find('{').expect("contains a brace") + 1);
             out.truncate(out.len() - line.len());
@@ -604,13 +542,11 @@ fn add_menu_entries(current: Option<&str>) -> Result<String> {
         }
     }
     if !placed {
-        // Not an object to add to: start one.
         return add_menu_entries(None);
     }
     Ok(out)
 }
 
-/// `text` with tunebox's block at the end, in place of one it had.
 fn add_block(text: &str, comment: &str, block: &str) -> Result<String> {
     let mut out = remove_block(text, comment)?;
     if !out.is_empty() && !out.ends_with('\n') {
@@ -626,8 +562,6 @@ fn has_block(text: &str, comment: &str) -> bool {
     text.lines().any(|line| line.trim_start().starts_with(&format!("{comment} {BEGIN}")))
 }
 
-/// `text` without tunebox's block, and without the blank line `add_block` put before it. Where
-/// the block's end line is gone, there is no telling where it ended, so that is an error.
 fn remove_block(text: &str, comment: &str) -> Result<String> {
     let mut out = String::with_capacity(text.len());
     let mut inside = false;
@@ -653,13 +587,10 @@ fn remove_block(text: &str, comment: &str) -> Result<String> {
     Ok(out)
 }
 
-/// What an error about a file says first: that the file stayed as it was.
 fn left_alone(path: &Path) -> String {
     format!("Left {} as it was", path.display())
 }
 
-/// Takes tunebox's block out of the file at `path`, and the file too where tunebox created it.
-/// Returns whether there was a block.
 fn remove_block_from(path: &Path, comment: &str) -> Result<bool> {
     let Ok(text) = fs::read_to_string(path) else { return Ok(false) };
     if !has_block(&text, comment) {
@@ -679,14 +610,10 @@ fn is_ours(desktop_entry: &Path) -> bool {
     fs::read_to_string(desktop_entry).is_ok_and(|entry| entry.lines().any(|line| line.trim() == DESKTOP_MARK))
 }
 
-/// Whether the icon is the one `install` writes, rather than one of the user's.
 fn is_our_icon(icon: &Path) -> bool {
     fs::read_to_string(icon).is_ok_and(|icon| icon == ICON)
 }
 
-/// Writes `content` unless the file has it already, through a temporary file so that a reader
-/// never sees half of it. A symlink, as stow or chezmoi put in place, stays one: the file it
-/// points to gets the content, and keeps its permissions.
 fn write_if_changed(path: &Path, content: &str) -> Result<()> {
     if fs::read_to_string(path).is_ok_and(|current| current == content) {
         return Ok(());
@@ -705,19 +632,15 @@ fn write_if_changed(path: &Path, content: &str) -> Result<()> {
     fs::rename(&temporary, path).with_context(|| format!("Couldn't write {}", path.display()))
 }
 
-/// The file at the end of `path`'s symlinks, or `path` itself where it is none.
 fn link_target(path: &Path) -> PathBuf {
     let mut path = path.to_path_buf();
-    // As many as Linux follows.
     for _ in 0..40 {
         let Ok(target) = fs::read_link(&path) else { break };
-        // A relative target starts from the link's folder; an absolute one replaces it all.
         path = path.parent().unwrap_or(Path::new("")).join(target);
     }
     path
 }
 
-/// Removes a file; whether there was one.
 fn remove_file(path: &Path) -> Result<bool> {
     match fs::remove_file(path) {
         Ok(()) => Ok(true),
@@ -732,7 +655,6 @@ mod tests {
 
     const USER_MENU: &str = "{\n  // Extend the menu.\n  // \"personal\": {\"icon\":\"\",\"label\":\"Personal\"},\n  \"about\": {\"icon\":\"\",\"label\":\"About\"}\n}\n";
 
-    /// The file as the shell reads it: whole-line comments out, trailing commas dropped.
     fn parse_menu(text: &str) -> serde_json::Value {
         let without_comments: String =
             text.lines().filter(|line| !line.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
@@ -748,7 +670,6 @@ mod tests {
         serde_json::from_str(&cleaned).expect("the menu file stays valid")
     }
 
-    /// An Omarchy of its own in the temp folder, with a dark theme set.
     fn scratch(name: &str) -> Omarchy {
         let root = env::temp_dir().join(format!("tunebox-omarchy-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);

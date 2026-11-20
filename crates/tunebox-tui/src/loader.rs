@@ -1,4 +1,3 @@
-//! Background data loading. Every request runs in its own task and reports back as an event.
 
 use std::{
     path::PathBuf,
@@ -42,10 +41,8 @@ use crate::{
     views::TrackSource,
 };
 
-/// Cached cover art unused for this long is deleted at startup.
 const IMAGE_CACHE_AGE: Duration = Duration::from_secs(60 * 24 * 60 * 60);
 
-/// A load running in the background; dropping it stops the load.
 pub struct Fetch(tokio::task::AbortHandle);
 
 impl Drop for Fetch {
@@ -54,7 +51,6 @@ impl Drop for Fetch {
     }
 }
 
-/// A task in [`Loader::pending`].
 struct Pending(Arc<AtomicUsize>);
 
 impl Pending {
@@ -70,29 +66,22 @@ impl Drop for Pending {
     }
 }
 
-/// An encoded image plus, in snapshot mode, its source for pasting into PNG snapshots.
 pub struct Picture {
     pub graphic: Graphic,
     pub source: Option<Arc<image::DynamicImage>>,
-    /// Memory the terminal keeps for the image once drawn. Only kitty keeps images, until told
-    /// to delete them; the other protocols draw them and forget.
     pub terminal_bytes: usize,
 }
 
 pub enum Graphic {
-    /// Kitty placeholders or half blocks: cells that ratatui draws like text.
     Cells(Protocol),
-    /// Sixel or iTerm2: escape sequences that tunebox writes after the frame.
     Inline(Arc<Inline>),
 }
 
 pub enum DataEvent {
-    /// What arrived for `service`'s pages, which may no longer be the ones shown.
     For(Service, Box<DataEvent>),
     Me(Result<User, String>),
     Home {
         view: u64,
-        /// The chip it was asked for with, `None` for the whole Home.
         chip: Option<String>,
         result: Result<Home, String>,
     },
@@ -104,12 +93,10 @@ pub enum DataEvent {
         key: String,
         result: Result<Picture, String>,
     },
-    /// The image was off screen by its turn and was not decoded.
     ImageSkipped {
         key: String,
     },
     Playlists(Result<Vec<PlaylistInfo>, String>),
-    /// The rest of the library; each part arrives, or fails, on its own.
     LikedCount(Result<u32, String>),
     Albums(Result<Vec<AlbumInfo>, String>),
     Artists(Result<Vec<ArtistInfo>, String>),
@@ -125,7 +112,6 @@ pub enum DataEvent {
     },
     Cover {
         url: String,
-        /// The cover and its dominant color.
         result: Result<(Picture, Option<Rgb>), String>,
     },
     LargeCover {
@@ -133,7 +119,6 @@ pub enum DataEvent {
         size: Size,
         result: Result<Picture, String>,
     },
-    /// A cover as an encoded image, for the system's media controls.
     Artwork {
         url: String,
         result: Result<Arc<[u8]>, String>,
@@ -142,61 +127,45 @@ pub enum DataEvent {
         uri: String,
         result: Result<Option<Lyrics>, String>,
     },
-    /// Library state of URIs (liked songs, saved albums, followed playlists …).
     Saved(Vec<(String, bool)>),
-    /// Spotify confirmed a library change.
     SaveDone {
         uri: String,
         notice: String,
     },
-    /// A library change failed; `saved` is the state to roll back to.
     SaveFailed {
         uri: String,
         saved: bool,
         error: String,
     },
-    /// Adding `count` songs to a playlist failed; its song count goes back down.
     AddFailed {
         playlist_id: String,
         count: u32,
         error: String,
     },
-    /// What plays where, from Spotify Connect.
     Playback(Result<Option<Playback>, String>),
-    /// Spotify answered a remote command, which stood for `commands` collapsed ones.
     RemoteDone {
         commands: usize,
         result: Result<(), String>,
     },
     Devices(Result<Vec<Device>, String>),
-    /// Spotify answered a transfer of playback to the device named `name`.
     Transferred {
         name: String,
         result: Result<(), String>,
     },
-    /// Details of tracks in the queue, for the URIs in `asked`; tracks Spotify has none for are
-    /// left out. With `reached` false no request got to Spotify, so they can be asked for again.
     QueueTracks {
         asked: Vec<String>,
         tracks: Vec<Track>,
         reached: bool,
     },
-    /// The Web API's list of what plays after `playing`.
     Upcoming {
         playing: String,
         result: Result<Vec<Track>, String>,
     },
-    /// The device took a skip to a track in the queue, or turned it down.
     SkippedTo(Result<(), String>),
-    /// What Spotify suggests asking DJ for.
     DjSuggestions(Result<Vec<String>, String>),
-    /// DJ took a request, or turned it down.
     DjAsked(Result<(), String>),
-    /// A release newer than this tunebox.
     UpdateAvailable(Release),
-    /// How much of the update has downloaded, in percent.
     UpdateProgress(u8),
-    /// The update took the place of the binary at this path; it runs after a restart.
     UpdateInstalled(PathBuf),
     UpdateFailed(String),
     Notice(String),
@@ -205,48 +174,29 @@ pub enum DataEvent {
 
 #[derive(Clone)]
 pub struct Loader {
-    /// The services in use, in the order the config lists them.
     services: Arc<[Service]>,
-    /// What each service started has to show, asked by the URI's service.
     catalogs: Arc<[Catalog]>,
-    /// Why the services that couldn't start didn't, such as a missing sign-in.
     problems: Arc<[(Service, String)]>,
-    /// The service whose Home, Library and Search show.
     service: Option<Service>,
     tx: UnboundedSender<AppEvent>,
     http: reqwest::Client,
-    /// What the terminal said about images at startup.
     image_terminal: Arc<ImageTerminal>,
-    /// The protocol chosen for covers, and what encodes them for it. It can change while
-    /// tunebox runs; covers encoded before are dropped as they arrive.
     picker: Arc<watch::Sender<(ImageProtocol, Picker)>>,
-    /// Keep decoded images for dev snapshots.
     keep_sources: bool,
     image_cache: PathBuf,
-    /// Turns for decoding and encoding covers. A screenful asks for dozens at once; run all
-    /// together, they would hog every core and need a few megabytes of buffers each.
     encode_turns: Arc<Semaphore>,
-    /// Turns for covers loaded ahead of being shown, separate so they never hold up the ones on
-    /// screen.
     prefetch_turns: Arc<Semaphore>,
-    /// The number of the last frame drawn; see [`Loader::frame_drawn`].
     frames_drawn: Arc<AtomicU64>,
-    /// The sample `tunebox demo` shows instead of the account's data.
     demo: Option<Arc<Demo>>,
-    /// Tasks started and not yet done, for tests to wait on.
     pending: Arc<AtomicUsize>,
 }
 
-/// An image to decode: downloaded bytes, or artwork tunebox draws itself.
 enum ImageSource {
     Downloaded(Vec<u8>),
-    /// Artwork drawn by tunebox, e.g. a generated name cover. Boxed so it can capture the name.
     Drawn(Arc<dyn Fn() -> image::DynamicImage + Send + Sync>),
 }
 
 impl Loader {
-    /// `started` has each service in use, started or why it couldn't; `service` is the one
-    /// whose Home, Library and Search show first.
     pub fn new(
         started: Vec<(Service, Result<Catalog, String>)>,
         service: Option<Service>,
@@ -257,7 +207,6 @@ impl Loader {
     ) -> Self {
         let http =
             tunebox_core::http::client(concat!("tunebox/", env!("CARGO_PKG_VERSION"))).build().unwrap_or_default();
-        // Leave cores for the interface and audio.
         let turns = std::thread::available_parallelism().map_or(2, |n| n.get().saturating_sub(2).clamp(1, 4));
         let picker = image_terminal.picker(ImageProtocol::Auto);
         let services = started.iter().map(|(service, _)| *service).collect();
@@ -281,8 +230,6 @@ impl Loader {
         }
     }
 
-    /// A loader for `services`, none of them started, so that what it is asked for fails or
-    /// never arrives; `problems` say why some couldn't start.
     #[cfg(test)]
     pub fn for_tests(services: &[Service], problems: &[(Service, &str)], tx: UnboundedSender<AppEvent>) -> Self {
         let images = std::env::temp_dir().join("tunebox-test-images");
@@ -293,28 +240,23 @@ impl Loader {
         loader
     }
 
-    /// Answers every request from the demo's sample instead of Spotify.
     pub fn with_demo(mut self, demo: Option<Arc<Demo>>) -> Self {
         self.demo = demo;
         self
     }
 
-    /// The protocol chosen for covers.
     pub fn image_protocol(&self) -> ImageProtocol {
         self.picker.borrow().0
     }
 
-    /// What [`ImageProtocol::Auto`] draws with in this terminal.
     pub fn auto_image_protocol(&self) -> ImageProtocol {
         self.image_terminal.auto()
     }
 
-    /// Encodes covers for `protocol` from now on.
     pub fn set_image_protocol(&self, protocol: ImageProtocol) {
         self.picker.send_replace((protocol, self.image_terminal.picker(protocol)));
     }
 
-    /// What covers are encoded as now.
     pub fn image_kind(&self) -> ProtocolType {
         self.picker.borrow().1.protocol_type()
     }
@@ -323,32 +265,26 @@ impl Loader {
         self.demo.as_deref()
     }
 
-    /// The service whose Home, Library and Search show.
     pub fn service(&self) -> Option<Service> {
         self.service
     }
 
-    /// The services in use, started or not, in the order the config lists them.
     pub fn services(&self) -> Vec<Service> {
         self.services.to_vec()
     }
 
-    /// Why `service` couldn't start, if it couldn't.
     pub fn problem(&self, service: Service) -> Option<&str> {
         self.problems.iter().find(|(s, _)| *s == service).map(|(_, problem)| problem.as_str())
     }
 
-    /// Shows `service`'s Home, Library and Search from now on.
     pub fn set_service(&mut self, service: Option<Service>) {
         self.service = service;
     }
 
-    /// Whether the service shown knows who listens; without, it has no library to load.
     pub fn signed_in(&self) -> bool {
         self.demo.is_some() || self.shown().is_ok_and(|catalog| catalog.signed_in())
     }
 
-    /// The catalog of `service`, if it was started.
     fn catalog(&self, service: Option<Service>) -> Result<Catalog> {
         let service = service.context("No music service to ask")?;
         if let Some(problem) = self.problem(service) {
@@ -358,18 +294,14 @@ impl Loader {
         catalog.cloned().with_context(|| format!("{} isn't enabled", service.name()))
     }
 
-    /// The catalog of the service `uri` belongs to.
     fn catalog_of(&self, uri: &str) -> Result<Catalog> {
         self.catalog(Service::of(uri))
     }
 
-    /// The catalog of the service shown.
     fn shown(&self) -> Result<Catalog> {
         self.catalog(self.service)
     }
 
-    /// Notes that frame `number` is on screen. An image request whose image the frame did not
-    /// draw has scrolled out of view.
     pub fn frame_drawn(&self, number: u64) {
         self.frames_drawn.store(number, Ordering::Relaxed);
     }
@@ -378,7 +310,6 @@ impl Loader {
         let _ = self.tx.send(AppEvent::Data(event));
     }
 
-    /// Sends what was loaded for the service shown when it was asked for.
     fn send_for(&self, event: DataEvent) {
         match self.service {
             Some(service) => self.send(DataEvent::For(service, Box::new(event))),
@@ -386,7 +317,6 @@ impl Loader {
         }
     }
 
-    /// Runs `task` in the background and reports its error, if any.
     fn spawn<F>(&self, task: impl FnOnce(Self) -> F + Send + 'static)
     where
         F: Future<Output = ()> + Send + 'static,
@@ -394,7 +324,6 @@ impl Loader {
         tokio::spawn(self.counted(task(self.clone())));
     }
 
-    /// Like [`Self::spawn`], for loads that may become pointless before they finish.
     fn spawn_fetch<F>(&self, task: impl FnOnce(Self) -> F + Send + 'static) -> Fetch
     where
         F: Future<Output = ()> + Send + 'static,
@@ -402,7 +331,6 @@ impl Loader {
         Fetch(tokio::spawn(self.counted(task(self.clone()))).abort_handle())
     }
 
-    /// Counts `task` as pending until it ends or is dropped.
     fn counted<F: Future<Output = ()>>(&self, task: F) -> impl Future<Output = ()> + use<F> {
         let pending = Pending::new(&self.pending);
         async move {
@@ -411,7 +339,6 @@ impl Loader {
         }
     }
 
-    /// Whether every task started has ended.
     #[cfg(test)]
     pub fn is_idle(&self) -> bool {
         self.pending.load(Ordering::SeqCst) == 0
@@ -427,8 +354,6 @@ impl Loader {
         });
     }
 
-    /// Looks for a newer tunebox on GitHub, at most every few hours unless `asked`. Only a look
-    /// the user asked for reports finding nothing, or failing.
     pub fn check_update(&self, paths: Paths, asked: bool) {
         self.spawn(move |this| async move {
             match update::check(&paths, asked).await {
@@ -443,7 +368,6 @@ impl Loader {
         });
     }
 
-    /// Downloads `release` and puts it in place of the running binary.
     pub fn install_update(&self, release: Release) {
         let Some(variant) = backend::VARIANT else {
             return self.send(DataEvent::UpdateFailed("This tunebox has no release to update to".into()));
@@ -468,7 +392,6 @@ impl Loader {
         });
     }
 
-    /// Home, or the Home of the chip with this ID.
     pub fn home(&self, view: u64, chip: Option<String>) {
         if let Some(demo) = self.demo() {
             return self.send_for(DataEvent::Home { view, chip, result: Ok(demo.home.clone()) });
@@ -490,20 +413,14 @@ impl Loader {
         });
     }
 
-    /// Loads an image at a fixed cell size; `round` masks it to a circle (artist portraits).
-    /// `drawn` is the number of the last frame that drew the image.
     pub fn image(&self, key: String, url: String, size: Size, round: bool, drawn: Arc<AtomicU64>) {
         self.spawn(move |this| async move {
-            // A fast scroll asks for every cover it passes. Ones gone from the screen by their
-            // turn are skipped, so the covers where the scroll stops come first; they are asked
-            // for again if they come back.
             let on_screen = || drawn.load(Ordering::Relaxed) >= this.frames_drawn.load(Ordering::Relaxed);
             let result = async {
                 let source = this.fetch_image(&url).await?;
                 if !on_screen() {
                     return Ok(None);
                 }
-                // Downloads run freely; decoding waits for a turn, held until the encode is done.
                 let _turn = this.encode_turns.acquire().await?;
                 if !on_screen() {
                     return Ok(None);
@@ -519,8 +436,6 @@ impl Loader {
         });
     }
 
-    /// Encodes a generated name cover: a smooth gradient and letter, rounded by `mask` like a
-    /// real cover. No download and no network; caching is handled by the app's image slots.
     pub fn placeholder(&self, key: String, name: String, size: Size, round: bool, drawn: Arc<AtomicU64>) {
         self.spawn(move |this| async move {
             let result = async {
@@ -540,8 +455,6 @@ impl Loader {
         });
     }
 
-    /// Loads an image the interface is likely to show soon, like [`Loader::image`] but one of
-    /// two at a time, download included, and whether on screen or not.
     pub fn prefetch_image(&self, key: String, url: String, size: Size, round: bool) {
         self.spawn(move |this| async move {
             let result = async {
@@ -554,7 +467,6 @@ impl Loader {
         });
     }
 
-    /// Everything in the library except playlists, each part shown as soon as it is complete.
     pub fn library(&self) {
         self.liked_count();
         self.albums();
@@ -612,8 +524,6 @@ impl Loader {
         });
     }
 
-    /// Loads all tracks of a source. Pages after the first are fetched a few at a time and
-    /// arrive in order.
     pub fn tracks(&self, view: u64, source: TrackSource) -> Fetch {
         if let Some(demo) = self.demo() {
             let items = match &source {
@@ -656,7 +566,6 @@ impl Loader {
         });
     }
 
-    /// Downloads cover art, picks the accent color and encodes it for the terminal.
     pub fn cover(&self, url: String, size: Size) {
         self.spawn(move |this| async move {
             let result = this.load_image(&url, size, |image| theme::dominant_color(image)).await;
@@ -678,8 +587,6 @@ impl Loader {
         });
     }
 
-    /// Fetches and encodes an image without waiting for a turn: the player bar and Now Playing
-    /// show one cover each, which must not queue behind a screenful of thumbnails.
     async fn load_image<T: Send + 'static>(
         &self,
         url: &str,
@@ -694,13 +601,11 @@ impl Loader {
         Ok(match url {
             art::LIKED_COVER => ImageSource::Drawn(Arc::new(art::liked_cover)),
             art::PLACEHOLDER_COVER => ImageSource::Drawn(Arc::new(art::placeholder_cover)),
-            // Tests stay offline: every other cover is the placeholder.
             _ if cfg!(test) => ImageSource::Drawn(Arc::new(art::placeholder_cover)),
             _ => ImageSource::Downloaded(self.download_image(url).await?),
         })
     }
 
-    /// Decodes, processes and encodes an image for the terminal, on the blocking pool.
     async fn encode_image<T: Send + 'static>(
         &self,
         source: ImageSource,
@@ -714,27 +619,18 @@ impl Loader {
                 ImageSource::Downloaded(bytes) => image::load_from_memory(&bytes)?,
                 ImageSource::Drawn(draw) => draw(),
             };
-            // Every slot is square, so other shapes are cut to their middle square, as Spotify's
-            // client does; scaled whole, they would leave a strip beside or below them.
             let (width, height) = (image.width(), image.height());
             if width != height {
                 let side = width.min(height);
                 image = image.crop_imm((width - side) / 2, (height - side) / 2, side, side);
             }
-            // Some services hand out a solid-colour square (SoundCloud's all-black artwork)
-            // as a cover. Drawn, it reads as a broken tile, so treat it as missing.
             if featureless(&image) {
                 return Err(anyhow::anyhow!("featureless cover"));
             }
             let extra = process(&mut image);
             let source = keep_source.then(|| Arc::new(image.clone()));
-            // Triangle (bilinear) is several times faster than Lanczos and looks the same when shrinking.
             let (graphic, terminal_bytes) = match picker.protocol_type() {
                 ProtocolType::Kitty => {
-                    // Fill the cells exactly. Fitted in proportion, a square cover leaves a
-                    // letterboxed strip in cells that are about twice as tall as wide, and then
-                    // the gradient placeholder, which does fill its slot, looks larger than the
-                    // artwork it stands in for. The stretch comes only from the cell shape.
                     let font = picker.font_size();
                     let width = u32::from(size.width) * u32::from(font.width);
                     let height = u32::from(size.height) * u32::from(font.height);
@@ -746,7 +642,6 @@ impl Loader {
                     let inline = Inline::new(kind, &image, size, picker.font_size(), picker.tmux_detected())?;
                     (Graphic::Inline(Arc::new(inline)), 0)
                 }
-                // Scale, not Fit: small covers (e.g. user-uploaded playlist images) must fill their slot too.
                 ProtocolType::Halfblocks => {
                     (Graphic::Cells(picker.new_protocol(image, size, Resize::Scale(Some(FilterType::Triangle)))?), 0)
                 }
@@ -756,7 +651,6 @@ impl Loader {
         .await?
     }
 
-    /// Cover art is immutable per URL, so it is cached on disk until unused for a while.
     async fn download_image(&self, url: &str) -> Result<Vec<u8>> {
         if cfg!(test) {
             anyhow::bail!("Tests stay offline: {url}");
@@ -771,8 +665,6 @@ impl Loader {
         Ok(bytes)
     }
 
-    /// Deletes cached cover art unused for [`IMAGE_CACHE_AGE`], and files named the way older
-    /// versions did, which are never read again. Runs in the background.
     pub fn prune_image_cache(&self) {
         let dir = self.image_cache.clone();
         tokio::task::spawn_blocking(move || {
@@ -784,7 +676,6 @@ impl Loader {
                 let current = entry.file_name().to_str().is_some_and(|name| {
                     name.len() == 64 && name.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
                 });
-                // Reading a file updates its access time, at most once a day on most systems.
                 let age = entry.metadata().ok().and_then(|meta| {
                     let modified = meta.modified().ok()?;
                     meta.accessed().map_or(modified, |accessed| accessed.max(modified)).elapsed().ok()
@@ -808,7 +699,6 @@ impl Loader {
         let duration_ms = track.duration_ms;
         self.spawn(move |this| async move {
             let query = LyricsQuery { uri: &uri, title: &title, artist: &artist, album: &album, duration_ms };
-            // A service that isn't on leaves LRCLIB.
             let result = match this.catalog_of(&uri) {
                 Ok(catalog) => catalog.lyrics(query).await,
                 Err(_) => lyrics::lrclib(&this.http, &query).await,
@@ -817,8 +707,6 @@ impl Loader {
         });
     }
 
-    /// Checks which URIs are in the library. Each batch reports as soon as it is known, so the
-    /// first rows of a long list get their hearts without waiting for the rest.
     pub fn check_saved(&self, uris: Vec<String>) {
         if uris.is_empty() {
             return;
@@ -861,7 +749,6 @@ impl Loader {
         });
     }
 
-    /// What plays on `service`'s devices.
     pub fn playback(&self, service: Option<Service>) {
         if self.demo.is_some() {
             return self.send(DataEvent::Playback(Ok(None)));
@@ -892,8 +779,6 @@ impl Loader {
         });
     }
 
-    /// What the service suggests asking DJ for while `track_uri` plays. Answers with
-    /// `DjSuggestions`.
     pub fn dj_suggestions(&self, track_uri: String) {
         if self.demo.is_some() {
             return self.send(DataEvent::DjSuggestions(Ok(Vec::new())));
@@ -905,7 +790,6 @@ impl Loader {
         });
     }
 
-    /// Waits for DJ to take a request. Answers with `DjAsked`.
     pub fn ask_dj(&self, answer: impl Future<Output = anyhow::Result<()>> + Send + 'static) {
         self.spawn(move |this| async move {
             let result = answer.await.map_err(|e| format!("{e:#}"));
@@ -913,7 +797,6 @@ impl Loader {
         });
     }
 
-    /// Controls playback on another of `service`'s devices. Answers with `RemoteDone`.
     pub fn remote(&self, service: Option<Service>, command: Remote) {
         if self.demo.is_some() {
             return;
@@ -923,7 +806,6 @@ impl Loader {
         }
     }
 
-    /// Reports only failures; the app confirms right away.
     pub fn queue(&self, uri: String) {
         if self.demo.is_some() {
             return;
@@ -935,7 +817,6 @@ impl Loader {
         });
     }
 
-    /// Details of tracks in the queue, a batch at a time. Answers with `QueueTracks`.
     pub fn queue_tracks(&self, uris: Vec<String>) {
         if let Some(demo) = self.demo() {
             let tracks = uris.iter().filter_map(|uri| demo.track(uri)).cloned().collect();
@@ -944,7 +825,6 @@ impl Loader {
         self.spawn(move |this| async move {
             let (known, unknown): (Vec<_>, Vec<_>) =
                 uris.into_iter().partition(|uri| Service::of(uri).is_some_and(|s| this.catalog(Some(s)).is_ok()));
-            // No service to ask has nothing to say about these.
             if !unknown.is_empty() {
                 this.send(DataEvent::QueueTracks { asked: unknown, tracks: Vec::new(), reached: true });
             }
@@ -959,8 +839,6 @@ impl Loader {
         });
     }
 
-    /// The Web API's list of what plays next, for when Spotify hasn't said yet in its own way.
-    /// Answers with `Upcoming`.
     pub fn upcoming(&self, playing: String) {
         if self.demo.is_some() {
             return;
@@ -971,7 +849,6 @@ impl Loader {
         });
     }
 
-    /// Skips ahead to a track in the queue of `device`. Answers with `SkippedTo`.
     pub fn skip_to(&self, device: String, entry: Upcoming) {
         if self.demo.is_some() {
             return;
@@ -983,8 +860,6 @@ impl Loader {
         });
     }
 
-    /// Hands `device` of `service` its queue back with a change. Reports only failures; the
-    /// device's next state shows the change.
     pub fn set_queue(&self, service: Option<Service>, device: String, listed: Listed) {
         if self.demo.is_some() {
             return;
@@ -997,7 +872,6 @@ impl Loader {
         });
     }
 
-    /// Reports only failures; the app confirms right away.
     pub fn add_to_playlist(&self, playlist: &PlaylistInfo, uris: Vec<String>) {
         if self.demo.is_some() {
             return;
@@ -1013,7 +887,6 @@ impl Loader {
     }
 }
 
-/// `uris` by the service each belongs to, in order; ones of no service are left out.
 fn by_service(uris: Vec<String>) -> Vec<(Service, Vec<String>)> {
     let mut groups: Vec<(Service, Vec<String>)> = Vec::new();
     for uri in uris {
@@ -1026,14 +899,11 @@ fn by_service(uris: Vec<String>) -> Vec<(Service, Vec<String>)> {
     groups
 }
 
-/// The cache file of an image URL: its SHA-256 in hex. Not std's hasher, whose output may change
-/// with any Rust release and would orphan the whole cache.
 fn cache_name(url: &str) -> String {
     Sha256::digest(url.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 impl Picture {
-    /// In cells.
     pub fn size(&self) -> Size {
         match &self.graphic {
             Graphic::Cells(protocol) => protocol.size(),
@@ -1041,7 +911,6 @@ impl Picture {
         }
     }
 
-    /// The protocol it was encoded for.
     pub fn kind(&self) -> ProtocolType {
         match &self.graphic {
             Graphic::Cells(Protocol::Kitty(_)) => ProtocolType::Kitty,
@@ -1052,12 +921,10 @@ impl Picture {
         }
     }
 
-    /// Whether the terminal holds the image: a kitty image that has been drawn.
     pub fn in_terminal(&self) -> bool {
         matches!(&self.graphic, Graphic::Cells(Protocol::Kitty(kitty)) if kitty.transmitted())
     }
 
-    /// The escape sequence that deletes the image from the terminal, if it holds it.
     pub fn terminal_delete(&self) -> Option<String> {
         match &self.graphic {
             Graphic::Cells(Protocol::Kitty(kitty)) if kitty.transmitted() => Some(kitty.delete_sequence()),
@@ -1066,7 +933,6 @@ impl Picture {
     }
 }
 
-/// Masks artist portraits to a circle and gives the other covers rounded corners.
 fn mask(round: bool) -> impl FnOnce(&mut image::DynamicImage) + Send + 'static {
     move |image| {
         if round {
@@ -1077,7 +943,6 @@ fn mask(round: bool) -> impl FnOnce(&mut image::DynamicImage) + Send + 'static {
     }
 }
 
-/// Makes everything outside the inscribed circle transparent, with a soft edge.
 fn circle(image: &image::DynamicImage) -> image::DynamicImage {
     let mut rgba = image.to_rgba8();
     let (width, height) = rgba.dimensions();
@@ -1091,14 +956,12 @@ fn circle(image: &image::DynamicImage) -> image::DynamicImage {
     rgba.into()
 }
 
-/// Softens a cover's corners to transparency, so cards read as cards at every size.
 fn rounded(image: &image::DynamicImage) -> image::DynamicImage {
     let mut rgba = image.to_rgba8();
     let (width, height) = rgba.dimensions();
     let radius = (width.min(height) as f32 / 8.0).max(2.0);
     let (cx, cy) = (width as f32 / 2.0, height as f32 / 2.0);
     for (x, y, pixel) in rgba.enumerate_pixels_mut() {
-        // How far past the straight edges of the rounded rectangle this pixel is; only corners are.
         let dx = ((x as f32 + 0.5 - cx).abs() - (cx - radius)).max(0.0);
         let dy = ((y as f32 + 0.5 - cy).abs() - (cy - radius)).max(0.0);
         let coverage = (radius - dx.hypot(dy) + 0.5).clamp(0.0, 1.0);
@@ -1107,9 +970,6 @@ fn rounded(image: &image::DynamicImage) -> image::DynamicImage {
     rgba.into()
 }
 
-/// A cover with no detail at all: a single flat colour, such as the all-black squares
-/// SoundCloud hands out for some playlists. Drawn, it reads as a broken tile, so the view
-/// falls back to its generated placeholder instead.
 fn featureless(image: &image::DynamicImage) -> bool {
     let rgb = image.to_rgb8();
     let (width, height) = rgb.dimensions();

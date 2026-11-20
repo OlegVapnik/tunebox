@@ -1,10 +1,3 @@
-//! Playback: mpv plays, tunebox keeps the queue. Commands go over a channel to one task that
-//! owns mpv and the queue, so none of them waits.
-//!
-//! A [`Source`] turns a service's URIs into songs, pages of a context and playable stream URLs.
-//! Each song's URL is resolved while the one before it plays and loaded into mpv's playlist
-//! ahead of time, so mpv moves on without a gap. The player reports what happens as
-//! [`PlayerEvent`]s, the same ones librespot's player sends for Spotify.
 
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -32,43 +25,27 @@ use crate::{
     ytdlp::Stream,
 };
 
-/// A service's catalog and streams, as the player needs them.
 #[async_trait]
 pub trait Source: Send + Sync + 'static {
-    /// The name of the service, for messages.
     fn name(&self) -> &'static str;
-    /// Whether the URI names a single song.
     fn is_track(&self, uri: &str) -> bool;
-    /// A stable key for the song's stream, cached while fresh.
     fn key(&self, uri: &str) -> String;
-    /// The songs of a context, page by page, in order.
     fn context(&self, uri: String) -> BoxStream<'static, Result<Vec<Track>>>;
-    /// A song's details, for the queue.
     async fn track(&self, uri: String) -> Result<Option<Track>>;
-    /// A playable URL for the song with this key.
     async fn resolve(&self, key: String) -> Result<Stream>;
-    /// Songs to play after the context ends.
     async fn autoplay(&self, seed: String) -> Result<Vec<Track>>;
-    /// A cover large enough for the player bar.
     fn large_cover(&self, url: &str) -> String {
         url.to_owned()
     }
 }
 
-/// "Previous" restarts the song once it has played this long, as Spotify's apps do.
 const RESTART_AFTER_MS: u32 = 3_000;
-/// How often the position is reported while playing.
 const POSITION_INTERVAL: Duration = Duration::from_secs(1);
-/// The next song goes into mpv's playlist this long before the current one ends.
 const APPEND_BEFORE_END_MS: u32 = 20_000;
-/// Tries to play a song: with a fresh URL, then through mpv's own yt-dlp hook.
 const ATTEMPTS: u8 = 3;
-/// Playback stops after this many songs in a row couldn't play.
 const MAX_SKIPS_IN_A_ROW: u32 = 5;
-/// A seek mpv took but never said it finished holds back the position this long at most.
 const SEEK_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// The YouTube Music player.
 #[derive(Clone)]
 pub struct Player {
     commands: UnboundedSender<Command>,
@@ -93,14 +70,11 @@ enum Command {
 }
 
 impl Player {
-    /// Starts mpv at `volume` (0 to 65535). Fails when mpv isn't installed. `TUNEBOX_MPV_ARGS`
-    /// adds arguments for mpv, separated by spaces, such as `--ao=null` for tests.
     pub async fn spawn(source: Arc<dyn Source>, volume: u16, events: UnboundedSender<PlayerEvent>) -> Result<Player> {
         let args = std::env::var("TUNEBOX_MPV_ARGS").unwrap_or_default();
         Self::spawn_with_args(source, volume, events, args.split_whitespace().map(str::to_owned).collect()).await
     }
 
-    /// [`Player::spawn`] with more arguments for mpv, such as `--ao=null` for tests.
     pub async fn spawn_with_args(
         source: Arc<dyn Source>,
         volume: u16,
@@ -117,13 +91,10 @@ impl Player {
         Ok(Player { commands })
     }
 
-    /// Plays a playlist, album or artist (its songs), or a song and its radio, from
-    /// `track_uri` if given.
     pub fn play(&self, context_uri: String, track_uri: Option<String>) -> Result<()> {
         self.send(Command::Play { context: context_uri, track: track_uri, position_ms: 0, shuffle: None })
     }
 
-    /// Continues a song from the last session at `position_ms`, in its context if known.
     pub fn resume(&self, context: Option<String>, track: String, position_ms: u32) -> Result<()> {
         let context = context.unwrap_or_else(|| track.clone());
         self.send(Command::Play { context, track: Some(track), position_ms, shuffle: None })
@@ -133,7 +104,6 @@ impl Player {
         self.send(Command::Play { context: context_uri, track: None, position_ms: 0, shuffle: Some(true) })
     }
 
-    /// Plays or pauses; with nothing loaded, there is nothing to do.
     pub fn toggle(&self, has_track: bool) -> Result<()> {
         self.send(Command::Toggle { has_track })
     }
@@ -146,7 +116,6 @@ impl Player {
         self.send(Command::Next)
     }
 
-    /// Goes to the song before, or restarts this one once it has played for 3 seconds.
     pub fn previous(&self) -> Result<()> {
         self.send(Command::Previous)
     }
@@ -155,7 +124,6 @@ impl Player {
         self.send(Command::Seek(position_ms))
     }
 
-    /// From 0 to 65535, as for librespot.
     pub fn set_volume(&self, volume: u16) -> Result<()> {
         self.send(Command::Volume(volume))
     }
@@ -168,28 +136,22 @@ impl Player {
         self.send(Command::Repeat { context, track })
     }
 
-    /// Empties the queue; the rest of the context stays.
     pub fn clear_queue(&self) -> Result<()> {
         self.send(Command::ClearQueue)
     }
 
-    /// Adds a song after the ones queued before.
     pub fn add_to_queue(&self, uri: &str) -> Result<()> {
         self.send(Command::AddToQueue(uri.to_owned()))
     }
 
-    /// Resolves a track's stream ahead of time, so playing it later starts without waiting for
-    /// yt-dlp. Only single tracks are prefetched.
     pub fn prefetch(&self, uri: &str) -> Result<()> {
         self.send(Command::Prefetch(uri.to_owned()))
     }
 
-    /// Jumps to an upcoming song.
     pub fn skip_to(&self, uri: &str) -> Result<()> {
         self.send(Command::SkipTo(uri.to_owned()))
     }
 
-    /// Stops playback and mpv.
     pub fn shutdown(&self) {
         let _ = self.commands.send(Command::Shutdown);
     }
@@ -205,12 +167,10 @@ fn with_volume(args: &[String], volume: u16) -> Vec<String> {
     args
 }
 
-/// mpv's volume goes from 0 to 100, on a cubic curve that sounds even.
 fn mpv_volume(volume: u16) -> f64 {
     (f64::from(volume) * 100.0 / f64::from(u16::MAX) * 10.0).round() / 10.0
 }
 
-/// Work done off the player's task, and its result.
 enum Job {
     Resolved { key: String, result: Result<Stream> },
     Context { generation: u64, page: Result<Vec<Track>>, last: bool },
@@ -218,7 +178,6 @@ enum Job {
     Queued { uri: String, track: Result<Option<Track>> },
 }
 
-/// A context being loaded, waiting for the page with the song to start at.
 struct Starting {
     context: String,
     track: Option<String>,
@@ -227,7 +186,6 @@ struct Starting {
     tracks: Vec<Track>,
 }
 
-/// A song in mpv's playlist.
 struct Loaded {
     entry: u64,
     uri: String,
@@ -236,7 +194,6 @@ struct Loaded {
 #[derive(Default)]
 struct Autoplay {
     fetching: bool,
-    /// The context ended while the radio was being fetched; play it once it's there.
     waiting: bool,
 }
 
@@ -248,53 +205,34 @@ struct Engine {
     mpv_events: Events,
     jobs: UnboundedSender<Job>,
     queue: Queue,
-    /// Songs on their way into the queue, in the order they were added, with their details
-    /// once these arrived: each joins only after the ones added before it.
     adding: VecDeque<(String, Option<Option<Track>>)>,
-    /// Resolved stream URLs by key.
     streams: HashMap<String, Stream>,
     resolving: HashSet<String>,
-    /// Songs yt-dlp couldn't resolve, which mpv's hook gets to try.
     unresolvable: HashSet<String>,
-    /// YouTube's bot check stopped yt-dlp since the last start, and the interface was told.
     blocked: bool,
-    /// Failed tries to play each song, by URI.
     attempts: HashMap<String, u8>,
     skipped_in_a_row: u32,
-    /// Counts loaded contexts, so results for one before are dropped.
     generation: u64,
     loader: Option<JoinHandle<()>>,
-    /// Every page of the context arrived.
     context_loaded: bool,
     starting: Option<Starting>,
-    /// The song that plays, once mpv has it.
     current: Option<Loaded>,
-    /// The song after it, loaded ahead.
     next: Option<Loaded>,
-    /// The entry of a song loaded ahead that was taken out again, in case mpv had gone on to it
-    /// already, its events still on their way.
     dropped: Option<u64>,
-    /// The current song waits for its URL, to start at this position.
     waiting: Option<u32>,
-    /// mpv began playing the current song.
     started: bool,
     paused: bool,
     position_ms: u32,
-    /// The current song's length as mpv has it, which beats the catalog's.
     duration_ms: Option<u32>,
-    /// A seek mpv took, to this position, and when.
     seeking: Option<(u32, Instant)>,
     volume: u16,
     active: bool,
     autoplay: Autoplay,
-    /// When the song before ended, to log the gap to the next one.
     ended_at: Option<Instant>,
-    /// The last queue reported, to report changes only.
     reported: Option<(String, Option<String>, Vec<QueueTrack>)>,
 }
 
 impl Engine {
-    /// Without mpv yet, which starts with the first command that needs it.
     fn new(
         source: Arc<dyn Source>,
         events: UnboundedSender<PlayerEvent>,
@@ -440,7 +378,6 @@ impl Engine {
         }
     }
 
-    /// mpv, started again should it have gone away.
     async fn mpv(&mut self) -> Result<&mut Mpv> {
         if self.mpv.is_none() {
             let mpv = Mpv::spawn(&with_volume(&self.mpv_args, self.volume), self.mpv_events.clone()).await?;
@@ -466,7 +403,6 @@ impl Engine {
         self.stop_audio().await?;
         if let Some(track) = &track {
             self.emit(PlayerEvent::Loading { uri: track.clone(), position_ms });
-            // The URL takes longer than the context; both are on their way at once.
             if self.source.is_track(track) {
                 let key = self.source.key(track);
                 if !self.streams.get(&key).is_some_and(Stream::fresh) {
@@ -475,7 +411,6 @@ impl Engine {
             }
         } else if self.source.is_track(&context) {
             let key = self.source.key(&context);
-            // A selection may already have prefetched this stream; don't resolve it twice.
             if !self.streams.get(&key).is_some_and(Stream::fresh) {
                 self.resolve(&key);
             }
@@ -489,19 +424,13 @@ impl Engine {
         Ok(())
     }
 
-    /// Every start makes this the player that plays, also after another service's played.
     fn activate(&mut self) {
         self.active = true;
         self.emit(PlayerEvent::Activated);
-        // The interface may have shown another player's queue since, so this one's is reported
-        // again, even unchanged.
         self.reported = None;
-        // Each start says once that YouTube's bot check stops it, also after the last one's
-        // notice was closed.
         self.blocked = false;
     }
 
-    /// Silences mpv; what was loaded is gone.
     async fn stop_audio(&mut self) -> Result<()> {
         self.current = None;
         self.next = None;
@@ -515,11 +444,9 @@ impl Engine {
         Ok(())
     }
 
-    /// Starts the queue's current song at `start_ms`.
     async fn begin(&mut self, start_ms: u32) -> Result<()> {
         let Some(track) = self.queue.current().cloned() else { return self.stopped().await };
         self.stop_audio().await?;
-        // A song that starts plays, even if the one before was paused.
         if self.paused {
             self.mpv().await?.set("pause", json!(false)).await?;
             self.paused = false;
@@ -533,7 +460,6 @@ impl Engine {
         Ok(())
     }
 
-    /// Loads the current song into mpv once its URL is there; asks for the URL otherwise.
     async fn load_current(&mut self, start_ms: u32) -> Result<()> {
         let Some(track) = self.queue.current().cloned() else { return Ok(()) };
         let key = self.source.key(&track.uri);
@@ -550,7 +476,6 @@ impl Engine {
         let start = (start_ms > 0).then(|| f64::from(start_ms) / 1000.0);
         let entry = self.mpv().await?.load(&url, false, start, &media_title(&track)).await?;
         self.current = Some(Loaded { entry, uri: track.uri });
-        // Loading in place of what played empties mpv's playlist, the song loaded ahead too.
         self.next = None;
         self.dropped = None;
         self.started = false;
@@ -571,9 +496,6 @@ impl Engine {
         });
     }
 
-    /// Gets the song after the current one ready: its URL right away, and into mpv's playlist
-    /// near the end of the current one, so mpv moves on to it without a gap. Drops the one
-    /// there when the queue changed.
     async fn sync_next(&mut self) -> Result<()> {
         if !self.started || self.current.is_none() {
             return Ok(());
@@ -583,8 +505,6 @@ impl Engine {
             return Ok(());
         }
         if let Some(next) = self.next.take() {
-            // Removes every entry but the one that plays: the one loaded ahead, unless mpv has
-            // gone on to it already, which its start then shows.
             self.dropped = Some(next.entry);
             self.mpv().await?.command(json!(["playlist-clear"])).await?;
         }
@@ -596,8 +516,6 @@ impl Engine {
             }
             return Ok(());
         };
-        // mpv opens the next entry ahead of time only once: an entry appended early and then
-        // replaced, as when a song is queued, would leave the next one to start with a gap.
         let duration_ms = self.duration_ms.unwrap_or_else(|| self.queue.current().map_or(0, |t| t.duration_ms));
         if duration_ms > 0 && self.position_ms + APPEND_BEFORE_END_MS < duration_ms {
             return Ok(());
@@ -619,7 +537,6 @@ impl Engine {
         self.sync_next().await
     }
 
-    /// Asks for the radio when the context is about to run out.
     fn want_autoplay(&mut self) {
         if !self.context_loaded || self.autoplay.fetching || !self.queue.wants_autoplay() {
             return;
@@ -638,7 +555,6 @@ impl Engine {
             return self.set_paused(!self.paused).await;
         }
         if has_track && self.queue.current().is_some() {
-            // Stopped at the end: play the last song again.
             return self.begin(0).await;
         }
         Ok(())
@@ -651,7 +567,6 @@ impl Engine {
         self.mpv().await?.set("pause", json!(paused)).await
     }
 
-    /// The user skipped.
     async fn skip(&mut self) -> Result<()> {
         if self.queue.advance(false).is_some() {
             return self.begin(0).await;
@@ -677,14 +592,11 @@ impl Engine {
             return Ok(());
         }
         let seconds = f64::from(position_ms) / 1000.0;
-        // mpv turns a seek down while it still opens the song; only one it took holds back the
-        // position until it got there.
         self.mpv().await?.command(json!(["seek", seconds, "absolute"])).await?;
         self.seeking = Some((position_ms, Instant::now()));
         Ok(())
     }
 
-    /// Nothing is left to play, unless the radio is on its way.
     async fn end_of_queue(&mut self) -> Result<()> {
         if self.autoplay.fetching {
             self.autoplay.waiting = true;
@@ -700,7 +612,6 @@ impl Engine {
         Ok(())
     }
 
-    /// Reports the position, and loads the next song when the end draws near.
     async fn tick(&mut self) -> Result<()> {
         if self.seeking.is_some_and(|(_, since)| since.elapsed() >= SEEK_TIMEOUT) {
             tracing::debug!("mpv didn't finish seeking");
@@ -717,8 +628,6 @@ impl Engine {
     }
 
     async fn mpv_event(&mut self, instance: u64, event: MpvEvent) -> Result<()> {
-        // An mpv that is gone, such as one that failed to start, says so once its connection
-        // closes, maybe after another one started; its playlist entries aren't this one's either.
         if self.mpv.as_ref().is_none_or(|mpv| mpv.instance != instance) {
             tracing::debug!("mpv {instance}, gone: {event:?}");
             return Ok(());
@@ -754,8 +663,6 @@ impl Engine {
                 if self.next.as_ref().is_some_and(|next| next.entry == entry) {
                     self.moved_on().await?;
                 } else if self.dropped == Some(entry) {
-                    // mpv went on to a song that isn't next any more before it was taken out:
-                    // the one before ended, and what comes next now plays instead.
                     tracing::debug!("mpv went on to a song taken out of its playlist");
                     self.dropped = None;
                     self.ended().await?;
@@ -784,7 +691,6 @@ impl Engine {
                 } else if let Some((position_ms, _)) = self.seeking.take() {
                     self.position_ms = position_ms;
                     self.emit(PlayerEvent::Seeked { position_ms });
-                    // Maybe close to the end now.
                     self.sync_next().await?;
                 }
             }
@@ -793,7 +699,6 @@ impl Engine {
                     return Ok(());
                 }
                 match reason.as_str() {
-                    // With a song loaded ahead, mpv moves on by itself.
                     "eof" if self.next.is_some() => self.ended_at = Some(Instant::now()),
                     "eof" => self.ended().await?,
                     "error" => self.failed(error.unwrap_or_default()).await?,
@@ -815,7 +720,6 @@ impl Engine {
         Ok(())
     }
 
-    /// mpv went on to the song loaded ahead.
     async fn moved_on(&mut self) -> Result<()> {
         let next = self.next.take().expect("checked by the caller");
         let track = self.queue.advance(true).cloned();
@@ -830,14 +734,12 @@ impl Engine {
         self.seeking = None;
         self.position_ms = 0;
         self.emit(PlayerEvent::TrackChanged { track: current_track(&track, self.source.as_ref()) });
-        // The song that ended is still first in mpv's playlist.
         self.mpv().await?.command(json!(["playlist-clear"])).await?;
         self.queue_changed().await?;
         self.want_autoplay();
         Ok(())
     }
 
-    /// The song ended with nothing loaded ahead.
     async fn ended(&mut self) -> Result<()> {
         if self.queue.advance(true).is_some() {
             return self.begin(0).await;
@@ -845,7 +747,6 @@ impl Engine {
         self.end_of_queue().await
     }
 
-    /// mpv couldn't play the song: try a fresh URL, then mpv's own yt-dlp hook, then skip it.
     async fn failed(&mut self, error: String) -> Result<()> {
         let Some(track) = self.queue.current().cloned() else { return Ok(()) };
         let key = self.source.key(&track.uri);
@@ -858,8 +759,6 @@ impl Engine {
             self.unresolvable.remove(&key);
             self.attempts.remove(&track.uri);
             self.skipped_in_a_row += 1;
-            // Something bigger is wrong (no network, yt-dlp missing or outdated); skipping on
-            // would run through the whole radio.
             if self.skipped_in_a_row >= MAX_SKIPS_IN_A_ROW {
                 tracing::warn!("{} songs in a row couldn't play; stopping", self.skipped_in_a_row);
                 self.skipped_in_a_row = 0;
@@ -868,7 +767,6 @@ impl Engine {
             tracing::info!("skipping {} – {}: not available", track.uri, track.name);
             return self.skip().await;
         }
-        // The URL may have gone stale; after that, the source's fallback gets to try.
         if attempts > 1 {
             self.unresolvable.insert(key);
         }
@@ -889,7 +787,6 @@ impl Engine {
                     Err(err) => {
                         tracing::warn!("can't resolve {key}: {err:#}");
                         self.unresolvable.insert(key.clone());
-                        // Said once: every song after it would run into the same check.
                         if err.downcast_ref::<BotCheck>().is_some() && !self.blocked {
                             self.blocked = true;
                             self.emit(PlayerEvent::Blocked { reason: err.to_string() });
@@ -928,7 +825,6 @@ impl Engine {
                         None
                     }
                 };
-                // Gone when the queue was cleared meanwhile.
                 let Some(slot) = self.adding.iter_mut().find(|(added, slot)| *added == uri && slot.is_none()) else {
                     return Ok(());
                 };
@@ -969,9 +865,6 @@ impl Engine {
             return Ok(());
         }
         let starting = self.starting.take().expect("checked above");
-        // YouTube has many songs under more than one video, and a song from search or an
-        // artist's page may be in its album's list as another one. It plays on its own then,
-        // with its radio after it, as on YouTube Music, rather than the album from the start.
         if let Some(track) =
             starting.track.clone().filter(|t| !found && self.source.is_track(t) && *t != starting.context)
         {
@@ -994,8 +887,6 @@ impl Engine {
     }
 }
 
-/// Fetches a context's songs page by page for the player.
-/// How a song shows in mixers and media lists: "Song – Artist, Artist".
 fn media_title(track: &Track) -> String {
     if track.artists.is_empty() {
         track.name.clone()
@@ -1015,7 +906,6 @@ fn load_context(
         while let Some(page) = pages.next().await {
             match page {
                 Ok(tracks) => {
-                    // The source decides where a context ends; an empty page ends it too.
                     let last = tracks.is_empty();
                     let _ = jobs.send(Job::Context { generation, page: Ok(tracks), last });
                     if last {
@@ -1076,7 +966,6 @@ mod tests {
         assert_eq!(current.cover_url_large.as_deref(), Some("https://example.com/a=w800-h300"));
     }
 
-    /// A source with no network: contexts come from `context`, and streams from `streams`.
     #[derive(Clone, Default)]
     struct Fake {
         context: Arc<Vec<Track>>,
@@ -1124,8 +1013,6 @@ mod tests {
         }
     }
 
-    /// YouTube's bot check is said once per start: not for every song after it, but again when
-    /// the next start runs into it, after its notice may have been closed.
     #[tokio::test]
     async fn the_bot_check_is_said_once_per_start() {
         let (mut engine, (mut events, _)) = idle_engine("bot-check");
@@ -1145,8 +1032,6 @@ mod tests {
 
     type Reports = (UnboundedReceiver<PlayerEvent>, UnboundedReceiver<(u64, MpvEvent)>);
 
-    /// An engine that never loads a context, with what it reports and mpv's events, which the
-    /// test hands it.
     fn idle_engine(name: &str) -> (Engine, Reports) {
         let _ = name;
         let (events, events_rx) = mpsc::unbounded_channel();
@@ -1156,8 +1041,6 @@ mod tests {
         (engine, (events_rx, mpv_rx))
     }
 
-    /// [`idle_engine`] with mpv running, silently; `None` where mpv isn't installed, unless
-    /// `TUNEBOX_REQUIRE_MPV` is set, as in CI.
     async fn engine(name: &str) -> Option<(Engine, Reports)> {
         let (mut engine, events) = idle_engine(name);
         engine.mpv_args = vec!["--ao=null".into()];
@@ -1172,7 +1055,6 @@ mod tests {
         }
     }
 
-    /// A song whose stream is a tone mpv makes itself.
     fn tone(engine: &mut Engine, id: &str, hz: u32, seconds: u32) -> Track {
         let url = format!("av://lavfi:sine=frequency={hz}:duration={seconds}");
         engine.streams.insert(id.into(), Stream { url, until: Instant::now() + Duration::from_secs(3600) });
@@ -1188,7 +1070,6 @@ mod tests {
         }
     }
 
-    /// Hands mpv's events to the engine until `done`; false when that takes too long.
     async fn pump(
         engine: &mut Engine,
         mpv_events: &mut UnboundedReceiver<(u64, MpvEvent)>,
@@ -1210,7 +1091,6 @@ mod tests {
         let opener = tone(&mut engine, "opener", 440, 10);
         let song = tone(&mut engine, "song", 440, 10);
         engine.source = Arc::new(Fake::with_context(vec![opener.clone()]));
-        // Nothing runs the loaders: the test hands the engine the context's songs itself.
         engine.play("test:album:a".into(), Some(song.uri.clone()), 0, None).await.unwrap();
         engine.loader.take().unwrap().abort();
         engine.context_page(Ok(vec![opener]), true).await.unwrap();
@@ -1233,7 +1113,6 @@ mod tests {
         engine.queue_changed().await.unwrap();
         engine.queue_changed().await.unwrap();
         assert_eq!(reports(), 1, "a queue that didn't change isn't reported again");
-        // Another service played meanwhile, and the same album starts here again.
         engine.activate();
         engine.queue_changed().await.unwrap();
         assert_eq!(reports(), 1);
@@ -1242,11 +1121,9 @@ mod tests {
     #[tokio::test]
     async fn an_mpv_that_failed_to_start_leaves_the_next_one_alone() {
         let Some((mut engine, (_, mut mpv_events))) = engine("restart").await else { return };
-        // mpv went away; one started in its place quits at once, and says so once it's gone…
         engine.mpv = None;
         let failed = Mpv::spawn(&["--no-such-option".into()], engine.mpv_events.clone()).await;
         assert!(failed.is_err());
-        // …which the engine hears only after yet another one started.
         let instance = engine.mpv().await.unwrap().instance;
         while let Ok(Some((from, event))) = tokio::time::timeout(Duration::from_millis(500), mpv_events.recv()).await {
             engine.mpv_event(from, event).await.unwrap();
@@ -1259,13 +1136,11 @@ mod tests {
     #[tokio::test]
     async fn a_seek_mpv_turns_down_holds_nothing_back() {
         let Some((mut engine, (mut events, _))) = engine("seek").await else { return };
-        // mpv doesn't seek in a song it is still opening, such as a pipe nothing is written to.
         let dir = std::env::temp_dir().join(format!("tunebox-mpv-seek-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let pipe = dir.join("song");
         let path = std::ffi::CString::new(pipe.to_str().unwrap()).unwrap();
-        // SAFETY: a valid C string, for a path in a folder of this test.
         assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
         let track = tone(&mut engine, "pipe", 440, 10);
         engine.streams.get_mut("pipe").unwrap().url = pipe.display().to_string();
@@ -1274,7 +1149,6 @@ mod tests {
         assert!(engine.seek(5_000).await.is_err());
         assert!(engine.seeking.is_none(), "a seek turned down holds back no position");
 
-        // One mpv took but never finished stops holding it back after a while.
         engine.started = true;
         engine.seeking = Some((5_000, Instant::now() - SEEK_TIMEOUT));
         engine.tick().await.unwrap();
@@ -1293,11 +1167,8 @@ mod tests {
         let queued = tone(&mut engine, "queued", 660, 30);
         engine.queue.load("c".into(), vec![first, second.clone()], None, false);
         engine.begin(0).await.unwrap();
-        // Close to its end from the start, the first song has the second loaded after it.
         assert!(pump(&mut engine, &mut mpv_events, |e| e.next.is_some()).await);
         let ahead = engine.next.as_ref().unwrap().entry;
-        // mpv goes on to it while the engine is busy with a song being queued, which comes
-        // before the second.
         let mut held = Vec::new();
         while held.last().is_none_or(|(_, event)| *event != MpvEvent::StartFile { entry: ahead }) {
             let event = tokio::time::timeout(Duration::from_secs(10), mpv_events.recv()).await;
@@ -1308,7 +1179,6 @@ mod tests {
         for (instance, event) in held {
             engine.mpv_event(instance, event).await.unwrap();
         }
-        // The queued song plays, and shows; the second one comes after it.
         assert_eq!(engine.queue.current().map(|t| &t.uri), Some(&queued.uri));
         assert_eq!(engine.queue.peek().map(|t| &t.uri), Some(&second.uri));
         let entry = engine.current.as_ref().map(|c| c.entry);

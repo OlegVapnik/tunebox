@@ -1,4 +1,3 @@
-//! Generic passwords in the login keychain, under the service "tunebox".
 
 use std::io;
 
@@ -6,7 +5,6 @@ use security_framework::passwords;
 
 pub const AVAILABLE: bool = true;
 const SERVICE: &str = "tunebox";
-/// `errSecItemNotFound`.
 const NOT_FOUND: i32 = -25300;
 
 pub fn get(name: &str) -> io::Result<Option<Vec<u8>>> {
@@ -30,8 +28,6 @@ pub fn delete(name: &str) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    /// Writes to the login keychain, which may ask for permission: run it by hand with
-    /// `cargo test -p tunebox-os -- --ignored`.
     #[test]
     #[ignore = "uses the login keychain"]
     fn keeps_and_forgets_a_secret() {

@@ -8,16 +8,13 @@ use anyhow::{Context, Result};
 use etcetera::BaseStrategy;
 
 const APP: &str = "tunebox";
-/// The name this project had before it became tunebox; its folders are moved over.
 const PREVIOUS_APP: &str = "cloofy";
 
-/// Where tunebox keeps its files: the XDG layout, on macOS as well.
 #[derive(Debug, Clone)]
 pub struct Paths {
     pub config: PathBuf,
     pub data: PathBuf,
     pub cache: PathBuf,
-    /// Sign-ins go to the system's keychain instead of files (`credentials = "keychain"`).
     pub keychain: bool,
 }
 
@@ -40,18 +37,14 @@ impl Paths {
         self.secret("webapi-token", self.data.join("webapi-token.json"))
     }
 
-    /// librespot's reusable streaming credentials. In files, librespot keeps them itself.
     pub fn streaming_credentials(&self) -> Secret {
         self.secret("streaming", self.session_dir().join("credentials.json"))
     }
 
-    /// The YouTube Music sign-in: youtube.com's cookies, borrowed from a browser, as a
-    /// `cookies.txt`.
     pub fn ytmusic_cookies(&self) -> Secret {
         self.secret("ytmusic-cookies", self.data.join("ytmusic").join("cookies.txt"))
     }
 
-    /// SoundCloud's sign-in: the `oauth_token` cookie of a browser signed in there.
     pub fn soundcloud_token(&self) -> Secret {
         self.secret("soundcloud-token", self.data.join("soundcloud").join("token"))
     }
@@ -72,7 +65,6 @@ impl Paths {
         self.cache.join("audio")
     }
 
-    /// Tracks being streamed; librespot copies each to the audio cache once it is complete.
     pub fn audio_tmp(&self) -> PathBuf {
         self.cache.join("tmp")
     }
@@ -81,7 +73,6 @@ impl Paths {
         self.cache.join("pathfinder-hashes.json")
     }
 
-    /// Open view, selection and last track, restored on the next start.
     pub fn state_file(&self) -> PathBuf {
         self.data.join("state.json")
     }
@@ -90,14 +81,11 @@ impl Paths {
         self.cache.join("tunebox.log")
     }
 
-    /// When tunebox last asked GitHub for a new release, and the answer.
     pub fn update_check(&self) -> PathBuf {
         self.cache.join("update-check.json")
     }
 }
 
-/// The folder for a base directory, moving the one of the previous name over when nothing
-/// new has been written yet, so a rename keeps sign-ins, the cache and settings.
 fn migrate(base: PathBuf) -> PathBuf {
     let (new, old) = (base.join(APP), base.join(PREVIOUS_APP));
     if !new.exists() && old.is_dir() {
@@ -106,12 +94,9 @@ fn migrate(base: PathBuf) -> PathBuf {
     new
 }
 
-/// Where a sign-in is kept.
 #[derive(Debug, Clone)]
 pub enum Secret {
-    /// A file only the user can read.
     File(PathBuf),
-    /// The system's keychain, under `name`. A `file` from before moves over when read.
     Keychain { name: &'static str, file: PathBuf },
 }
 
@@ -120,7 +105,6 @@ impl Secret {
         match self {
             Secret::File(path) => read_file(path),
             Secret::Keychain { name, file } => {
-                // A file wins: it was written by a login, or before the switch to the keychain.
                 if let Some(bytes) = read_file(file)? {
                     tunebox_os::secrets::set(name, &bytes).context("Saving to the keychain failed")?;
                     fs::remove_file(file).with_context(|| format!("{} can't be removed", file.display()))?;
@@ -142,8 +126,6 @@ impl Secret {
         }
     }
 
-    /// Forgets the secret wherever it is kept, a file from before the keychain included; fine
-    /// when there is none.
     pub fn delete(&self) -> Result<()> {
         let file = self.file();
         match fs::remove_file(file) {
@@ -157,7 +139,6 @@ impl Secret {
         Ok(())
     }
 
-    /// The file the secret is kept in, or was before it moved to the keychain.
     pub fn file(&self) -> &Path {
         match self {
             Secret::File(path) | Secret::Keychain { file: path, .. } => path,
@@ -173,7 +154,6 @@ fn read_file(path: &Path) -> Result<Option<Vec<u8>>> {
     }
 }
 
-/// Writes a file only the current user can read, creating parent directories as needed.
 pub fn write_private(path: &Path, contents: &[u8]) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -214,8 +194,6 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
-    /// Writes to the login keychain: run it by hand with
-    /// `cargo test -p tunebox-core -- --ignored`.
     #[test]
     #[ignore = "uses the login keychain"]
     fn moves_a_file_into_the_keychain() {

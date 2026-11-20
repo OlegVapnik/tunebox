@@ -1,6 +1,3 @@
-//! YouTube Music as it answers today, signed out. These go online, so ordinary runs leave them
-//! out; the nightly workflow runs every ignored test of this crate, to notice when InnerTube
-//! changes before people do.
 
 use futures::StreamExt;
 use tunebox_core::{lyrics::LyricsQuery, paths::Paths};

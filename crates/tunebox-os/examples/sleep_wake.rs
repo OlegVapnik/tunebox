@@ -1,8 +1,3 @@
-//! Prints the system's sleep and wake as tunebox sees them. Close the lid to try it:
-//!
-//! ```sh
-//! cargo run -p tunebox-os --example sleep_wake
-//! ```
 
 fn main() {
     tunebox_os::run_main(|| {

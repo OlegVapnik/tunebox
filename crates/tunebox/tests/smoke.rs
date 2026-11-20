@@ -1,6 +1,3 @@
-//! The real binary, in a pseudo-terminal of its own: it starts, takes keys, and leaves the
-//! terminal as it found it however it ends. The interface itself is tested in tunebox-tui; this
-//! is what only a real terminal shows.
 #![cfg(unix)]
 
 use std::{
@@ -58,11 +55,9 @@ fn a_closed_window_ends_it_cleanly() {
     }
 }
 
-/// tunebox on a pseudo-terminal of 120×36, with a home of its own.
 struct Tty {
     child: Child,
     master: File,
-    /// The terminal's local modes before tunebox started: echo, line editing and the like.
     modes: libc::tcflag_t,
     output: Arc<Mutex<Vec<u8>>>,
     home: PathBuf,
@@ -91,12 +86,10 @@ impl Tty {
             .env("XDG_CACHE_HOME", home.join("cache"))
             .env("XDG_STATE_HOME", home.join("state"))
             .env("TERM", "xterm-256color")
-            // No terminal answers here, so tunebox shouldn't ask one which images it draws.
             .env("TUNEBOX_IMAGES", "blocks")
             .stdin(stdio())
             .stdout(stdio())
             .stderr(stdio());
-        // A session of its own, with the pseudo-terminal as its terminal, as a shell gives it.
         unsafe {
             command.pre_exec(|| {
                 if libc::setsid() < 0 || libc::ioctl(0, libc::TIOCSCTTY as _, 0) < 0 {
@@ -111,7 +104,6 @@ impl Tty {
         let (mut reader, sink) = (master.try_clone().unwrap(), output.clone());
         std::thread::spawn(move || {
             let mut buffer = [0; 4096];
-            // Ends with an error once tunebox is gone, on Linux, or never: the test ends first.
             while let Ok(read @ 1..) = reader.read(&mut buffer) {
                 sink.lock().unwrap().extend_from_slice(&buffer[..read]);
             }
@@ -128,7 +120,6 @@ impl Tty {
         self.output.lock().unwrap().clone()
     }
 
-    /// Waits until the screen has shown `text`.
     #[track_caller]
     fn wait_for(&self, text: &str) {
         let started = Instant::now();
@@ -149,8 +140,6 @@ impl Tty {
         }
     }
 
-    /// The terminal is back as tunebox found it: main screen, no mouse or focus reports, and
-    /// typing echoes and edits lines again.
     #[track_caller]
     fn assert_restored(&self) {
         let raw = String::from_utf8_lossy(&self.raw()).into_owned();
@@ -176,7 +165,6 @@ impl Drop for Tty {
     }
 }
 
-/// Read through our end: once tunebox is gone, macOS takes its end away.
 fn local_modes(fd: &impl AsRawFd) -> libc::tcflag_t {
     let mut settings = unsafe { std::mem::zeroed::<libc::termios>() };
     assert_eq!(unsafe { libc::tcgetattr(fd.as_raw_fd(), &mut settings) }, 0);
@@ -188,8 +176,6 @@ fn unique() -> usize {
     NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
-/// What a terminal of 120×36 shows after `raw`. Enough of one for ratatui, which only moves the
-/// cursor, sets colors and clears: text goes where the cursor is, and the rest is skipped.
 fn screen(raw: &[u8]) -> String {
     const ROWS: usize = 36;
     const COLUMNS: usize = 120;
@@ -223,7 +209,6 @@ fn screen(raw: &[u8]) -> String {
                         _ => {}
                     }
                 }
-                // Strings (OSC, DCS, APC, PM) end with BEL or ESC \.
                 Some(']' | 'P' | '_' | '^') => {
                     while let Some(c) = chars.next() {
                         if c == '\x07' {

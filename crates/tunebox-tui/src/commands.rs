@@ -1,7 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// Everything the user can trigger from anywhere: keys, mouse and the command palette all
-/// end up here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Home,
@@ -17,7 +15,6 @@ pub enum Command {
     Repeat,
     Search,
     NowPlaying,
-    /// The queue page: what plays next.
     ShowQueue,
     Like,
     Queue,
@@ -30,13 +27,11 @@ pub enum Command {
     Help,
     Settings,
     Update,
-    /// Shows the next music service's pages, with two or more in use.
     SwitchService,
     Quit,
 }
 
 impl Command {
-    /// Commands offered in the palette, in display order.
     pub const PALETTE: [Command; 26] = [
         Command::Home,
         Command::Library,
@@ -130,7 +125,6 @@ impl Command {
         }
     }
 
-    /// Global key bindings. List navigation keys are handled per pane.
     pub fn from_key(key: &KeyEvent) -> Option<Command> {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let shift = key.modifiers.contains(KeyModifiers::SHIFT);

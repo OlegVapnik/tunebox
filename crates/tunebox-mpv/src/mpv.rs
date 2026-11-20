@@ -1,8 +1,3 @@
-//! mpv as a child process, driven over its JSON IPC.
-//!
-//! The IPC runs over one end of a socket pair that mpv inherits (`--input-ipc-client=fd://N`)
-//! instead of a socket file: mpv quits by itself once that connection closes, which happens
-//! when tunebox exits in any way, a crash or `kill -9` included. No mpv is left behind playing.
 
 use std::{
     collections::HashMap,
@@ -27,44 +22,33 @@ use tokio::{
     sync::{mpsc::UnboundedSender, oneshot},
 };
 
-/// Waits this long for mpv to answer a command.
 const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Properties observed, by the ID mpv reports them with.
 pub(crate) const TIME_POS: u64 = 1;
 pub(crate) const PAUSE: u64 = 2;
 pub(crate) const DURATION: u64 = 3;
 
-/// Counts the mpvs started, so the events of one that is gone can be told apart.
 static INSTANCES: AtomicU64 = AtomicU64::new(0);
 
-/// Events come with the instance of the mpv that sent them.
 pub(crate) type Events = UnboundedSender<(u64, MpvEvent)>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum MpvEvent {
-    /// An observed property changed.
     Property { id: u64, data: Value },
-    /// A playlist entry starts loading.
     StartFile { entry: u64 },
-    /// An entry stopped: `eof`, `stop`, `quit`, `error` or `redirect`.
     EndFile { entry: u64, reason: String, error: Option<String> },
-    /// Playback (re)started after loading or seeking.
     PlaybackRestart,
-    /// mpv is gone.
     Exited,
 }
 
 type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value>>>>>;
 
 pub(crate) struct Mpv {
-    /// Which mpv this is, as its events say.
     pub instance: u64,
     child: Child,
     writer: OwnedWriteHalf,
     pending: Pending,
     next_id: u64,
-    /// `loadfile` takes options as its fourth argument since mpv 0.38, as its third before.
     pub legacy_loadfile: bool,
 }
 
@@ -78,27 +62,17 @@ impl Mpv {
             .args([
                 "--idle=yes",
                 "--no-video",
-                // Neither the user's mpv.conf nor scripts like mpv-mpris, which would add a second
-                // media player to the system's controls.
                 "--no-config",
                 "--load-scripts=no",
-                // Streams come resolved by yt-dlp. mpv's own yt-dlp hook only plays `ytdl://`
-                // URLs, as a fallback; it can't be turned on later, so it is on but kept away
-                // from the resolved URLs.
                 "--ytdl=yes",
                 "--ytdl-format=bestaudio/best",
-                // A Lua pattern; mpv's option parser would take `%` for its own quoting.
                 "--script-opts=ytdl_hook-exclude=googlevideo",
                 "--no-input-terminal",
                 "--audio-display=no",
                 "--audio-client-name=tunebox",
-                // Mixers name the stream by the window title: the song, as `load` sets it,
-                // instead of the stream's URL with " - mpv".
                 "--title=${media-title}",
                 "--prefetch-playlist=yes",
                 "--gapless-audio=weak",
-                // Keep a little of the network stream ahead of the decoder, so a short stall
-                // in the connection doesn't cut the song off. Resolved URLs are direct media.
                 "--cache=yes",
                 "--cache-secs=20",
                 "--demuxer-readahead-secs=20",
@@ -111,7 +85,6 @@ impl Mpv {
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
-        // SAFETY: only async-signal-safe calls between fork and exec.
         unsafe {
             command.pre_exec(move || inherit(fd));
         }
@@ -123,7 +96,6 @@ impl Mpv {
             Err(err) => return Err(err).context("Can't start mpv"),
         };
         drop(theirs);
-        // mpv only prints errors; the last one explains a failed start.
         let last_error: Arc<Mutex<Option<String>>> = Arc::default();
         if let Some(stderr) = child.stderr.take() {
             let last_error = last_error.clone();
@@ -155,7 +127,6 @@ impl Mpv {
         Ok(mpv)
     }
 
-    /// Sends a command and waits for its answer.
     pub async fn command(&mut self, command: Value) -> Result<Value> {
         self.next_id += 1;
         let id = self.next_id;
@@ -185,8 +156,6 @@ impl Mpv {
         self.command(json!(["set_property", name, value])).await.map(drop)
     }
 
-    /// Loads a URL, replacing what plays or appended to the playlist, maybe starting at
-    /// `start` seconds, with `title` for the song. Returns the playlist entry's ID.
     pub async fn load(&mut self, url: &str, append: bool, start: Option<f64>, title: &str) -> Result<u64> {
         let mode = if append { "append" } else { "replace" };
         let options = load_options(start, title);
@@ -199,7 +168,6 @@ impl Mpv {
         reply["playlist_entry_id"].as_u64().context("mpv didn't say which entry it loaded")
     }
 
-    /// Asks mpv to quit, and makes sure it does.
     pub async fn quit(mut self) {
         let _ = tokio::time::timeout(Duration::from_millis(500), self.command(json!(["quit"]))).await;
         if tokio::time::timeout(Duration::from_secs(1), self.child.wait()).await.is_err() {
@@ -208,8 +176,6 @@ impl Mpv {
     }
 }
 
-/// The options of a `loadfile`: where to start, and the title mixers and the window show. mpv
-/// takes `%<bytes>%` before a value as its quoting, so a title may have commas and `=`.
 fn load_options(start: Option<f64>, title: &str) -> String {
     let mut options = format!("force-media-title=%{}%{title}", title.len());
     if let Some(start) = start.filter(|s| *s > 0.0) {
@@ -218,9 +184,7 @@ fn load_options(start: Option<f64>, title: &str) -> String {
     options
 }
 
-/// Runs in the child before mpv starts: keeps mpv's end of the socket open across exec.
 fn inherit(fd: RawFd) -> std::io::Result<()> {
-    // SAFETY: fcntl on a descriptor this process owns.
     if unsafe { libc::fcntl(fd, libc::F_SETFD, 0) } == -1 {
         return Err(std::io::Error::last_os_error());
     }
@@ -267,7 +231,6 @@ fn parse_event(message: &Value) -> Option<MpvEvent> {
     })
 }
 
-/// Whether an `mpv-version` such as `mpv v0.37.0` or `mpv 0.35.1` is older than 0.38.
 fn older_than_0_38(version: &str) -> bool {
     let number = version.split_whitespace().nth(1).unwrap_or_default().trim_start_matches('v');
     let mut parts = number.split(['.', '-', '+']).map(|p| p.parse::<u32>().ok());

@@ -1,6 +1,3 @@
-//! The top bar: wordmark, home button and the search field, like the official client, the
-//! switch between music services when there are several, and an update button while there is
-//! a newer tunebox.
 
 use ratatui::{
     buffer::Buffer,
@@ -21,21 +18,14 @@ use crate::{
 };
 
 pub const HEIGHT: u16 = 4;
-/// A square-ish button with its icon in the middle cell.
 const BUTTON_WIDTH: u16 = 5;
-/// Empty columns between the search field and the service switch: without them the active
-/// service's raised background touches the search field and looks part of it.
 pub(crate) const SEARCH_GAP: u16 = 4;
-/// Empty columns between the update button and the service switch.
 const UPDATE_GAP: u16 = 2;
-/// A search field narrower than this is no longer useful; the right-hand controls give way first.
 const MIN_SEARCH: u16 = 10;
 
 #[derive(Clone, Copy)]
 enum ServiceLabels {
-    /// Active service with its name, the others with their icon or initials.
     Mixed,
-    /// Icons or initials for every service.
     Icons,
 }
 
@@ -50,7 +40,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         wordmark::draw(buf, area.x + 3, area.y + 1, app.accent.rgb());
     }
 
-    // Back and home buttons and the search field, centered in the window like Spotify's.
     let search_width = (area.width / 2).clamp(28, 48);
     let cluster = 2 * (BUTTON_WIDTH + 1) + search_width;
     let left_limit = if wide { area.x + 3 + wordmark::WIDTH + 3 } else { area.x + 2 };
@@ -60,9 +49,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let back = button(buf, app, x, row, 2, icons().chevron_left, Hit::Hint(HintAction::Back), app.can_go_back());
     let home = button(buf, app, back.right() + 1, row, 2, icons().home, Hit::Command(Command::Home), true);
     let search_x = home.right() + 1;
-    // Reserve room for the right-hand controls before sizing the search field, otherwise the
-    // service switch is drawn over the search prompt as the window shrinks. The switch sits at
-    // `switch_right`, leaving SEARCH_GAP empty columns after the search field.
     let switch_min = switch_width(app, 2, ServiceLabels::Icons);
     let right_edge = area.right().saturating_sub(3);
     let fit = |update_min: u16| -> u16 {
@@ -78,7 +64,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let search = Rect::new(search_x, row, width, 1);
     search_field(buf, app, search, 2);
 
-    // Right of the search field: the update button, the service switch, then the user's name.
     let switch_right = if update_min > 0 { right_edge.saturating_sub(update_min + UPDATE_GAP) } else { right_edge };
     if update_min > 0 {
         update_button(buf, app, right_edge, row, 2, update_min);
@@ -99,13 +84,11 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         let width = name.width() as u16;
         if right.saturating_sub(width) > search.right() + 2 {
             buf.set_string(right - width, row, name, Style::new().fg(p.muted));
-            // Like the profile menu in Spotify's apps, the name leads to the settings.
             app.hits.push((Rect::new(right - width, row, width, 1), Hit::Command(Command::Settings)));
         }
     }
 }
 
-/// One row with slimmer buttons, for small windows.
 fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     let back =
         button(buf, app, area.x + 1, area.y, 1, icons().chevron_left, Hit::Hint(HintAction::Back), app.can_go_back());
@@ -132,18 +115,14 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     search_field(buf, app, search, 1);
 }
 
-/// The smallest possible update button: just its icon and the padding around it.
 fn update_width(app: &App, padding: u16) -> u16 {
     if app.update.is_some() { icons().update.width() as u16 + 2 * padding } else { 0 }
 }
 
-/// The update button, its right edge at `right`, with as much of its label as fits into `room`
-/// columns and at least its icon. Draws nothing without an update.
 fn update_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u16, room: u16) -> Option<Rect> {
     let p = theme::palette();
     let (icon, labels) = match app.update.as_ref()? {
         Update::Available(release) => (icons().update, [format!("Update to v{}", release.version()), "Update".into()]),
-        // Nothing to install here: the button says what's out, and a click how to update.
         Update::Managed { release, .. } => {
             (icons().update, [format!("v{} is out", release.version()), format!("v{}", release.version())])
         }
@@ -169,8 +148,6 @@ fn update_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u
     Some(area)
 }
 
-/// The label a service gets in the switch. The service that is open keeps its name, the others
-/// show only their icon, so the active one is the one you can read at a glance.
 fn service_label(app: &App, service: Service, labels: ServiceLabels) -> String {
     let icon = icons::service(service);
     let initials = match service {
@@ -189,7 +166,6 @@ fn service_label(app: &App, service: Service, labels: ServiceLabels) -> String {
     if icon.is_empty() { short.to_owned() } else { format!("{icon}  {short}") }
 }
 
-/// The width of the service switch with either full or icon-only labels, including the gaps.
 fn switch_width(app: &App, padding: u16, labels: ServiceLabels) -> u16 {
     app.services()
         .iter()
@@ -198,9 +174,6 @@ fn switch_width(app: &App, padding: u16, labels: ServiceLabels) -> u16 {
         .saturating_sub(1)
 }
 
-/// The music services in use side by side, the one shown lit, each a button that shows its
-/// pages; its right edge at `right`. Uses names when they fit, else icons; draws nothing if even
-/// the icons would spill into whatever is left of `room`.
 fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: u16, room: u16) -> Option<Rect> {
     let p = theme::palette();
     if app.services().len() < 2 {
@@ -238,8 +211,6 @@ fn service_switch(buf: &mut Buffer, app: &mut App, right: u16, y: u16, padding: 
     Some(Rect::new(first, y, right.saturating_sub(first), 1))
 }
 
-/// A filled button with `icon` centered, `padding` cells either side; dimmed and inert unless
-/// `enabled`. The home icon lights up while Home is open.
 #[allow(clippy::too_many_arguments)]
 fn button(buf: &mut Buffer, app: &mut App, x: u16, y: u16, padding: u16, icon: &str, hit: Hit, enabled: bool) -> Rect {
     let p = theme::palette();
@@ -257,7 +228,6 @@ fn button(buf: &mut Buffer, app: &mut App, x: u16, y: u16, padding: u16, icon: &
     area
 }
 
-/// The search field: icon, then the query or a prompt, and a spinner while results load.
 fn search_field(buf: &mut Buffer, app: &mut App, area: Rect, padding: u16) {
     let p = theme::palette();
     let accent = app.accent.color();
@@ -290,7 +260,6 @@ fn search_field(buf: &mut Buffer, app: &mut App, area: Rect, padding: u16) {
     app.hits.push((area, Hit::SearchInput));
 }
 
-/// The end of `text` that fits into `width` columns, so the cursor stays visible.
 fn tail(text: &str, width: usize) -> String {
     let mut out: Vec<char> = Vec::new();
     let mut used = 0;

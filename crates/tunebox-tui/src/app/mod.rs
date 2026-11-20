@@ -54,146 +54,90 @@ use crate::{
     },
 };
 
-/// Cover art size in the player bar, in cells (roughly square in most fonts).
 pub const COVER_SIZE: Size = Size { width: 10, height: 5 };
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(250);
 const STATUS_TTL: Duration = Duration::from_secs(8);
-/// How long after the start tunebox waits before it asks for a star, so the first screen is up.
 const STAR_DELAY: Duration = Duration::from_secs(5);
 const SEEK_STEP_MS: i64 = 5_000;
-/// "Previous" restarts the track once it has played this long, as in Spotify's own clients.
 const RESTART_AFTER_MS: u32 = 3_000;
 const HISTORY_LIMIT: usize = 50;
-/// Opening a page this soon after the last one skips the transition, so browsing fast stays
-/// instant.
 const QUICK_NAV: Duration = Duration::from_millis(300);
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
-/// Images unseen for this long are dropped from memory, unless the terminal holds them.
 const IMAGE_TTL: Duration = Duration::from_secs(120);
-/// Memory kitty may keep for the covers tunebox drew; the least recently drawn ones beyond it are
-/// deleted from the terminal.
 const TERMINAL_IMAGE_BUDGET: usize = 48 << 20;
-/// A cover that failed to load, e.g. while offline, is tried again when drawn after this long.
 const IMAGE_RETRY: Duration = Duration::from_secs(30);
 const EVICTION_INTERVAL: Duration = Duration::from_secs(30);
-/// Freed memory goes back to the system this long after the last of a burst of loads.
 const TRIM_DELAY: Duration = Duration::from_secs(1);
-/// Now Playing loads its cover for a new size once the window has kept that size this long.
 const ZEN_COVER_SETTLE: Duration = Duration::from_millis(150);
-/// A Now Playing cover that failed to load is tried again after this long.
 const ZEN_COVER_RETRY: Duration = Duration::from_secs(10);
 const SCROLL_STEP: isize = 3;
-/// The character Kitty's unicode-placeholder images are drawn with.
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
-/// Cells animations leave alone. Kitty images are drawn through placeholder cells whose color
-/// encodes the image, so recoloring them would show the wrong picture. Sixel and iTerm2 images
-/// aren't recolored either, so that they keep counting as uncovered.
 pub fn not_animated(cell: &Cell) -> bool {
     cell.symbol().starts_with(KITTY_PLACEHOLDER) || cell.symbol() == INLINE_CELL
 }
-/// How often to check which device plays, and how soon to look again while a change sent to
-/// another device doesn't show yet.
 const POLL_INTERVAL: Duration = Duration::from_secs(3);
 const QUICK_POLL: Duration = Duration::from_millis(500);
-/// Once Spotify pushes changes, polls follow the pushes; this is only a safety net.
 const PUSHED_POLL_INTERVAL: Duration = Duration::from_secs(15);
-/// Pushes come in bursts; one poll covers a burst.
 const PUSH_DELAY: Duration = Duration::from_millis(150);
-/// How long a push is newer than what the Web API may still report.
 const PUSH_LEAD: Duration = Duration::from_secs(2);
-/// A remote track that ends is followed by the next one about this much later.
 const TRACK_END_SLACK: Duration = Duration::from_millis(300);
-/// How long after Spotify accepted a remote command to check that the device applied it.
 const CONFIRM_DELAY: Duration = Duration::from_millis(300);
-/// How long the device label shows a transfer that the device hasn't confirmed.
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(5);
-/// How long after a track change Spotify may take to say what plays next, before the queue
-/// page asks the Web API instead.
 const QUEUE_GRACE: Duration = Duration::from_secs(2);
-/// Session state is also saved periodically, in case tunebox gets killed.
 const STATE_SAVE_INTERVAL: Duration = Duration::from_secs(20);
-/// Rapid like/unlike toggles collapse into one request after this pause.
 const SAVE_DEBOUNCE: Duration = Duration::from_millis(350);
-/// Animation frame length (spinners, equalizer, progress bar).
 const FRAME: Duration = Duration::from_millis(120);
-/// Track lists and artist pages opened again within this time are shown as they were; older
-/// ones are shown too, and refreshed behind the scenes.
 const PAGE_FRESH: Duration = Duration::from_secs(60);
-/// Home fetched within this time is shown again without asking Spotify.
 const HOME_FRESH: Duration = Duration::from_secs(5 * 60);
-/// While data keeps arriving, the data cache is written at most this often.
 const CACHE_SAVE_DELAY: Duration = Duration::from_secs(2);
-/// Parts of the library besides playlists, each loaded on its own.
 const LIBRARY_PARTS: u8 = 4;
-/// How long a clicked target stays lit.
 const PRESS_FLASH: Duration = Duration::from_millis(150);
-/// In Low Power Mode, a playing track redraws once a second: often enough for the clock.
 const LOW_POWER_FRAME: Duration = Duration::from_secs(1);
-/// How often to look at the system's motion and power settings.
 const SETTINGS_INTERVAL: Duration = Duration::from_secs(3);
-/// After sleeping this long, the connection is gone, even if Spotify takes a while to notice.
 const LONG_SLEEP: Duration = Duration::from_secs(60);
 
-/// What the app opens with.
 pub enum Start<'a> {
-    /// The last session: the page, the selection and the track to resume.
     Restore(Box<crate::state::State>),
-    /// The demo's playing track and queue, with nothing of an account restored.
     Demo(&'a crate::demo::Demo),
 }
 
-/// A newer tunebox, offered in the top bar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Update {
     Available(Release),
-    /// Out, but for the package manager that installed tunebox to install.
     Managed {
         release: Release,
         manager: PackageManager,
     },
-    /// Downloading, with the percentage once the size is known.
     Installing {
         release: Release,
         percent: Option<u8>,
     },
-    /// In place of the running binary, which carries on until restarted.
     Installed {
         release: Release,
         binary: PathBuf,
     },
 }
 
-/// That `release` is out, and how `manager` updates this build to it.
 fn managed_update(release: &Release, manager: PackageManager) -> String {
-    // Only builds with a service look for updates, and each has its own package.
     let variant = backend::VARIANT.unwrap_or_default();
     format!("tunebox {} is out · {}", release.version(), manager.how_to_update(variant))
 }
 
-/// Reduced motion and low power as the system has them; all off in tests, whatever the machine.
 fn system_settings() -> Settings {
     if cfg!(test) { Settings::default() } else { tunebox_os::settings::current() }
 }
 
-// Events move through a channel once each; boxing the big ones would only add allocations.
 #[allow(clippy::large_enum_variant)]
 pub enum AppEvent {
     Data(DataEvent),
-    /// What a service's player reports.
     Player(Service, PlayerEvent),
-    /// A service pushed a change of what plays on the account's devices.
     Pushed(Service, ConnectPush),
-    /// A service's player is up; also after it connected again.
     PlayerReady(Box<Player>),
     PlayerFailed(Service, String),
-    /// The player's connection to the service dropped; a new one is on its way.
     PlayerLost(Service),
-    /// The computer is about to sleep, or woke up.
     Power(tunebox_os::power::Event),
-    /// A media key, headphone button or Control Center.
     Media(tunebox_os::media::Command),
-    /// The audio output a service's player used went away, named.
     OutputLost(Service, String),
 }
 
@@ -204,7 +148,6 @@ pub enum Focus {
     SearchInput,
 }
 
-/// An entry of the sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NavItem {
     Home,
@@ -213,11 +156,9 @@ pub enum NavItem {
 }
 
 impl NavItem {
-    /// Entries above the library; Home and Search live in the top bar now.
     pub const FIXED: usize = 0;
 }
 
-/// An item of "Your Library", pointing into the app's library lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryEntry {
     Liked,
@@ -227,7 +168,6 @@ pub enum LibraryEntry {
     Show(usize),
 }
 
-/// The filter chips above the library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum LibraryFilter {
     #[default]
@@ -255,14 +195,11 @@ impl LibraryFilter {
 }
 
 pub enum ImageSlot {
-    /// Holds the number of the last frame that drew the image, which the loader checks
-    /// before decoding it.
     Loading(Arc<AtomicU64>),
     Ready(Picture),
     Failed(Instant),
 }
 
-/// A clickable region, registered while drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hit {
     NavArea,
@@ -273,38 +210,25 @@ pub enum Hit {
         shelf: usize,
         item: usize,
     },
-    /// The play button shown on a hovered card.
     CardPlay {
         shelf: usize,
         item: usize,
     },
-    /// The play button on a hovered card of the full-page library.
     RowPlay(usize),
-    /// The arrows that page a shelf sideways.
     ShelfScroll {
         shelf: usize,
         forward: bool,
     },
-    /// The Play all button of a shelf.
     ShelfPlay(usize),
-    /// The pinned problem in the bottom line, which copies its command…
     PinnedCopy,
-    /// …and the cross that closes it.
     PinnedClose,
-    /// A chip above Home's shelves, such as "Relax".
     HomeChip(usize),
-    /// An artist, album or playlist name that leads to its page.
     Link(Link),
     Chip(LibraryFilter),
-    /// A filter tab of the full-page library.
     PageChip(LibraryFilter),
-    /// A clickable entry of the hint bar.
     Hint(HintAction),
-    /// Play, shuffle, save or more on a playlist, album or artist page.
     Header(HeaderButton),
-    /// The heart next to the playing track.
     LikePlaying,
-    /// A service in the switch of the top bar.
     Service(Service),
     SearchInput,
     Command(Command),
@@ -317,7 +241,6 @@ pub enum Hit {
         width: u16,
     },
     Cover,
-    /// The arrows, or the switch, that change the `index`th setting on the Settings page.
     SettingStep {
         index: usize,
         forward: bool,
@@ -327,37 +250,29 @@ pub enum Hit {
 }
 
 impl Hit {
-    /// Things that react to a click, as opposed to the areas behind them.
     pub fn is_interactive(&self) -> bool {
         !matches!(self, Hit::NavArea | Hit::ContentArea | Hit::OverlayArea | Hit::Seek { .. } | Hit::Volume { .. })
     }
 }
 
-/// Where a clickable name leads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Link {
-    /// The `artist`th artist of track `row` in the open track list or search results.
     TrackArtist {
         row: usize,
         artist: usize,
     },
     TrackAlbum(usize),
-    /// The `n`th artist of the playing track.
     PlayingArtist(usize),
     PlayingAlbum,
-    /// The playlist, album or artist the music plays from.
     PlayingContext,
 }
 
-/// What a click on the hint bar does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HintAction {
     Run(Command),
     Activate,
     Back,
     ToggleFocus,
-    /// Does exactly what the key does where it is pressed, for keys whose meaning depends
-    /// on the focus or the page.
     Key(KeyCode),
 }
 
@@ -369,7 +284,6 @@ pub enum HeaderButton {
     More,
 }
 
-/// Slots for running animations; a new animation replaces the one in its slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Fx {
     #[default]
@@ -386,7 +300,6 @@ pub struct LargeCover {
 
 pub struct LyricsState {
     pub uri: String,
-    /// `None` while loading; `Ok(None)` when the song has no lyrics.
     pub result: Option<Result<Option<Lyrics>, String>>,
 }
 
@@ -396,35 +309,27 @@ pub struct Status {
     since: Instant,
 }
 
-/// A problem that stays in the bottom line until it's solved or closed, rather than for a few
-/// seconds: an expired sign-in, or YouTube's bot check.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pinned {
     pub text: String,
-    /// What to run in a terminal, e.g. `tunebox login ytmusic`; a click copies it.
     pub command: Option<String>,
     pub copied: bool,
     pub cause: Cause,
-    /// The service this problem belongs to, so it only shows on that service's tab.
     pub service: Option<Service>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cause {
-    /// The service doesn't accept the sign-in any more: gone once it does again.
     SignIn,
-    /// Nothing can play: gone once something does.
     Blocked,
 }
 
-/// A transfer of playback to another device, until that device shows up playing.
 struct Transfer {
     device_id: String,
     name: String,
     since: Instant,
 }
 
-/// What `f`, `q` and `a` act on.
 struct Target {
     uri: String,
     name: String,
@@ -435,91 +340,49 @@ pub struct App {
     loader: Loader,
     state_path: std::path::PathBuf,
     last_save: Instant,
-    /// The last session's track, until something else plays; ␣ continues it.
     resume: Option<crate::state::LastTrack>,
-    /// What the current track plays in, so a restart can continue there.
     last_context: Option<String>,
-    /// tunebox's own volume, saved while the slider shows another device's.
     restored_volume: Option<u16>,
-    /// Local volume changes on their way to the player.
     volume_sync: VolumeSync,
-    /// tunebox's own players, one per service that is connected.
     players: HashMap<Service, Player>,
-    /// The service whose player is the one that plays, or played last. Only one plays at a
-    /// time: starting playback on another one pauses this one.
     active: Option<Service>,
-    /// Why a service's player couldn't start or connect, by service.
     player_errors: HashMap<Service, String>,
-    /// The pages of the services not shown; see [`browsing`].
     parked: HashMap<Service, browsing::Browsing>,
-    /// Pages of the last run for services not shown yet, reopened when they first show.
     saved_pages: HashMap<Service, crate::state::Page>,
-    /// tunebox's own device ID among the account's devices.
     device_id: Option<String>,
-    /// tunebox's own device is the active one. Until something activates it, Spirc ignores
-    /// every command but loading a track.
     local_active: bool,
-    /// Playback runs on another device; commands go through Spotify Connect.
     remote_active: bool,
-    /// The Spotify Connect device that plays, by ID, as Spotify last said.
     active_device: Option<String>,
-    /// Changes sent to the other device that Spotify doesn't show yet.
     remote_intent: RemoteIntent,
-    /// When the last command went to another device; polls started before show older state.
     last_command: Instant,
-    /// The last device list, so the picker opens at once while a fresh one loads.
     devices_cache: Option<Vec<Device>>,
-    /// The picker should open when the device list arrives.
     devices_wanted: bool,
-    /// Playback is moving to another device.
     transfer: Option<Transfer>,
-    /// What the user chose on the Settings page.
     pub prefs: Preferences,
     next_poll: Instant,
     polling: bool,
     poll_started: Instant,
-    /// The last change Spotify pushed, and when.
     last_push: Option<(ConnectPush, Instant)>,
-    /// Where the data cache and the state file live.
     paths: Paths,
     pub now: NowPlaying,
-    /// When the shown track last changed.
     track_changed_at: Instant,
-    /// What plays next on the device that plays, as Spotify or tunebox's player last said.
     queue: Queue,
-    /// Details of the tracks in the queue by URI; `None` while they load.
     queue_tracks: HashMap<String, Option<Track>>,
-    /// Tracks in the queue Spotify has no details for; they are left off the queue page.
     queue_tracks_missing: HashSet<String>,
-    /// Counts the reports of what plays next, so a slower answer can tell it is outdated.
     queue_version: u64,
-    /// The track the Web API was last asked what plays after, and the report it was asked
-    /// about, so it is asked once per report.
     upcoming_asked: Option<(String, u64)>,
-    /// The Web API's answer is on its way.
     upcoming_pending: bool,
-    /// When to ask the Web API what plays next.
     upcoming_due: Option<Instant>,
-    /// tunebox's player shuffled what plays next and hasn't said how.
     queue_reshuffled: bool,
-    /// The system's media controls, where there are any.
     media: Option<MediaSync>,
-    /// Announces new tracks while tunebox is in the background, in terminals that can.
     notifier: Option<Notifier>,
-    /// Whether the terminal window has keyboard focus, as far as it reports.
     focused: bool,
-    /// When the computer went to sleep, in wall-clock time: the monotonic clock stops meanwhile.
     slept_at: Option<std::time::SystemTime>,
-    /// Reduce Motion and Low Power Mode, as the system reported them at the last check.
     system_settings: Settings,
-    /// The system's settings with the user's choice for power saving applied.
     pub settings: Settings,
     settings_checked: Instant,
-    /// Where the palette comes from; `None` in tests, which keep tunebox's own colors.
     colors: Option<Colors>,
     pub accent: Accent,
-    /// The dominant color of the playing cover, for when the accent follows it; tuned to the
-    /// background when shown.
     cover_accent: Option<Rgb>,
     pub me: Option<User>,
     pub playlists: Vec<PlaylistInfo>,
@@ -529,117 +392,73 @@ pub struct App {
     pub shows: Vec<ShowInfo>,
     pub liked_total: Option<u32>,
     pub library_loading: bool,
-    /// Parts of the library still on their way at startup.
     library_pending: u8,
     pub library_filter: LibraryFilter,
-    /// The service browses and plays without an account, so there is no library to show.
     pub signed_out: bool,
-    /// Why the service couldn't start; its pages say so instead.
     pub problem: Option<String>,
-    /// The service's pages were filled already: it showed before in this run.
     shown_before: bool,
-    /// The last Home feed, shown instantly while a fresh one loads.
     home_cache: Option<Home>,
     home_fetched_at: Option<Instant>,
-    /// On how many days tunebox was used, and whether it asked for a star.
     pub(crate) usage: crate::state::Usage,
-    /// When to ask for a star on GitHub.
     star_due: Option<Instant>,
-    /// Links opened in the browser, in tests instead.
     #[cfg(test)]
     pub opened: Vec<String>,
-    /// A problem that stays until it's solved or closed.
     pub pinned: Option<Pinned>,
-    /// Library, user or Home changed since the data cache was last written.
     data_dirty: bool,
     last_cache_save: Instant,
-    /// The track list the last run left open, until the restored view has taken it.
     cached_tracks: Option<crate::datacache::Tracks>,
-    /// Which load of which list the track cache holds, to write it only when it changed.
     cached_tracks_version: Option<(u64, Instant)>,
-    /// Cover art by cell size and URL.
     pub images: HashMap<String, ImageSlot>,
-    /// When each image was last drawn; long-unseen ones are dropped to save memory.
     image_used: HashMap<String, Instant>,
     last_eviction: Instant,
-    /// When to hand freed memory back to the system.
     trim_due: Option<Instant>,
-    /// Frames drawn so far.
     draws: u64,
-    /// When the last frame started; images used since were drawn in it.
     frame_started: Instant,
-    /// Escape sequences to write after the next frame, such as deleting images the terminal
-    /// holds.
     pub terminal_out: Vec<String>,
-    /// Covers the frame being drawn will likely show soon; see [`App::prefetch`].
     prefetch: Vec<(String, Size, bool)>,
-    /// Last track whose stream was prefetched on hover, and when, for the debounce.
     track_prefetch: Option<(String, Instant)>,
-    /// Known library state per URI: liked songs, saved albums, followed playlists.
     pub saved: HashMap<String, bool>,
-    /// Library changes not sent yet: wanted state, item name, time of the last toggle.
     pending_saves: HashMap<String, (bool, String, Instant)>,
-    /// Library changes Spotify hasn't confirmed yet; one request per URI at a time.
     saving: HashSet<String>,
-    /// Items taken out of the library before Spotify confirmed it, and where they were, to
-    /// put them back should it fail.
     unsaved: HashMap<String, (usize, library::LibraryItem)>,
-    /// Library lists of each service to load again after confirmed changes, and when.
     library_reloads: HashMap<(Service, library::LibraryPart), Instant>,
     pub focus: Focus,
     pub nav: ListCursor,
     pub view: View,
     history: Vec<View>,
-    /// When the page last changed.
     last_nav: Option<Instant>,
     next_view_id: u64,
     pub status: Option<Status>,
     pub overlay: Option<Overlay>,
-    /// Set when an overlay opens; the first draw that knows its area starts the animation.
     pub overlay_fx_pending: bool,
     pub zen: bool,
     pub zen_cover: Option<LargeCover>,
-    /// Cover size the Now Playing layout asked for at the last draw.
     pub zen_cover_want: Option<Size>,
-    /// The size asked for, and since when; a resize passes through many sizes.
     zen_cover_want_since: Option<(Size, Instant)>,
     zen_cover_pending: Option<(String, Size)>,
-    /// The last cover that failed to load, and when.
     zen_cover_failed: Option<(String, Size, Instant)>,
     pub lyrics: Option<LyricsState>,
-    /// Smoothly animated lyric line position.
     pub lyrics_scroll: f32,
     pub hits: Vec<(Rect, Hit)>,
-    /// Last known mouse position, for hover highlights.
     pub mouse: Option<Position>,
     hovered: Option<Hit>,
-    /// The seek bar or volume slider while the left button holds it.
     dragging: Option<Hit>,
-    /// Where a drag on the seek bar will jump to; shown until the button is released.
     pub seek_preview: Option<u32>,
-    /// Images drawn in the current frame, for dev snapshots.
     pub placements: Vec<Placement>,
-    /// Writes the frame's Sixel and iTerm2 images.
     pub inline: InlineLayer,
-    /// F12 was pressed; the next frame gets written as a PNG.
     pub snapshot_requested: bool,
     last_click: Option<(Instant, Hit)>,
-    /// The target clicked last, where it was and when, so it can light up for a moment.
     pressed: Option<(Hit, Rect, Instant)>,
     pub effects: Effects<Fx>,
     pub last_draw: Instant,
     pub content_area: Rect,
     pub screen: Rect,
-    /// Rows of the content list at the last draw, for paging.
     pub page_height: usize,
     started: Instant,
     last_frame: u64,
     pub quit: bool,
-    /// A newer tunebox, and how far installing it got.
     pub update: Option<Update>,
-    /// The updated binary to start once the interface has closed.
     pub restart: Option<PathBuf>,
-    /// A showcase with sample data (`tunebox demo`): nothing is saved.
     demo: bool,
 }
 
@@ -654,7 +473,6 @@ impl App {
         mut colors: Option<Colors>,
     ) -> Self {
         let system_settings = system_settings();
-        // The palette from the first frame on, and the accent the app starts with.
         if let Some(palette) = colors.as_mut().and_then(Colors::poll) {
             theme::set_palette(palette);
         }
@@ -789,7 +607,6 @@ impl App {
         };
         match start {
             Start::Restore(state) => app.restore(*state),
-            // A showcase starts fresh, and never touches the account's saved session.
             Start::Demo(demo) => {
                 app.open_browsing();
                 app.start_demo(demo);
@@ -798,7 +615,6 @@ impl App {
         app
     }
 
-    /// Shows the demo's track as playing, with its queue. Nothing plays: there is no player.
     fn start_demo(&mut self, demo: &crate::demo::Demo) {
         let playing = &demo.playing;
         let track = &playing.track;
@@ -828,13 +644,11 @@ impl App {
         self.start_demo_queue(queued, rest);
     }
 
-    /// Whether every load the app asked for has ended.
     #[cfg(test)]
     pub fn is_idle(&self) -> bool {
         self.loader.is_idle()
     }
 
-    /// The last session's track is shown and ␣ would continue it.
     pub fn can_resume(&self) -> bool {
         self.resume.is_some()
     }
@@ -843,62 +657,50 @@ impl App {
         self.player().is_some()
     }
 
-    /// The player that plays, or played last, while it is connected.
     fn player(&self) -> Option<&Player> {
         self.players.get(&self.active?)
     }
 
-    /// The service playing, or else the one shown.
     pub fn service(&self) -> Option<Service> {
         self.active.or(self.loader.service())
     }
 
-    /// Why the player of the service playing, or else shown, isn't there.
     pub fn player_error(&self) -> Option<&str> {
         self.player_errors.get(&self.service()?).map(String::as_str)
     }
 
-    /// The name of the service playing or shown, for messages about it.
     pub fn service_name(&self) -> &'static str {
         self.service().map_or("your music service", Service::name)
     }
 
-    /// Whether Spotify's DJ is there, for the service that plays.
     pub fn supports_dj(&self) -> bool {
         self.service().is_some_and(backend::supports_dj)
     }
 
-    /// Whether the service that plays can play on the account's other devices.
     pub fn supports_devices(&self) -> bool {
         self.service().is_some_and(backend::supports_devices)
     }
 
-    /// Whether the service that plays can fade songs into each other.
     pub fn supports_crossfade(&self) -> bool {
         self.service().is_some_and(backend::supports_crossfade)
     }
 
-    /// Whether `command` does anything here. The palette and the help leave out the ones for
-    /// what the service lacks.
     pub fn offers(&self, command: Command) -> bool {
         match command {
             Command::Dj => self.supports_dj(),
             Command::Devices => self.supports_devices(),
             Command::Crossfade => self.supports_crossfade(),
             Command::SwitchService => self.next_service().is_some(),
-            // A build without a service is never released.
             Command::Update => backend::VARIANT.is_some(),
             _ => true,
         }
     }
 
-    /// Animation frame counter, shared by all animated elements.
     pub fn frame(&self) -> u64 {
         let frame = if self.settings.low_power { LOW_POWER_FRAME } else { FRAME };
         (self.started.elapsed().as_millis() / frame.as_millis()) as u64
     }
 
-    /// Without movement that only decorates: for Reduce Motion, and to save energy.
     pub fn calm(&self) -> bool {
         self.settings.reduce_motion || self.settings.low_power
     }
@@ -907,7 +709,6 @@ impl App {
         self.saved.get(uri).copied().unwrap_or(false)
     }
 
-    /// The target that was just clicked and its area, while it should still look pressed.
     pub fn pressed(&self) -> Option<(Hit, Rect)> {
         self.pressed.filter(|(_, _, at)| at.elapsed() < PRESS_FLASH).map(|(hit, area, _)| (hit, area))
     }
@@ -924,9 +725,7 @@ impl App {
         }
     }
 
-    // ── Updates ──────────────────────────────────────────────────────────────────────────
 
-    /// Looks for a newer tunebox; one the user `asked` for reports what it finds either way.
     pub fn check_for_update(&mut self, asked: bool) {
         if self.offers(Command::Update) {
             self.loader.check_update(self.paths.clone(), asked);
@@ -934,7 +733,6 @@ impl App {
     }
 
     fn on_update_available(&mut self, release: Release) {
-        // An update on its way, or done, stays as it is.
         if matches!(self.update, Some(Update::Installing { .. } | Update::Installed { .. })) {
             return;
         }
@@ -948,7 +746,6 @@ impl App {
         self.update = Some(update);
     }
 
-    /// Says that a newer tunebox is out, and how to get it.
     fn announce(&mut self, update: &Update) {
         match update {
             Update::Available(release) => self.notice(format!("tunebox {} is out · U updates", release.version())),
@@ -957,8 +754,6 @@ impl App {
         }
     }
 
-    /// The update button: installs the update, or restarts into the installed one, or says how
-    /// to update where a package manager does. Without an update, looks for one.
     fn run_update(&mut self) {
         match self.update.clone() {
             None if self.demo => self.error("This is the demo: nothing updates here".into()),
@@ -980,7 +775,6 @@ impl App {
         }
     }
 
-    /// What the update command does now, for the palette.
     fn update_label(&self) -> String {
         match &self.update {
             None => Command::Update.label().to_owned(),
@@ -991,9 +785,7 @@ impl App {
         }
     }
 
-    // ── Events ───────────────────────────────────────────────────────────────────────────
 
-    /// Returns whether the screen needs a redraw.
     pub fn on_input(&mut self, event: Event) -> bool {
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => {
@@ -1010,11 +802,9 @@ impl App {
         }
     }
 
-    /// Returns whether the screen needs a redraw.
     pub fn on_event(&mut self, event: AppEvent) -> bool {
         match event {
             AppEvent::Player(service, event) => return self.on_player(service, event),
-            // A push brings the next poll forward; only the queue page shows it at once.
             AppEvent::Pushed(service, push) if self.is_active(service) => return self.on_push(push),
             AppEvent::Pushed(..) => return false,
             AppEvent::PlayerReady(player) => self.on_player_ready(*player),
@@ -1028,7 +818,6 @@ impl App {
         true
     }
 
-    /// Whether `service`'s player is the one that plays, or nothing has played yet.
     fn is_active(&self, service: Service) -> bool {
         self.active.is_none_or(|active| active == service)
     }
@@ -1038,7 +827,6 @@ impl App {
         self.player_errors.remove(&service);
         player.set_crossfade(Duration::from_secs(self.prefs.crossfade));
         self.players.insert(service, player);
-        // Until something plays, the player of the service shown is the one that would.
         if self.active.is_none() || (self.now.track.is_none() && self.loader.service() == Some(service)) {
             self.take_over(service);
         } else if self.is_active(service) {
@@ -1049,7 +837,6 @@ impl App {
         }
     }
 
-    /// The new connection starts out idle; what played gets ready to continue, as after a restart.
     fn on_player_lost(&mut self, service: Service) {
         self.players.remove(&service);
         if !self.is_active(service) {
@@ -1082,13 +869,11 @@ impl App {
                         player.reconnect();
                     }
                 }
-                // Whatever plays elsewhere may have changed meanwhile.
                 self.next_poll = Instant::now();
             }
         }
     }
 
-    /// Unplugged headphones pause playback rather than move it to the speakers.
     fn on_output_lost(&mut self, service: Service, name: String) {
         if !self.is_active(service) {
             if let Some(player) = self.players.get(&service) {
@@ -1096,11 +881,7 @@ impl App {
             }
             return;
         }
-        // The report itself says tunebox's player is writing audio, whatever the state shows,
-        // and pausing a player that isn't playing does nothing.
         self.control(Player::pause);
-        // Shown paused at once: a pause from the headphones that arrives before the player
-        // confirms must not toggle playback back on, through the speakers.
         self.now.set_playing(false);
         self.notice(format!("Paused: {name} disconnected"));
     }
@@ -1110,7 +891,6 @@ impl App {
         match command {
             Media::Toggle => self.run(Command::PlayPause),
             Media::Play if !self.now.playing => self.run(Command::PlayPause),
-            // Pausing the local player twice stays paused, unlike toggling it.
             Media::Pause if !self.remote_active => {
                 self.control(|c| c.pause());
             }
@@ -1123,7 +903,6 @@ impl App {
         }
     }
 
-    /// Writes a desktop notification once a new track plays while tunebox is in the background.
     pub fn announce_track(&mut self) {
         let Some(notifier) = self.notifier.as_mut().filter(|_| self.prefs.notifications) else { return };
         let track = self.now.track.as_ref().filter(|_| !self.remote_active);
@@ -1134,7 +913,6 @@ impl App {
         }
     }
 
-    /// Brings the system's media controls up to date; cheap when nothing changed.
     pub fn sync_media(&mut self) {
         let Some(media) = &mut self.media else { return };
         let track = self.now.track.as_ref().filter(|_| !self.remote_active);
@@ -1144,13 +922,11 @@ impl App {
         media.sync(&self.now, !self.remote_active);
     }
 
-    /// The player keeps trying to connect and reports back with `PlayerReady`.
     fn on_player_failed(&mut self, service: Service, err: String) {
         tracing::warn!("{} player: {err}", service.name());
         self.player_errors.insert(service, err);
     }
 
-    /// Loads the open page again once the session is up, if it failed without one.
     fn reload_failed_view(&mut self) {
         match &mut self.view {
             View::Home(v) if v.error.is_some() => {
@@ -1177,15 +953,11 @@ impl App {
 
     fn on_player(&mut self, service: Service, event: PlayerEvent) -> bool {
         if !self.is_active(service) {
-            // Playback started on another service's player, say from another app: that one
-            // plays now, and this one stops.
             if !matches!(event, PlayerEvent::TrackChanged { .. } | PlayerEvent::Playing { .. }) {
                 return false;
             }
             self.take_over(service);
         }
-        // What plays next, as tunebox's own player has it; while another device plays, it has
-        // nothing to say.
         if let PlayerEvent::QueueChanged { context_uri, current, next } = event {
             if !self.remote_active {
                 self.set_queue(Queue::from_player(context_uri, current, &next));
@@ -1200,18 +972,14 @@ impl App {
         match &event {
             PlayerEvent::Activated => {
                 self.local_active = true;
-                // A volume set while inactive was ignored; Spirc takes it now.
                 if let Some(volume) = self.volume_sync.next() {
                     self.control(|c| c.set_volume(volume));
                 }
             }
             PlayerEvent::Deactivated => {
                 self.local_active = false;
-                // Usually another device took over; find out which before the next command.
                 self.next_poll = Instant::now();
             }
-            // Spotify refuses librespot the keys to songs at times; skipping them silently
-            // would look like tunebox's fault.
             PlayerEvent::Unavailable { refused: true, .. } => {
                 self.error(
                     "Spotify refused the key to a song, so it was skipped. See github.com/OlegVapnik/tunebox/blob/main/website/src/pages/troubleshooting".into(),
@@ -1229,19 +997,16 @@ impl App {
         }
         if matches!(event, PlayerEvent::TrackChanged { .. } | PlayerEvent::Playing { .. }) {
             self.resume = None;
-            // Playback moved here.
             if self.transfer.as_ref().is_some_and(|t| Some(&t.device_id) == self.device_id.as_ref()) {
                 self.transfer = None;
             }
         }
         if self.remote_active {
             match event {
-                // Playback just moved to tunebox.
                 PlayerEvent::TrackChanged { .. } | PlayerEvent::Playing { .. } => {
                     self.remote_active = false;
                     self.now.device = None;
                 }
-                // The local player idles while another device plays.
                 _ => return false,
             }
         }
@@ -1263,8 +1028,6 @@ impl App {
         true
     }
 
-    /// Spotify pushed a change of what plays where; a poll brings the details.
-    /// What plays next comes with the push. Returns whether the screen shows it.
     fn on_push(&mut self, push: ConnectPush) -> bool {
         if push.worth_polling(self.device_id.as_deref(), self.remote_active, self.last_context.as_deref()) {
             self.next_poll = self.next_poll.min(Instant::now() + PUSH_DELAY);
@@ -1275,8 +1038,6 @@ impl App {
         matches!(self.view, View::Queue(_))
     }
 
-    /// Returns whether anything shown changed: while tunebox plays or nothing does, the poll
-    /// mostly confirms what is on screen.
     fn on_playback(&mut self, playback: Option<Playback>) -> bool {
         if let (Some(transfer), Some(p)) = (&self.transfer, &playback)
             && transfer.device_id == p.device.id
@@ -1286,9 +1047,6 @@ impl App {
         if let Some(p) = &playback
             && Some(p.device.id.as_str()) != self.device_id.as_deref()
         {
-            // While tunebox starts a track itself, Spotify may still name the device that
-            // played before; another device starting a track may still show the old one.
-            // Either would undo the early switch.
             let stale = if self.remote_active {
                 self.now.awaits_remote(p, self.remote_intent.is_waiting())
             } else {
@@ -1303,7 +1061,6 @@ impl App {
         match playback {
             Some(p) if Some(p.device.id.as_str()) == self.device_id.as_deref() => {
                 let changed = self.remote_active || (p.context.is_some() && p.context != self.last_context);
-                // Playback started from another app on tunebox's device: learn what it plays.
                 if p.context.is_some() {
                     self.last_context = p.context.clone();
                 }
@@ -1325,13 +1082,11 @@ impl App {
                 if let Some(url) = cover {
                     self.load_cover(url);
                 }
-                // The Web API may lag behind a push; look again until it catches up.
                 let behind =
                     self.last_push.as_ref().is_some_and(|(push, at)| at.elapsed() < PUSH_LEAD && push.is_ahead_of(&p));
                 if unconfirmed || behind {
                     self.next_poll = self.next_poll.min(Instant::now() + QUICK_POLL);
                 }
-                // Catch the next track as soon as this one ends.
                 if self.now.playing
                     && let Some(track) = &self.now.track
                 {
@@ -1341,7 +1096,6 @@ impl App {
                         self.next_poll = self.next_poll.min(end);
                     }
                 }
-                // The slider follows the mouse while it holds it, not the device.
                 if let Some(volume) = dragged_volume {
                     self.now.volume = volume;
                 }
@@ -1359,9 +1113,7 @@ impl App {
         }
     }
 
-    /// Loads lyrics and the like state for a new track.
     fn after_track_change(&mut self, before: Option<String>) {
-        // The player does not name the album; the open track list may.
         if let (Some(track), View::Tracks(v)) = (&mut self.now.track, &self.view)
             && track.album_uri.is_none()
             && let Some(listed) = v.tracks.iter().find(|t| t.uri == track.uri)
@@ -1387,10 +1139,7 @@ impl App {
         }
     }
 
-    /// Returns whether the screen needs a redraw.
     fn on_data(&mut self, event: DataEvent) -> bool {
-        // Decoding covers and pages allocates a lot for a moment. Each such load pushes the
-        // trim back, so a burst ends in one.
         if matches!(
             event,
             DataEvent::Image { .. }
@@ -1410,13 +1159,11 @@ impl App {
             }
             DataEvent::Me(result) => match result {
                 Ok(user) => {
-                    // The data cache belongs to whoever was logged in last time.
                     if self.me.as_ref().is_some_and(|me| me.id != user.id) {
                         self.forget_library();
                     }
                     self.me = Some(user);
                     self.data_dirty = true;
-                    // Signed in again.
                     if let Some(service) = self.loader.service()
                         && self.pinned.as_ref().and_then(|p| p.command.as_deref())
                             == Some(&*format!("tunebox login {}", service.key()))
@@ -1480,7 +1227,6 @@ impl App {
                 self.loader.check_saved(uris);
             }
             DataEvent::Home { view, chip, result } => {
-                // A chip's Home is only for its view; the whole Home is what Home opens with.
                 if let Some(home) = result.as_ref().ok().filter(|_| chip.is_none()) {
                     self.home_cache = Some(home.clone());
                     self.home_fetched_at = Some(Instant::now());
@@ -1492,7 +1238,6 @@ impl App {
                 }
                 match result {
                     Ok(home) => v.set_home(home),
-                    // The Home before the chip stays, so the failure is said at the bottom.
                     Err(err) => match v.chip_failed() {
                         Some(failed) => self.error(format!("Couldn't load {failed}: {err}")),
                         None => {
@@ -1502,11 +1247,9 @@ impl App {
                     },
                 }
             }
-            // Loads still under way when cover art was turned off.
             DataEvent::Image { .. } | DataEvent::Cover { .. } | DataEvent::LargeCover { .. } if !self.prefs.covers => {
                 return false;
             }
-            // Encoded for the protocol used before a change in Settings: loaded again when drawn.
             DataEvent::Image { key, result: Ok(picture) } if picture.kind() != self.loader.image_kind() => {
                 if matches!(self.images.get(&key), Some(ImageSlot::Loading(_))) {
                     self.images.remove(&key);
@@ -1592,8 +1335,6 @@ impl App {
                             self.terminal_out.extend(old.picture.terminal_delete());
                         }
                     }
-                    // For a size or track no longer shown: dropped before it is ever sent to the
-                    // terminal, which would cost megabytes for nothing.
                     Ok(_) => {}
                     Err(err) => {
                         tracing::warn!("large cover {url}: {err}");
@@ -1609,9 +1350,7 @@ impl App {
                 }
             }
             DataEvent::Saved(flags) => {
-                // A fresher local toggle wins over a check that was already under way.
                 let fresh: Vec<_> = flags.into_iter().filter(|(uri, _)| !self.save_in_progress(uri)).collect();
-                // Most checks only confirm what is already known.
                 let changed = fresh.iter().any(|(uri, saved)| self.saved.get(uri) != Some(saved));
                 self.saved.extend(fresh);
                 return changed;
@@ -1640,7 +1379,6 @@ impl App {
             }
             DataEvent::Playback(result) => {
                 self.polling = false;
-                // Started before the last remote command, it shows the state from before it.
                 if self.poll_started < self.last_command {
                     return false;
                 }
@@ -1655,7 +1393,6 @@ impl App {
             DataEvent::RemoteDone { commands, result } => {
                 self.remote_intent.answered(commands, result.is_ok());
                 match result {
-                    // Look again once the device has had a moment to apply it.
                     Ok(()) => self.next_poll = self.next_poll.min(Instant::now() + CONFIRM_DELAY),
                     Err(err) => {
                         self.cancel_start();
@@ -1708,11 +1445,9 @@ impl App {
                         *suggestions = fresh;
                         picker.set_items(dj_items(&picker.query, suggestions), |&choice| Some(choice) == selected);
                     }
-                    // Without suggestions, the panel still asks and jumps.
                     Err(err) => tracing::warn!("DJ suggestions: {err}"),
                 }
             }
-            // DJ's answer speaks for itself, seconds later.
             DataEvent::DjAsked(Ok(())) => {}
             DataEvent::DjAsked(Err(err)) => {
                 self.cancel_start();
@@ -1734,7 +1469,6 @@ impl App {
                 if let Some(Update::Installing { release, .. }) = self.update.take() {
                     self.update = Some(Update::Available(release));
                 }
-                // The status line has one row.
                 self.error(format!("Update failed: {}", err.split_whitespace().collect::<Vec<_>>().join(" ")));
             }
             DataEvent::Notice(text) => self.notice(text),
@@ -1743,14 +1477,12 @@ impl App {
         true
     }
 
-    /// Counts down the library parts loading at startup; later reloads don't show a spinner.
     fn library_part_done(&mut self) {
         self.library_pending = self.library_pending.saturating_sub(1);
         self.library_loading = self.library_pending > 0;
     }
 
     fn on_tracks(&mut self, view: u64, page: Result<Page<Track>, String>) {
-        // A page may predate a like or unlike that Spotify has not confirmed yet.
         let unconfirmed: HashMap<String, bool> =
             self.pending_saves.keys().chain(&self.saving).map(|uri| (uri.clone(), self.is_saved(uri))).collect();
         let Some(View::Tracks(v)) = self.view_mut(view) else { return };
@@ -1759,7 +1491,6 @@ impl App {
             Err(err) => {
                 v.loading = false;
                 v.fetch = None;
-                // A failed refresh leaves the songs on screen as they were.
                 match v.incoming.take() {
                     Some(_) => tracing::warn!("refreshing a track list: {err}"),
                     None => v.error = Some(err),
@@ -1785,7 +1516,6 @@ impl App {
         if done {
             if let Some(mut fresh) = v.incoming.take() {
                 if liked {
-                    // Songs liked meanwhile may be missing from the fresh copy.
                     let missing: Vec<Track> = v
                         .tracks
                         .iter()
@@ -1807,7 +1537,6 @@ impl App {
         }
     }
 
-    /// Advances timers. Returns whether anything visible changed.
     pub fn on_tick(&mut self) -> bool {
         let mut redraw = false;
 
@@ -1855,7 +1584,6 @@ impl App {
             if at.elapsed() >= PRESS_FLASH {
                 self.pressed = None;
             }
-            // One more frame after the flash ends clears it.
             redraw = true;
         }
 
@@ -1874,7 +1602,6 @@ impl App {
             redraw = true;
         }
         if self.now.start_failed() {
-            // Spirc only logs a failed load; another device's state comes with the next poll.
             let failed_here = self.now.pending.as_ref().is_some_and(|p| !p.skip) && !self.remote_active;
             self.cancel_start();
             if failed_here {
@@ -1930,7 +1657,6 @@ impl App {
             || (!self.is_connected() && self.player_error().is_none())
     }
 
-    /// Requests the big cover once the Now Playing layout knows its size.
     fn request_zen_cover(&mut self) {
         if !self.prefs.covers {
             return;
@@ -1942,15 +1668,11 @@ impl App {
         }
         let shown = self.zen_cover.as_ref().is_some_and(|c| c.url == url);
         let loaded = shown && self.zen_cover.as_ref().is_some_and(|c| c.size == size);
-        // One cover per track at a time: while a resize goes on, a request for an older size is
-        // let finish (and dropped) rather than joined by one for every size passed through.
         let pending = self.zen_cover_pending.as_ref().is_some_and(|(u, _)| *u == url);
         let failed = self
             .zen_cover_failed
             .as_ref()
             .is_some_and(|(u, s, at)| *u == url && *s == size && at.elapsed() < ZEN_COVER_RETRY);
-        // A new track or a first look loads at once; after a resize, the cover at the old size
-        // stays until the window settles.
         let settled = self.zen_cover_want_since.is_some_and(|(_, since)| since.elapsed() >= ZEN_COVER_SETTLE);
         if loaded || pending || failed || (shown && !settled) {
             return;
@@ -1959,7 +1681,6 @@ impl App {
         self.loader.large_cover(url, size);
     }
 
-    /// Eases the lyrics towards the current line. Returns whether they moved.
     fn scroll_lyrics(&mut self) -> bool {
         let target = self
             .lyrics
@@ -1972,14 +1693,12 @@ impl App {
         let distance = target - self.lyrics_scroll;
         if distance.abs() < 0.02 || self.calm() {
             self.lyrics_scroll = target;
-            // A jump needs drawing; the last tiny step of a glide does not.
             return distance.abs() >= 0.02;
         }
         self.lyrics_scroll += distance * 0.25;
         true
     }
 
-    // ── Keys ─────────────────────────────────────────────────────────────────────────────
 
     fn on_key(&mut self, key: KeyEvent) {
         if key.code == KeyCode::F(12) {
@@ -2008,7 +1727,6 @@ impl App {
             }
             return;
         }
-        // `r` is repeat as usual, but retries a page that failed to load.
         if key.code == KeyCode::Char('r') && self.view.has_error() {
             self.reload_failed_view();
             return;
@@ -2156,12 +1874,10 @@ impl App {
         }
     }
 
-    /// Mouse wheel: moves the view, not the selection.
     fn scroll_content(&mut self, delta: isize) {
         match &mut self.view {
             View::Tracks(v) => v.list.scroll(delta),
             View::Search(v) => {
-                // Results with thumbnails are three rows tall; scroll by about as many rows.
                 let rows = v.entry_rows.max(1) as usize;
                 v.list.scroll(delta.signum() * delta.unsigned_abs().div_ceil(rows) as isize);
             }
@@ -2240,7 +1956,6 @@ impl App {
             Some(Overlay::Dj { picker, suggestions, .. }) => {
                 let query = picker.query.clone();
                 let outcome = picker.on_key(key);
-                // The first row asks for what was typed.
                 if picker.query != query {
                     let query = picker.query.clone();
                     picker.set_items(dj_items(&query, suggestions), |_| false);
@@ -2268,13 +1983,10 @@ impl App {
         }
     }
 
-    /// Asks for a star on GitHub once `delay` has passed and nothing else is in the way.
     pub(crate) fn ask_for_star_after(&mut self, delay: Duration) {
         self.star_due = Some(Instant::now() + delay);
     }
 
-    /// Shows the request for a star, if it is due and the screen is calm. It counts as asked
-    /// the moment it shows: closed in any way, it never comes back.
     fn ask_for_star(&mut self) -> bool {
         let calm = self.overlay.is_none() && self.focus != Focus::SearchInput && !self.zen && !self.demo;
         if !calm || !self.star_due.is_some_and(|due| Instant::now() >= due) {
@@ -2288,7 +2000,6 @@ impl App {
         true
     }
 
-    /// Closes the request for a star, opening tunebox's page on GitHub for one.
     fn answer_star(&mut self, star: bool) {
         self.overlay = None;
         if star {
@@ -2339,7 +2050,6 @@ impl App {
         }
     }
 
-    // ── Mouse ────────────────────────────────────────────────────────────────────────────
 
     fn on_mouse(&mut self, mouse: MouseEvent) -> bool {
         let position = Position::new(mouse.column, mouse.row);
@@ -2359,7 +2069,6 @@ impl App {
             }
         }
         if matches!(mouse.kind, MouseEventKind::Moved | MouseEventKind::Drag(_)) {
-            // Redraw only when the highlight moves to another target.
             let hovered = self.hit_at(position).filter(Hit::is_interactive);
             let changed = hovered != self.hovered;
             self.hovered = hovered;
@@ -2367,7 +2076,6 @@ impl App {
         }
         let hit = self.hit_at(position);
         let in_overlay = matches!(hit, Some(Hit::OverlayArea | Hit::OverlayItem(_)));
-        // Shift turns the wheel sideways, like in browsers.
         let sideways = mouse.modifiers.contains(KeyModifiers::SHIFT);
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
@@ -2377,8 +2085,6 @@ impl App {
                     self.dragging = Some(hit);
                     self.drag(hit, mouse.column, false);
                 } else if let Some(hit) = hit {
-                    // Lit at once, even where the result takes a moment (another device, a
-                    // track that still loads).
                     if hit.is_interactive()
                         && let Some(&(area, _)) = self.hits.iter().rev().find(|(area, _)| area.contains(position))
                     {
@@ -2389,7 +2095,6 @@ impl App {
             }
             MouseEventKind::Down(MouseButton::Right) => {
                 self.overlay = None;
-                // Names and play buttons lie on top of their row or card; the menu is theirs.
                 let hit = hit.map(|hit| match hit {
                     Hit::Link(Link::TrackArtist { row, .. } | Link::TrackAlbum(row)) => Hit::Row(row),
                     Hit::CardPlay { shelf, item } => Hit::Card { shelf, item },
@@ -2421,7 +2126,6 @@ impl App {
         true
     }
 
-    /// Follows the mouse on the seek bar or volume slider; `release` ends the drag.
     fn drag(&mut self, target: Hit, column: u16, release: bool) {
         match target {
             Hit::Seek { x, width } => {
@@ -2439,7 +2143,6 @@ impl App {
                 let ratio = (column.saturating_sub(x) + 1) as f64 / width.max(1) as f64;
                 let volume = (ratio.clamp(0.0, 1.0) * u16::MAX as f64) as u16;
                 self.now.volume = volume;
-                // Another device gets one request at the end, not one per mouse move.
                 if release || !self.remote_active {
                     self.set_volume(volume);
                 }
@@ -2448,7 +2151,6 @@ impl App {
         }
     }
 
-    /// Pages the shelf under the mouse sideways by one card.
     fn scroll_sideways(&mut self, hit: Option<Hit>, delta: isize) {
         let shelf = match hit {
             Some(
@@ -2466,26 +2168,20 @@ impl App {
         }
     }
 
-    /// Plays what the cursor is on, as the play button on a card does.
     fn play_selected(&mut self) {
         if let Some(target) = self.context_target() {
             self.run_menu(MenuAction::Play, target);
         }
     }
 
-    /// The topmost click target under `position` from the last frame.
     pub fn hit_at(&self, position: Position) -> Option<Hit> {
         self.hits.iter().rev().find(|(area, _)| area.contains(position)).map(|(_, hit)| *hit)
     }
 
-    /// Notes what the mouse is over in the frame just drawn. Scrolling, keys and loaded data
-    /// move things under a resting mouse; without this, moving it onto the target it was over
-    /// before would look like no change and leave the highlight behind.
     pub fn sync_hover(&mut self) {
         self.hovered = self.mouse.and_then(|position| self.hit_at(position)).filter(Hit::is_interactive);
     }
 
-    /// The track URI the mouse is currently over, if any: for hover prefetching.
     pub fn hovered_track_uri(&self) -> Option<String> {
         let hit = self.hovered?;
         match hit {
@@ -2509,7 +2205,6 @@ impl App {
                 View::Home(v) => {
                     let home = v.home.as_ref()?;
                     let shelf = home.shelves.get(shelf)?;
-                    // A song's card is its radio, but the stream is for the song itself.
                     shelf.items.get(item).and_then(|i| i.is_song().then(|| i.context_uri.clone()))
                 }
                 View::Artist(v) => {
@@ -2523,8 +2218,6 @@ impl App {
         }
     }
 
-    /// The track the keyboard selection rests on, if any: prefetching it makes Enter start
-    /// playback without waiting for a first resolve and context fetch.
     pub fn selected_track_uri(&self) -> Option<String> {
         match &self.view {
             View::Tracks(v) => v.tracks.get(v.list.selected).map(|t| t.uri.clone()),
@@ -2546,7 +2239,6 @@ impl App {
         }
     }
 
-    /// Moves the cursor to a clicked row, card or sidebar entry.
     fn select(&mut self, hit: Hit) {
         match hit {
             Hit::Nav(index) => {
@@ -2611,8 +2303,6 @@ impl App {
                 self.select(hit);
                 self.open_nav_item();
             }
-            // Cards open on a single click, like in the official client; tracks select first
-            // and play on a double click.
             Hit::Card { .. } => {
                 self.select(hit);
                 self.activate();
@@ -2707,8 +2397,6 @@ impl App {
         }
     }
 
-    /// Rows that stand for a page rather than a track: library cards and search results
-    /// other than tracks.
     fn opens_on_click(&self) -> bool {
         match &self.view {
             View::Library(_) => true,
@@ -2749,7 +2437,6 @@ impl App {
         }
     }
 
-    // ── Commands ─────────────────────────────────────────────────────────────────────────
 
     pub fn run(&mut self, command: Command) {
         match command {
@@ -2778,8 +2465,6 @@ impl App {
                     let uri = last.uri.clone();
                     if self.start_on(&uri, move |p| {
                         p.resume(last.context, last.uri, last.position_ms)?;
-                        // The player rebuilds its queue from the context, so put back the songs
-                        // the user queued by hand before quitting.
                         if !last.queued.is_empty() {
                             p.clear_queue()?;
                             for queued in last.queued {
@@ -2877,7 +2562,6 @@ impl App {
             Command::Devices => {
                 self.loader.devices(self.service());
                 match self.devices_cache.clone().filter(|d| !d.is_empty()) {
-                    // The last list opens at once and updates when the fresh one arrives.
                     Some(devices) => self.open_devices(devices, true),
                     None => {
                         self.devices_wanted = true;
@@ -2930,7 +2614,6 @@ impl App {
                 value: PaletteAction::Run(command),
             })
             .collect();
-        // An update waiting to be installed or started comes first.
         if matches!(self.update, Some(Update::Available(_) | Update::Installed { .. }))
             && let Some(index) = items.iter().position(|item| matches!(item.value, PaletteAction::Run(Command::Update)))
         {
@@ -2987,7 +2670,6 @@ impl App {
         self.open_overlay(Overlay::AddToPlaylist { uris: vec![uri], picker: Picker::new(items) });
     }
 
-    /// Whether the user made `playlist`. Some services name owners only, not their IDs.
     pub fn owns(&self, playlist: &PlaylistInfo) -> bool {
         self.me.as_ref().is_some_and(|me| match playlist.owner_id.as_str() {
             "" => playlist.owner_name == me.name,
@@ -3005,7 +2687,6 @@ impl App {
         }
     }
 
-    /// Confirms at once; the request takes a moment and only reports back when it fails.
     pub(super) fn queue(&mut self, uri: String, name: String) {
         self.loader.queue(uri);
         self.notice(format!("“{name}” added to queue"));
@@ -3016,7 +2697,6 @@ impl App {
         self.overlay_fx_pending = true;
     }
 
-    /// Called by the first draw of an overlay, which knows where it ended up.
     pub fn animate_overlay(&mut self, area: Rect) {
         let p = theme::palette();
         self.overlay_fx_pending = false;
@@ -3035,7 +2715,6 @@ impl App {
         }
     }
 
-    /// Likes/saves/follows or undoes it. The UI flips at once; the request follows shortly.
     pub(super) fn toggle_library(&mut self, uri: String, name: String) {
         let saved = !self.is_saved(&uri);
         self.saved.insert(uri.clone(), saved);
@@ -3043,8 +2722,6 @@ impl App {
         self.pending_saves.insert(uri, (saved, name, Instant::now()));
     }
 
-    /// Shows a library change in the library of the service `uri` belongs to, such as a like
-    /// of the song that plays while another service shows.
     fn show_library_change_of(&mut self, uri: &str, saved: bool) {
         match Service::of(uri) {
             Some(service) => self.with_service(service, |app| app.show_library_change(uri, saved)),
@@ -3052,7 +2729,6 @@ impl App {
         }
     }
 
-    /// Sends settled library changes, one request per item at a time.
     fn flush_saves(&mut self) {
         let ready: Vec<String> = self
             .pending_saves
@@ -3068,12 +2744,10 @@ impl App {
         }
     }
 
-    /// Whether a library change for `uri` is still on its way to Spotify.
     fn save_in_progress(&self, uri: &str) -> bool {
         self.pending_saves.contains_key(uri) || self.saving.contains(uri)
     }
 
-    /// The selected item in the content area, or else the playing track.
     fn target(&self) -> Option<Target> {
         let track = |uri: &str, name: &str, is_track| Target { uri: uri.into(), name: name.into(), is_track };
         if !self.zen && self.focus == Focus::Content {
@@ -3113,7 +2787,6 @@ impl App {
         self.animate(Fx::Screen, Effect::fade_in(p.bg, 320, screen));
     }
 
-    /// Starts an animation; the next frame measures time from now. None in Low Power Mode.
     fn animate(&mut self, slot: Fx, effect: Effect) {
         if self.settings.low_power {
             return;
@@ -3122,9 +2795,7 @@ impl App {
         self.last_draw = Instant::now();
     }
 
-    // ── Navigation ───────────────────────────────────────────────────────────────────────
 
-    /// Filter chips worth showing: only kinds the library actually contains.
     pub fn library_filters(&self) -> Vec<LibraryFilter> {
         let mut filters = vec![LibraryFilter::Playlists];
         let kinds = [
@@ -3160,8 +2831,6 @@ impl App {
         entries
     }
 
-    /// What the library says instead of its entries: why the service couldn't start, or how
-    /// to sign in where it plays without an account.
     pub fn library_note(&self) -> Option<String> {
         let service = self.loader.service()?;
         if let Some(problem) = &self.problem {
@@ -3176,7 +2845,6 @@ impl App {
         })
     }
 
-    /// The sidebar list; Home and Search are in the top bar.
     pub fn nav_items(&self) -> Vec<NavItem> {
         self.library_entries().into_iter().map(NavItem::Library).collect()
     }
@@ -3204,19 +2872,15 @@ impl App {
         self.set_filter(filters[next]);
     }
 
-    /// Whether a sidebar entry is the view currently open.
-    /// The playlist, album or artist the current track plays from.
     pub fn playing_context(&self) -> Option<&str> {
         self.now.track.as_ref()?;
         self.last_context.as_deref()
     }
 
-    /// Whether tunebox itself plays DJ, so the DJ button moves it on to different picks.
     pub fn dj_playing(&self) -> bool {
         self.local_active && self.playing_context().is_some_and(backend::is_dj)
     }
 
-    /// Track `row` of the open track list or search results.
     fn listed_track(&self, row: usize) -> Option<&Track> {
         match &self.view {
             View::Tracks(v) => v.tracks.get(row),
@@ -3267,7 +2931,6 @@ impl App {
         self.open_artist(uri, name);
     }
 
-    /// Whether there is a page to go back to.
     pub fn can_go_back(&self) -> bool {
         !self.history.is_empty()
     }
@@ -3300,7 +2963,6 @@ impl App {
         }
     }
 
-    /// Opens playlists and albums; artists and podcasts start playing.
     fn open_library_entry(&mut self, entry: LibraryEntry) {
         if !self.nav_items().contains(&NavItem::Library(entry)) {
             self.library_filter = LibraryFilter::All;
@@ -3343,22 +3005,17 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// A cover, or nothing for an item without one: the views draw the gradient placeholder
-    /// themselves, from the item's name.
     pub fn cover(&mut self, url: Option<&str>, size: Size, round: bool) -> Option<&Picture> {
         self.image(url?, size, round)
     }
 
-    /// Starts drawing a frame.
     pub fn begin_frame(&mut self) {
         self.draws += 1;
         self.frame_started = Instant::now();
     }
 
-    /// Finishes drawing a frame.
     pub fn end_frame(&mut self) {
         self.loader.frame_drawn(self.draws);
-        // Covers on screen were requested while drawing, so the ones near them queue up after.
         let mut queue = std::mem::take(&mut self.prefetch);
         for (url, size, round) in queue.drain(..) {
             let key = image_key(&url, size);
@@ -3366,15 +3023,11 @@ impl App {
                 continue;
             }
             self.images.insert(key.clone(), ImageSlot::Loading(Arc::new(AtomicU64::new(self.draws))));
-            // Counts as used once, so the cover is dropped again if it is never shown.
             self.image_used.insert(key.clone(), Instant::now());
             self.loader.prefetch_image(key, url, size, round);
         }
         self.prefetch = queue;
 
-        // Prefetch the selected track's stream, so pressing Enter starts without waiting for
-        // yt-dlp or a context fetch. Keyboard selection starts almost at once; a resting mouse
-        // keeps the longer debounce so moving it across a list doesn't spawn a resolve per cell.
         let target = self
             .selected_track_uri()
             .map(|uri| (uri, Duration::from_millis(50)))
@@ -3394,8 +3047,6 @@ impl App {
         }
     }
 
-    /// Asks for a cover that is likely shown soon, such as the next page of a shelf, so it is
-    /// there when it scrolls into view. Loaded after the frame's visible covers.
     pub fn prefetch(&mut self, url: Option<&str>, size: Size, round: bool) {
         if !self.prefs.covers {
             return;
@@ -3404,13 +3055,10 @@ impl App {
         self.prefetch.push((url.to_owned(), size, round));
     }
 
-    /// What [`ImageProtocol::Auto`] draws with in this terminal, to show beside the choice.
     pub fn auto_image_protocol(&self) -> ImageProtocol {
         self.loader.auto_image_protocol()
     }
 
-    /// Draws covers with `protocol` from now on, for the Settings page. Every cover is encoded
-    /// again, from the disk cache; covers that loaded for the old protocol meanwhile are dropped.
     pub fn set_image_protocol(&mut self, protocol: ImageProtocol) {
         if protocol == self.loader.image_protocol() {
             return;
@@ -3433,7 +3081,6 @@ impl App {
         self.zen_cover_failed = None;
     }
 
-    /// The cover for `url` at `size`, loading it on first use.
     pub fn image(&mut self, url: &str, size: Size, round: bool) -> Option<&Picture> {
         if !self.prefs.covers {
             return None;
@@ -3456,9 +3103,6 @@ impl App {
         }
     }
 
-    /// A generated cover for an item with no artwork, cached in the same slots as real covers.
-    /// The smooth gradient and rounded corners are encoded as an image; the view draws the
-    /// initial on top as text.
     pub fn placeholder_image(&mut self, name: &str, size: Size, round: bool) -> Option<&Picture> {
         if !self.prefs.covers {
             return None;
@@ -3481,13 +3125,6 @@ impl App {
         }
     }
 
-    /// Drops images that have not been on screen for a while. Until drawn, each one holds its
-    /// encoded pixels for the terminal, and they come back quickly from the disk cache.
-    ///
-    /// A drawn kitty image is different: tunebox keeps next to nothing of it, but kitty keeps
-    /// its pixels until told to delete it, and drawing it again would mean another upload.
-    /// Those stay until they take more than [`TERMINAL_IMAGE_BUDGET`] together; then the least
-    /// recently drawn ones that are off screen are deleted from the terminal.
     fn evict_images(&mut self) {
         self.last_eviction = Instant::now();
         let mut stale = Vec::new();
@@ -3533,7 +3170,6 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// Switches the filter tab of the full-page library.
     pub(crate) fn set_page_filter(&mut self, filter: LibraryFilter) {
         if let View::Library(v) = &mut self.view {
             v.filter = if v.filter == filter { LibraryFilter::All } else { filter };
@@ -3575,7 +3211,6 @@ impl App {
     }
 
     fn open_tracks(&mut self, source: TrackSource) {
-        // A page opens among its own service's pages.
         match &source {
             TrackSource::Liked => {}
             TrackSource::Playlist(PlaylistInfo { uri, .. }) | TrackSource::Album(AlbumInfo { uri, .. }) => {
@@ -3614,8 +3249,6 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// Takes the newest loaded copy of a list out of the history, to show it again at once.
-    /// An emptied stand-in keeps its place, so Back still leads there.
     fn take_loaded_copy(&mut self, source: &TrackSource) -> Option<TrackView> {
         let index = self.history.iter().rposition(
             |view| matches!(view, View::Tracks(v) if v.source.same(source) && !v.stale && v.error.is_none()),
@@ -3628,8 +3261,6 @@ impl App {
         Some(loaded)
     }
 
-    /// Empties earlier copies of a list in the history, so each list is held once however
-    /// often it was opened. Back loads them again.
     fn retire_copies(&mut self, source: &TrackSource) {
         for view in &mut self.history {
             if let View::Tracks(v) = view
@@ -3667,7 +3298,6 @@ impl App {
                 }
                 self.check_queue();
                 self.focus = Focus::Content;
-                // A page seen before comes back at once, without the rest of a transition.
                 self.last_nav = Some(Instant::now());
                 self.effects.cancel(&Fx::Content);
             }
@@ -3675,7 +3305,6 @@ impl App {
         }
     }
 
-    /// A new page's text fades in briefly, while its backgrounds and covers are there at once.
     fn animate_content(&mut self) {
         let p = theme::palette();
         let area = self.content_area;
@@ -3687,15 +3316,12 @@ impl App {
         self.next_view_id
     }
 
-    /// The view with `id`, of whichever service.
     fn view_mut(&mut self, id: u64) -> Option<&mut View> {
         let shown = std::iter::once(&mut self.view).chain(self.history.iter_mut());
         shown.chain(self.parked.values_mut().flat_map(browsing::Browsing::views_mut)).find(|v| v.id() == id)
     }
 
-    // ── Playback ─────────────────────────────────────────────────────────────────────────
 
-    /// Enter in the content area: play a track, or open an album or playlist.
     fn activate(&mut self) {
         match &self.view {
             View::Home(v) => {
@@ -3703,7 +3329,6 @@ impl App {
                     return self.pick_chip(chip);
                 }
                 if let Some(item) = v.selected().cloned() {
-                    // A song plays at once, as in YouTube Music's own apps.
                     if item.is_song() {
                         self.play_item(item);
                     } else {
@@ -3742,7 +3367,6 @@ impl App {
                 self.show_early(&track, cover_url);
             }
             View::Search(v) => match v.selected().cloned() {
-                // A song without an album, like a video, plays by itself and what follows it.
                 Some(SearchEntry::Track(t)) if t.album_uri.is_empty() => {
                     self.play(t.uri.clone(), None);
                     self.show_early(&t, t.image_url.clone());
@@ -3768,7 +3392,6 @@ impl App {
         }
     }
 
-    /// Opens playlists and albums; everything else starts playing.
     fn open_home_item(&mut self, item: HomeItem) {
         if backend::is_dj(&item.uri) {
             return self.run(Command::Dj);
@@ -3808,7 +3431,6 @@ impl App {
             return;
         }
         let id = self.next_id();
-        // Artist pages are small, so a loaded one is copied rather than moved.
         let loaded = self.history.iter().rev().find_map(|view| match view {
             View::Artist(v) if v.uri == uri && v.page.is_some() => Some(v.clone()),
             _ => None,
@@ -3829,7 +3451,6 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// Narrows Home to the chip at `index`, or widens it back to the whole Home.
     fn pick_chip(&mut self, index: usize) {
         let View::Home(v) = &mut self.view else { return };
         if let Some(chip) = v.pick_chip(index) {
@@ -3838,7 +3459,6 @@ impl App {
         }
     }
 
-    /// Plays what a shelf's Play all button plays.
     fn play_shelf(&mut self, shelf: usize) {
         let View::Home(v) = &self.view else { return };
         let Some(context) = v.home.as_ref().and_then(|h| h.shelves.get(shelf)).and_then(|s| s.play_all.clone()) else {
@@ -3863,7 +3483,6 @@ impl App {
         }
     }
 
-    /// Plays a context here, or on the other device that is currently playing.
     fn play(&mut self, context: String, track: Option<String>) {
         let before = (self.resume.take(), self.last_context.replace(context.clone()));
         let sent = if self.remote_active && self.plays_here(&context) {
@@ -3876,18 +3495,14 @@ impl App {
         if sent {
             self.now.start(track);
         } else {
-            // Nothing plays, so the last session's context stays, and ␣ still resumes it.
             (self.resume, self.last_context) = before;
         }
     }
 
-    /// A track is shown but nothing plays it: tunebox's own device is inactive and would
-    /// ignore play, skip and seek commands. A start on its way activates it.
     fn idle(&self) -> bool {
         !self.local_active && !self.remote_active && self.now.track.is_some() && self.now.pending.is_none()
     }
 
-    /// Plays the shown track on tunebox from where it stands, e.g. after another device stopped.
     fn play_shown(&mut self) {
         let Some(track) = &self.now.track else { return };
         let (context, uri, position_ms) = (self.last_context.clone(), track.uri.clone(), self.now.position_ms());
@@ -3911,8 +3526,6 @@ impl App {
         }
     }
 
-    /// Skips to the next or previous track; the play button spins until it plays. Like
-    /// Spotify, previous restarts the track instead once it has played a few seconds.
     fn skip(&mut self, forward: bool) {
         let restart = !forward && self.now.position_ms() >= RESTART_AFTER_MS;
         let sent = match (self.remote_active, forward) {
@@ -3930,7 +3543,6 @@ impl App {
             (false, true) => self.control(Player::next),
             (false, false) => self.control(Player::previous),
         };
-        // An inactive player drops skips; with nothing shown there is nothing to wait for.
         if !sent || !(self.remote_active || self.local_active) {
             return;
         }
@@ -3943,8 +3555,6 @@ impl App {
         }
     }
 
-    /// Shows a picked track in the player bar right away, as the official client does,
-    /// instead of only once its audio has loaded. `cover_url` is its album's cover, if known.
     fn show_early(&mut self, track: &Track, cover_url: Option<String>) {
         let before = self.now.track.as_ref().map(|t| t.uri.clone());
         self.now.show_early(CurrentTrack {
@@ -3964,18 +3574,15 @@ impl App {
         if let Some(url) = cover_url {
             self.load_cover(url);
         }
-        // Lyrics and the like state load alongside the audio.
         self.after_track_change(before);
     }
 
-    /// Gives up on a track start, showing again what played before it.
     fn cancel_start(&mut self) {
         let before = self.now.track.as_ref().map(|t| t.uri.clone());
         self.now.cancel_start();
         self.after_track_change(before);
     }
 
-    /// The play, shuffle, save and more buttons in page headers.
     fn header_button(&mut self, button: HeaderButton) {
         let Some(target) = self.page_target() else { return };
         match button {
@@ -3983,7 +3590,6 @@ impl App {
             HeaderButton::Shuffle => self.play_shuffled(target.uri),
             HeaderButton::Save => self.run_menu(crate::overlay::MenuAction::Save, target),
             HeaderButton::More => {
-                // Right below the button, wherever the header puts it or has scrolled it to.
                 let Some(&(area, _)) = self.hits.iter().find(|(_, hit)| *hit == Hit::Header(button)) else { return };
                 let items = menu::page_menu_items(&target, self.is_saved(&target.uri));
                 let anchor = (area.x, area.bottom());
@@ -3993,7 +3599,6 @@ impl App {
         }
     }
 
-    /// Sends a command to the other device. Its answer schedules the poll that confirms it.
     fn remote(&mut self, command: Remote) {
         self.remote_intent.sent();
         self.last_command = Instant::now();
@@ -4006,7 +3611,6 @@ impl App {
         self.set_volume(volume);
     }
 
-    /// Moves the slider at once, so repeated steps add up; the device follows.
     fn set_volume(&mut self, volume: u16) {
         self.now.volume = volume;
         if self.remote_active {
@@ -4030,10 +3634,8 @@ impl App {
         self.seek_to(target as u32);
     }
 
-    /// Moves the bar at once; repeated seeks add up instead of all starting from the same spot.
     fn seek_to(&mut self, position_ms: u32) {
         let Some(track) = &self.now.track else { return };
-        // Spirc refuses positions past the end.
         let position_ms = if track.duration_ms > 0 { position_ms.min(track.duration_ms) } else { position_ms };
         if self.remote_active {
             self.now.set_position(position_ms);
@@ -4043,7 +3645,6 @@ impl App {
             self.now.seek(position_ms);
             self.control(|p| p.seek(position_ms));
         } else {
-            // tunebox's inactive device ignores seeks; space starts from the new spot instead.
             self.now.set_position(position_ms);
             if let Some(last) = &mut self.resume {
                 last.position_ms = position_ms;
@@ -4051,8 +3652,6 @@ impl App {
         }
     }
 
-    /// The DJ panel: ask DJ for something, take one of Spotify's suggestions or jump to
-    /// different picks.
     fn open_dj(&mut self) {
         let Some(track) = &self.now.track else { return };
         self.loader.dj_suggestions(track.uri.clone());
@@ -4100,7 +3699,6 @@ impl App {
         self.open_overlay(Overlay::Devices { devices, picker: Picker::new(items), refreshing });
     }
 
-    /// Updates the open device picker with a fresh list, keeping the selected device.
     fn refresh_devices(&mut self, devices: Vec<Device>) {
         if devices.is_empty() {
             self.overlay = None;
@@ -4117,19 +3715,16 @@ impl App {
     fn transfer_to(&mut self, index: usize) {
         let Some(Overlay::Devices { devices, .. }) = self.overlay.take() else { return };
         let Some(device) = devices.into_iter().nth(index) else { return };
-        // The device label shows the move until the device turns up playing.
         self.transfer =
             Some(Transfer { device_id: device.id.clone(), name: device.name.clone(), since: Instant::now() });
         self.loader.transfer(self.service(), device);
         self.last_command = Instant::now();
     }
 
-    /// The device playback is moving to, while it does.
     pub fn transferring_to(&self) -> Option<&str> {
         self.transfer.as_ref().map(|t| t.name.as_str())
     }
 
-    /// Sends a command to tunebox's own player. Returns whether it went out.
     fn control(&mut self, command: impl FnOnce(&Player) -> anyhow::Result<()>) -> bool {
         let Some(player) = self.player() else {
             self.not_connected();
@@ -4142,12 +3737,9 @@ impl App {
         true
     }
 
-    /// Starts playback of `uri` on the player of its service, which takes over from the one
-    /// that played before. Returns whether the command went out.
     fn start_on(&mut self, uri: &str, command: impl FnOnce(&Player) -> anyhow::Result<()>) -> bool {
         match Service::of(uri) {
             Some(service) if self.players.contains_key(&service) => self.take_over(service),
-            // Another service's player must not get it, while this one's isn't connected.
             Some(service) if !self.is_active(service) => {
                 self.not_connected_to(Some(service));
                 return false;
@@ -4157,8 +3749,6 @@ impl App {
         self.control(command)
     }
 
-    /// Makes `service`'s player the one that plays. Only one plays at a time, so the one that
-    /// played before pauses, wherever it played.
     fn take_over(&mut self, service: Service) {
         let previous = self.active.replace(service);
         self.device_id = self.players.get(&service).and_then(Player::device_id);
@@ -4172,19 +3762,15 @@ impl App {
         self.remote_active = false;
         self.active_device = None;
         self.now.device = None;
-        // The slider shows the volume of the player before, which this one takes on once it plays.
         self.volume_sync = VolumeSync::default();
         self.volume_sync.defer(self.now.volume);
-        // What plays next was the other player's; this one says what it has once it plays.
         self.set_queue(Queue::default());
     }
 
-    /// Whether `uri` plays on the service that plays now, rather than on another one.
     fn plays_here(&self, uri: &str) -> bool {
         Service::of(uri).is_none_or(|service| self.is_active(service))
     }
 
-    /// Liked Songs of the service shown as a context to play, once its player knows the user.
     fn liked_context(&self) -> Option<String> {
         let service = self.loader.service()?;
         let user = self.players.get(&service).and_then(Player::user);
@@ -4195,7 +3781,6 @@ impl App {
         self.not_connected_to(self.service());
     }
 
-    /// Says why `service`'s player can't take a command.
     fn not_connected_to(&mut self, service: Option<Service>) {
         let error =
             service.and_then(|service| self.problem_of(service).or_else(|| self.player_errors.get(&service).cloned()));
@@ -4212,7 +3797,6 @@ impl App {
     }
 
     pub(crate) fn error(&mut self, text: String) {
-        // An expired sign-in stays, with the command that renews it.
         if let Some(command) = sign_in_command(&text) {
             self.pinned = Some(Pinned { text, command: Some(command), copied: false, cause: Cause::SignIn, service: self.service() });
             return;
@@ -4220,14 +3804,12 @@ impl App {
         self.status = Some(Status { text, error: true, since: Instant::now() });
     }
 
-    /// Closes the pinned problem of `cause`, which went away.
     fn unpin(&mut self, cause: Cause) {
         if self.pinned.as_ref().is_some_and(|p| p.cause == cause) {
             self.pinned = None;
         }
     }
 
-    /// Copies the pinned problem's command, or closes it.
     fn on_pinned(&mut self, close: bool) {
         if close {
             self.pinned = None;
@@ -4240,19 +3822,16 @@ impl App {
     }
 }
 
-/// The command a message asks to run to sign in again, like `tunebox login ytmusic`.
 fn sign_in_command(text: &str) -> Option<String> {
     let start = text.find("`tunebox login")? + 1;
     let end = start + text[start..].find('`')?;
     Some(text[start..end].to_owned())
 }
 
-/// Images are kept per URL and cell size.
 fn image_key(url: &str, size: Size) -> String {
     format!("{}x{}:{url}", size.width, size.height)
 }
 
-/// Picker rows for Spotify Connect devices; `own` is tunebox's device ID.
 fn device_items(devices: &[Device], own: Option<&str>) -> Vec<PickItem<usize>> {
     devices
         .iter()
@@ -4271,7 +3850,6 @@ fn device_items(devices: &[Device], own: Option<&str>) -> Vec<PickItem<usize>> {
         .collect()
 }
 
-/// A picked overlay entry, unified across the different pickers.
 #[derive(Debug, Clone, Copy)]
 enum Choice {
     Palette(PaletteAction),

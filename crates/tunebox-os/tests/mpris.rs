@@ -1,6 +1,3 @@
-//! The media controls on a real session bus, as playerctl and the desktop's widgets see them. CI
-//! runs this under `dbus-run-session` with `TUNEBOX_REQUIRE_DBUS=1`; elsewhere, without a session
-//! bus, it passes without looking.
 #![cfg(target_os = "linux")]
 
 use std::{
@@ -85,7 +82,6 @@ async fn playerctl_sees_the_track_and_controls_it() {
     drop(controls);
 }
 
-/// Asks until `check` has an answer, for at most five seconds.
 async fn eventually<T, F: Future<Output = Option<T>>>(what: &str, mut check: impl FnMut() -> F) -> T {
     let started = Instant::now();
     loop {

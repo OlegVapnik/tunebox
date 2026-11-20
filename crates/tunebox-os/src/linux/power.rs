@@ -1,4 +1,3 @@
-//! Sleep and wake through logind, which announces both on the system bus.
 
 use std::{sync::Arc, time::Duration};
 
@@ -9,7 +8,6 @@ use super::bus;
 use crate::power::Event;
 
 const LOGIND: &str = "org.freedesktop.login1";
-/// How long the system waits after announcing sleep, so playback can pause first.
 const SLEEP_GRACE: Duration = Duration::from_secs(1);
 
 type Callback = Arc<dyn Fn(Event) + Send + Sync>;
@@ -20,11 +18,8 @@ type Callback = Arc<dyn Fn(Event) + Send + Sync>;
     default_path = "/org/freedesktop/login1"
 )]
 trait Logind {
-    /// Holds off `what` until the returned descriptor is closed; with mode "delay", only for a
-    /// few seconds.
     fn inhibit(&self, what: &str, who: &str, why: &str, mode: &str) -> zbus::Result<OwnedFd>;
 
-    /// Sent with `true` before the system sleeps, with `false` once it woke up.
     #[zbus(signal)]
     fn prepare_for_sleep(&self, start: bool) -> zbus::Result<()>;
 }
@@ -53,7 +48,6 @@ pub fn watch(on_event: Callback) -> bool {
             if *args.start() {
                 on_event(Event::Sleep);
                 tokio::time::sleep(SLEEP_GRACE).await;
-                // Closing the descriptor lets the system go on.
                 drop(delay.take());
             } else {
                 on_event(Event::Wake);
@@ -64,7 +58,6 @@ pub fn watch(on_event: Callback) -> bool {
     true
 }
 
-/// Asks logind to wait for tunebox before the system sleeps; `None` where it won't.
 async fn delay_sleep(logind: &LogindProxy<'_>) -> Option<OwnedFd> {
     logind
         .inhibit("sleep", "tunebox", "Pausing playback", "delay")

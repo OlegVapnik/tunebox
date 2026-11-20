@@ -1,11 +1,3 @@
-//! How covers reach the terminal: the protocol choice, and images for terminals that draw a
-//! picture from one escape sequence (Sixel, iTerm2).
-//!
-//! Kitty images and half blocks are cells that ratatui draws like text. A Sixel or iTerm2 image
-//! is not: ratatui would have to send the whole sequence again whenever any of its cells
-//! changes, and leaves what was drawn over the image on screen once it is gone. So tunebox keeps
-//! ratatui away from those cells and writes the images itself after each frame, only those that
-//! are new, moved, or came out from under something.
 
 use std::{
     io::{self, Write},
@@ -29,12 +21,8 @@ use ratatui_image::{
 
 use crate::{colors::TerminalColors, snapshot::Placement};
 
-/// What the cells of a Sixel or iTerm2 image hold while the frame is drawn. Anything drawn over
-/// the image replaces it, which is how tunebox tells which cells still show the picture.
 pub const INLINE_CELL: &str = "\u{10EEED}";
 
-/// How covers are drawn. The Settings page offers these; `Auto` uses what the terminal answered
-/// at startup.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ImageProtocol {
     #[default]
@@ -42,14 +30,12 @@ pub enum ImageProtocol {
     Kitty,
     Sixel,
     Iterm2,
-    /// Two colored pixels per cell, in any terminal.
     Blocks,
 }
 
 impl ImageProtocol {
     pub const ALL: [Self; 5] = [Self::Auto, Self::Kitty, Self::Sixel, Self::Iterm2, Self::Blocks];
 
-    /// The name to show for it.
     pub fn label(self) -> &'static str {
         match self {
             Self::Auto => "Auto",
@@ -60,7 +46,6 @@ impl ImageProtocol {
         }
     }
 
-    /// `TUNEBOX_IMAGES` set to `auto`, `kitty`, `sixel`, `iterm2` or `blocks`.
     pub fn from_env() -> Option<Self> {
         Self::parse(&std::env::var("TUNEBOX_IMAGES").ok()?)
     }
@@ -79,30 +64,20 @@ impl ImageProtocol {
     }
 }
 
-/// What the terminal said about images at startup, kept so that the protocol can change later
-/// without asking again. Its colors come with the same answer.
 #[derive(Clone)]
 pub struct ImageTerminal {
     picker: Picker,
-    /// What `Auto` draws with.
     auto: ProtocolType,
     colors: Option<TerminalColors>,
 }
 
 impl ImageTerminal {
-    /// Asks the terminal how it shows images, how big its cells are and what its colors are.
-    /// Must run after entering the alternate screen and before reading input events.
-    ///
-    /// When `TUNEBOX_IMAGES` forces a protocol, nothing is asked and cells are taken as 10×22 px:
-    /// that is for measuring a protocol where the terminal cannot answer, like tmux in tests.
     pub fn detect() -> Self {
         if ImageProtocol::from_env().is_some_and(|forced| forced != ImageProtocol::Auto) {
-            // Deprecated because a guessed font size draws images at the wrong size; fine here.
             #[allow(deprecated)]
             let picker = Picker::from_fontsize(FontSize { width: 10, height: 22 });
             return Self { picker, auto: ProtocolType::Halfblocks, colors: None };
         }
-        // The colors are in the same question, so they take no extra time.
         let options = QueryStdioOptions {
             terminal_background_color_osc: true,
             terminal_foreground_color_osc: true,
@@ -130,23 +105,19 @@ impl ImageTerminal {
         Self { picker, auto, colors }
     }
 
-    /// Half blocks, without asking a terminal, for tests.
     #[cfg(test)]
     pub fn halfblocks() -> Self {
         Self { picker: Picker::halfblocks(), auto: ProtocolType::Halfblocks, colors: None }
     }
 
-    /// The terminal's background and text colors, if it told them.
     pub fn colors(&self) -> Option<TerminalColors> {
         self.colors
     }
 
-    /// What `Auto` draws with in this terminal.
     pub fn auto(&self) -> ImageProtocol {
         ImageProtocol::of(self.auto)
     }
 
-    /// A picker that draws with `protocol`.
     pub fn picker(&self, protocol: ImageProtocol) -> Picker {
         let mut picker = self.picker.clone();
         picker.set_protocol_type(match protocol {
@@ -160,68 +131,47 @@ impl ImageTerminal {
     }
 }
 
-/// Where tunebox runs, as far as images go.
 #[derive(Clone, Copy, Default)]
 struct Host {
     tmux: bool,
-    /// Konsole, which told its cell size.
     konsole: bool,
     vscode: bool,
 }
 
-/// What `Auto` draws with, given the protocol the terminal answered with.
 fn auto_protocol(answered: ProtocolType, host: Host) -> ProtocolType {
     match answered {
-        // tmux keeps ten Sixel images at most and drops one as soon as text touches it, and it
-        // cannot place images it passes through: covers would come and go. Kitty images are
-        // cells, which tmux keeps like text.
         ProtocolType::Sixel | ProtocolType::Iterm2 if host.tmux => ProtocolType::Halfblocks,
-        // VS Code answers with Sixel when images are on in its settings; iTerm2 is only
-        // ratatui-image's guess from its name, and shows nothing while they are off.
         ProtocolType::Iterm2 if host.vscode => ProtocolType::Halfblocks,
-        // ratatui-image passes over Konsole's Sixel and Kitty, which leave traces, but has no
-        // way to tell its iTerm2 images apart.
         ProtocolType::Halfblocks if host.konsole && !host.tmux => ProtocolType::Iterm2,
         other => other,
     }
 }
 
-/// Numbers every inline image, so that one is never mistaken for another drawn at the same place.
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-/// A Sixel or iTerm2 image, encoded once, that can be drawn from any of its rows to any other.
 pub struct Inline {
     id: u64,
-    /// In cells.
     size: Size,
     font_height: u16,
     data: InlineData,
 }
 
 enum InlineData {
-    /// One image whose bands of six pixel rows can be left out at either end.
     Sixel {
-        /// The introducer and raster attributes up to the height, which depends on the bands drawn.
         start: String,
         palette: String,
         bands: String,
-        /// Where each band ends in `bands`, including its `-`.
         ends: Vec<usize>,
     },
-    /// A PNG per row of cells; an iTerm2 image cannot be cut.
     Iterm2 { rows: Vec<String> },
 }
 
 impl Inline {
-    /// Encodes `image` to fit `size` cells, in proportion, at the top left.
     pub fn new(kind: ProtocolType, image: &DynamicImage, size: Size, font: FontSize, tmux: bool) -> Result<Self> {
         let (width, height) = (u32::from(font.width), u32::from(font.height));
-        // Fill the cells exactly, so artwork and its gradient placeholder cover the same rows.
-        // Triangle (bilinear) is several times faster than Lanczos and looks the same shrinking.
         let fitted =
             image.resize_exact(u32::from(size.width) * width, u32::from(size.height) * height, FilterType::Triangle);
         let size = Size::new(fitted.width().div_ceil(width) as u16, fitted.height().div_ceil(height) as u16);
-        // Whole cells, so that rows are as tall as cells; the rest stays transparent.
         let mut canvas = RgbaImage::new(u32::from(size.width) * width, u32::from(size.height) * height);
         image::imageops::overlay(&mut canvas, &fitted.to_rgba8(), 0, 0);
         let data = match kind {
@@ -243,7 +193,6 @@ impl Inline {
         }
     }
 
-    /// Memory the encoded image takes.
     #[cfg(test)]
     pub fn bytes(&self) -> usize {
         match &self.data {
@@ -254,13 +203,9 @@ impl Inline {
         }
     }
 
-    /// Writes what draws `rows` of the image with the first of them at `(x, y)`.
     fn draw(&self, out: &mut Vec<u8>, (x, y): (u16, u16), rows: Range<u16>) -> io::Result<()> {
         match &self.data {
             InlineData::Sixel { start, palette, bands, ends } => {
-                // Bands are six pixels, rows as tall as the font: start at the first band that
-                // begins in the top row and stop before one that would reach past the bottom
-                // row. A few pixels of the image may go missing; none is drawn outside its rows.
                 let height = usize::from(self.font_height);
                 let first = (usize::from(rows.start) * height).div_ceil(6);
                 let last = (usize::from(rows.end) * height / 6).min(ends.len());
@@ -285,14 +230,11 @@ impl Inline {
     }
 }
 
-/// Encodes a Sixel image and splits it into its bands.
 fn sixel(image: &RgbaImage) -> Result<InlineData> {
     let (width, height) = image.dimensions();
     let options = icy_sixel::EncodeOptions::default();
     let data = icy_sixel::sixel_encode(image.as_raw(), width as usize, height as usize, &options)
         .map_err(|err| anyhow::anyhow!("sixel: {err}"))?;
-    // `ESC P … q "pan;pad;width;height`, then the palette (`#n;2;r;g;b` each), then the bands,
-    // each ending in `-`, then `ESC \`.
     let Some(body) = data.strip_suffix("\x1b\\") else { bail!("sixel: no string terminator") };
     let Some(raster) = body.find('"') else { bail!("sixel: no raster attributes") };
     let Some(palette_at) = body[raster..].find('#').map(|at| raster + at) else { bail!("sixel: no colors") };
@@ -308,8 +250,6 @@ fn sixel(image: &RgbaImage) -> Result<InlineData> {
     })
 }
 
-/// Where the color definitions starting at `at` end: at the first `#n` that selects a color
-/// rather than defining one.
 fn palette_end(body: &str, mut at: usize) -> usize {
     let bytes = body.as_bytes();
     while bytes.get(at) == Some(&b'#') {
@@ -323,8 +263,6 @@ fn palette_end(body: &str, mut at: usize) -> usize {
     at
 }
 
-/// One iTerm2 image per row of cells, each stretched over exactly its cells, so that a terminal
-/// whose cells are not the size tunebox was told still shows rows that line up.
 fn iterm2_rows(image: &RgbaImage, columns: u16, row_height: u32, tmux: bool) -> Result<Vec<String>> {
     let (width, height) = image.dimensions();
     let mut rows = Vec::new();
@@ -337,16 +275,13 @@ fn iterm2_rows(image: &RgbaImage, columns: u16, row_height: u32, tmux: bool) -> 
             png.len(),
             STANDARD.encode(&png),
         );
-        // tmux has no iTerm2 images of its own; they pass through to the terminal around it.
         rows.push(if tmux { format!("\x1bPtmux;{}\x1b\\", sequence.replace('\x1b', "\x1b\x1b")) } else { sequence });
     }
     Ok(rows)
 }
 
-/// Writes the Sixel and iTerm2 images of each frame, after ratatui has written the text.
 #[derive(Default)]
 pub struct InlineLayer {
-    /// The images of the last frame.
     shown: Vec<Shown>,
     screen: Rect,
     pending: Vec<Pending>,
@@ -356,11 +291,9 @@ struct Shown {
     id: u64,
     area: Rect,
     skip: u16,
-    /// For each cell of `area`, row by row, whether it showed the image.
     cells: Vec<bool>,
 }
 
-/// An image to write after the frame, and the cells drawn over it, which go on top again.
 struct Pending {
     blank: Vec<(u16, u16, Cell)>,
     image: Vec<u8>,
@@ -368,11 +301,7 @@ struct Pending {
 }
 
 impl InlineLayer {
-    /// Keeps ratatui away from the cells that show an image and finds the images to write: new
-    /// ones, moved ones, and ones with cells that something covered in the last frame. Called
-    /// once the frame is drawn, before ratatui writes it.
     pub fn prepare(&mut self, buf: &mut Buffer, placements: &[Placement]) {
-        // A resize clears the screen.
         if buf.area != self.screen {
             self.screen = buf.area;
             self.shown.clear();
@@ -389,7 +318,6 @@ impl InlineLayer {
                 if showing {
                     cell.set_diff_option(CellDiffOption::Skip);
                 } else if cell.diff_option == CellDiffOption::Skip {
-                    // Drawn over without being cleared, like a play button: ratatui writes it.
                     cell.set_diff_option(CellDiffOption::None);
                 }
                 cells.push(showing);
@@ -420,9 +348,6 @@ impl InlineLayer {
         self.shown = shown;
     }
 
-    /// Writes the images found by [`InlineLayer::prepare`], once ratatui has written the frame.
-    /// Their cells are blanked first, so that see-through parts show the background rather than
-    /// what was there before, and what was drawn over an image goes back on top of it.
     pub fn write<W: Write>(&mut self, backend: &mut CrosstermBackend<W>) -> io::Result<()> {
         for pending in self.pending.drain(..) {
             backend.draw(pending.blank.iter().map(|(x, y, cell)| (*x, *y, cell)))?;
@@ -492,7 +417,6 @@ mod tests {
         assert_eq!(auto_protocol(Iterm2, vscode), Halfblocks);
     }
 
-    /// An image in two colors: red on top, blue below.
     fn two_tone(width: u32, height: u32) -> DynamicImage {
         let image = RgbaImage::from_fn(width, height, |_, y| {
             if y < height / 2 { image::Rgba([255, 0, 0, 255]) } else { image::Rgba([0, 0, 255, 255]) }
@@ -500,7 +424,6 @@ mod tests {
         image.into()
     }
 
-    /// The images written in `bytes`, decoded: their width and height in pixels.
     fn sixels(bytes: &[u8]) -> Vec<(usize, usize)> {
         let text = String::from_utf8_lossy(bytes);
         text.match_indices("\x1bP")
@@ -514,7 +437,6 @@ mod tests {
 
     #[test]
     fn a_sixel_image_is_cut_to_whole_bands_inside_its_rows() {
-        // 3×3 cells of 10×20 px: 30×60 px, ten bands.
         let inline = Inline::new(ProtocolType::Sixel, &two_tone(30, 60), Size::new(3, 3), FONT, false).unwrap();
         assert_eq!(inline.size(), Size::new(3, 3));
         let draw = |rows| {
@@ -523,9 +445,7 @@ mod tests {
             sixels(&out)
         };
         assert_eq!(draw(0..3), [(30, 60)]);
-        // Row 1 starts at pixel 20, inside band 3: drawing starts with band 4, at pixel 24.
         assert_eq!(draw(1..3), [(30, 36)]);
-        // Row 1 ends at pixel 40, inside band 6, which is left out.
         assert_eq!(draw(0..2), [(30, 36)]);
         assert_eq!(draw(1..2), [(30, 12)]);
     }
@@ -537,7 +457,6 @@ mod tests {
         inline.draw(&mut out, (0, 0), 2..3).unwrap();
         let start = out.windows(2).position(|pair| pair == b"\x1bP").unwrap();
         let image = icy_sixel::SixelImage::decode(&out[start..]).unwrap();
-        // The bottom row is all blue.
         assert!(image.pixels.chunks(4).all(|pixel| pixel[..3] == [0, 0, 255]));
     }
 
@@ -558,7 +477,6 @@ mod tests {
         assert!(text.contains("\x1bPtmux;\x1b\x1b]1337;File="));
     }
 
-    /// What the terminal is sent.
     #[derive(Clone, Default)]
     struct Capture(std::rc::Rc<std::cell::RefCell<Vec<u8>>>);
 
@@ -573,7 +491,6 @@ mod tests {
         }
     }
 
-    /// Draws frames the way tunebox does, and returns what each one writes to the terminal.
     struct Screen {
         terminal: Terminal<CrosstermBackend<Capture>>,
         sent: Capture,
@@ -589,8 +506,6 @@ mod tests {
             Self { terminal, sent, layer: InlineLayer::default() }
         }
 
-        /// Draws `covers` with their top-left corners at the given cells (a negative row is
-        /// above the content area, which starts at row 2), then `over` on top.
         fn frame(&mut self, covers: &[(&Picture, (u16, i32))], over: impl FnOnce(&mut Buffer)) -> Vec<u8> {
             self.sent.0.borrow_mut().clear();
             let layer = &mut self.layer;
@@ -627,10 +542,8 @@ mod tests {
         let both = [(&a, (2, 3)), (&b, (12, 3))];
         assert_eq!(images(&screen.frame(&both, |_| {})), 2);
         assert_eq!(images(&screen.frame(&both, |_| {})), 0);
-        // Recoloring the cells, as a page fade does, changes nothing.
         let fade = |buf: &mut Buffer| buf.set_style(buf.area, Style::new().bg(ratatui::style::Color::Rgb(1, 2, 3)));
         assert_eq!(images(&screen.frame(&both, fade)), 0);
-        // A new cover comes alone.
         let c = picture(ProtocolType::Sixel);
         assert_eq!(images(&screen.frame(&[(&a, (2, 3)), (&b, (12, 3)), (&c, (22, 3))], |_| {})), 1);
     }
@@ -641,7 +554,6 @@ mod tests {
         let mut screen = Screen::new();
         let covers = [(&a, (2, 3))];
         screen.frame(&covers, |_| {});
-        // A menu over the right half of the cover: its text is written, the cover is not.
         let menu = |buf: &mut Buffer| {
             let popup = Rect::new(4, 4, 20, 3);
             Clear.render(popup, buf);
@@ -649,10 +561,8 @@ mod tests {
         };
         let out = screen.frame(&covers, menu);
         assert_eq!(images(&out), 0);
-        // Cells left as they were are skipped, so the words come apart.
         assert!(String::from_utf8_lossy(&out).contains("Add"));
         assert_eq!(images(&screen.frame(&covers, menu)), 0);
-        // Closed: the cover is written again over what the menu left.
         assert_eq!(images(&screen.frame(&covers, |_| {})), 1);
         assert_eq!(images(&screen.frame(&covers, |_| {})), 0);
     }
@@ -662,15 +572,12 @@ mod tests {
         let a = picture(ProtocolType::Sixel);
         let mut screen = Screen::new();
         let button = |buf: &mut Buffer| buf.set_string(4, 5, " ▶ ", Style::new());
-        // Hovered as it appears: the image first, then the button over it.
         let out = String::from_utf8(screen.frame(&[(&a, (2, 3))], button)).unwrap();
         let (image, play) = (out.find("\x1bP").unwrap(), out.rfind('▶').unwrap());
         assert!(image < play);
-        // The mouse leaves: the cover is written again, without the button.
         let out = screen.frame(&[(&a, (2, 3))], |_| {});
         assert_eq!(images(&out), 1);
         assert!(!String::from_utf8_lossy(&out).contains('▶'));
-        // And comes back: only the button is written.
         let out = screen.frame(&[(&a, (2, 3))], button);
         assert_eq!(images(&out), 0);
         assert!(String::from_utf8_lossy(&out).contains('▶'));
@@ -681,12 +588,10 @@ mod tests {
         let a = picture(ProtocolType::Sixel);
         let mut screen = Screen::new();
         screen.frame(&[(&a, (2, 3))], |_| {});
-        // One row above the content area, which starts at row 2.
         let out = screen.frame(&[(&a, (2, 1))], |_| {});
         assert_eq!(sixels(&out), [(60, 36)]);
         let text = String::from_utf8_lossy(&out);
         assert!(text.contains("\x1b[3;3H\x1bP"), "drawn from the first visible row");
-        // Scrolled out entirely: nothing to write.
         assert_eq!(images(&screen.frame(&[(&a, (2, -2))], |_| {})), 0);
     }
 
@@ -708,8 +613,6 @@ mod tests {
         assert_eq!(placed.map(|p| p.area), Some(Rect::new(0, 17, 6, 2)));
     }
 
-    /// Encode time and size of real covers, from the image cache:
-    /// `cargo test -p tunebox-tui --release measure_covers -- --ignored --nocapture`.
     #[test]
     #[ignore]
     fn measure_covers() {
@@ -721,7 +624,6 @@ mod tests {
             .take(20)
             .collect();
         let font = FontSize { width: 10, height: 22 };
-        // A Home card, the player bar, and Now Playing in a large window.
         for size in [Size::new(14, 7), Size::new(8, 3), Size::new(60, 27)] {
             for kind in [ProtocolType::Sixel, ProtocolType::Iterm2] {
                 let start = Instant::now();

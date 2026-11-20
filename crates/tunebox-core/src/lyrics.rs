@@ -1,4 +1,3 @@
-//! Song lyrics, and LRCLIB, which has them for most songs of any service.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -8,10 +7,8 @@ const LRCLIB: &str = "https://lrclib.net/api/get";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Lyrics {
-    /// Whether lines carry real timestamps.
     pub synced: bool,
     pub lines: Vec<LyricLine>,
-    /// Who provides the text, e.g. "Musixmatch" or "LRCLIB".
     pub provider: String,
 }
 
@@ -22,7 +19,6 @@ pub struct LyricLine {
 }
 
 impl Lyrics {
-    /// Index of the line being sung at `position_ms`.
     pub fn current_line(&self, position_ms: u32) -> Option<usize> {
         if !self.synced {
             return None;
@@ -39,7 +35,6 @@ pub struct LyricsQuery<'a> {
     pub duration_ms: u32,
 }
 
-/// Lyrics from LRCLIB, found by title, artist, album and length; `None` when it has none.
 pub async fn lrclib(http: &reqwest::Client, query: &LyricsQuery<'_>) -> Result<Option<Lyrics>> {
     let duration = (query.duration_ms / 1000).to_string();
     let response = http
@@ -52,7 +47,6 @@ pub async fn lrclib(http: &reqwest::Client, query: &LyricsQuery<'_>) -> Result<O
         ])
         .send()
         .await?;
-    // LRCLIB answers "not found" with 503 at times.
     if matches!(response.status(), reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::SERVICE_UNAVAILABLE) {
         return Ok(None);
     }
@@ -68,7 +62,6 @@ pub async fn lrclib(http: &reqwest::Client, query: &LyricsQuery<'_>) -> Result<O
     }))
 }
 
-/// Parses `[mm:ss.xx] text` lines; a line may carry several timestamps.
 fn parse_lrc(lrc: &str) -> Vec<LyricLine> {
     let mut lines = Vec::new();
     for raw in lrc.lines() {

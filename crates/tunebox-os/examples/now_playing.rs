@@ -1,12 +1,3 @@
-//! Shows a made-up track in the system's media controls and prints each request that arrives,
-//! for trying the integration without Spotify:
-//!
-//! ```sh
-//! cargo run -p tunebox-os --example now_playing [--paused] [--youtube] [--title <title>] [cover.jpg]
-//! ```
-//!
-//! On Linux, `playerctl -p tunebox play-pause` or `busctl --user call org.mpris.MediaPlayer2.tunebox
-//! /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Seek x 10000000` send requests too.
 
 use std::{sync::Arc, time::Duration};
 

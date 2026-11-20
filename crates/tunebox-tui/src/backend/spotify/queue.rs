@@ -1,6 +1,3 @@
-//! What plays next on a Spotify Connect device, from the player state Spotify pushes about it.
-//! The state holds the songs the user queued and the rest of the context in one list of next
-//! tracks, and tells them apart by who put each one there.
 
 use librespot::protocol::player::{PlayerState, ProvidedTrack};
 
@@ -9,7 +6,6 @@ use crate::{
     queue::{Queue, Upcoming, upcoming},
 };
 
-/// The lists as Spotify's player state had them, which changing the queue sends back.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Listed {
     pub next: Vec<ProvidedTrack>,
@@ -18,7 +14,6 @@ pub struct Listed {
 }
 
 impl Listed {
-    /// The lists to send back to Spotify without `entry`, if it came from them.
     pub fn without(&self, entry: &Upcoming) -> Option<Listed> {
         let index = self.next.iter().position(|t| t.uid == entry.uid && t.uri == entry.uri)?;
         let mut next = self.next.clone();
@@ -27,7 +22,6 @@ impl Listed {
     }
 }
 
-/// From the player state Spotify pushes about the device that plays.
 pub fn from_player_state(state: &PlayerState) -> Queue {
     Queue {
         current: Some(state.track.uri.clone()).filter(|uri| !uri.is_empty()),
@@ -94,14 +88,12 @@ mod tests {
             ["spotify:track:b", "spotify:track:c", "spotify:track:d"]
         );
         assert_eq!(uris(queue.after(Some("spotify:track:c"))), ["spotify:track:d"]);
-        // A track from elsewhere: the list says nothing about what follows it.
         assert!(queue.after(Some("spotify:track:z")).is_empty());
         assert!(!queue.knows("spotify:track:z"));
     }
 
     #[test]
     fn a_listing_keeps_known_queued_songs_queued() {
-        // After shuffling, the queued songs lead as before and the rest comes in a new order.
         let queue = from_player_state(&state());
         let listing = ["spotify:track:a", "spotify:track:b", "spotify:track:f", "spotify:track:c"];
         let listed =
@@ -109,7 +101,6 @@ mod tests {
         let providers: Vec<_> = listed.next.iter().map(|t| t.provider).collect();
         assert_eq!(providers, [Provider::Queue, Provider::Queue, Provider::Context, Provider::Context]);
         assert_eq!(listed.context_name.as_deref(), Some("Late Night Coding"));
-        // Nothing known: nothing to sort by.
         let fresh = Queue::default().with_listing("spotify:track:x", String::new(), vec!["spotify:track:a".into()]);
         assert_eq!(fresh.next[0].provider, Provider::Unknown);
     }
@@ -121,7 +112,6 @@ mod tests {
         let uids: Vec<_> = listed.next.iter().map(|t| t.uid.as_str()).collect();
         assert_eq!(uids, ["q0", "delimiter0", "c3", "c4", "c5"]);
         assert_eq!(listed.revision, "7");
-        // Entries the player reported itself aren't Spotify's to send back.
         assert!(Queue::from_player(String::new(), None, &[]).without(&queue.next[0]).is_none());
     }
 }

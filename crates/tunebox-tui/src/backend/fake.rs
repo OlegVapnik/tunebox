@@ -1,7 +1,3 @@
-//! A music service for tests. It stands in for Spotify or YouTube Music with a small made-up
-//! catalog, and its player does what it is told at once, reporting it in the order YouTube
-//! Music's player does. Tests keep a [`Fake`] to read the commands it got and to send what a
-//! real player would, like a lost connection or a refused song.
 
 use std::{
     collections::HashSet,
@@ -39,7 +35,6 @@ struct State {
     prefetches: Vec<String>,
     liked: HashSet<String>,
     playing: Option<Playing>,
-    /// Home fails to load from now on.
     home_down: bool,
 }
 
@@ -48,7 +43,6 @@ struct Playing {
     tracks: Vec<Track>,
     index: usize,
     queued: Vec<Track>,
-    /// Where the track was when it last started, paused or seeked, and since when it plays on.
     position_ms: u32,
     since: Option<Instant>,
 }
@@ -79,34 +73,27 @@ impl Fake {
         self.0.state.lock().unwrap()
     }
 
-    // ── For tests ────────────────────────────────────────────────────────────────────────
 
-    /// The player is up, as a real one says once it has connected.
     pub fn connect(&self) {
         let _ = self.0.tx.send(AppEvent::PlayerReady(Box::new(Player::Fake(self.clone()))));
     }
 
-    /// The player's connection dropped.
     pub fn lose_connection(&self) {
         let _ = self.0.tx.send(AppEvent::PlayerLost(self.0.service));
     }
 
-    /// Home fails to load from now on, as when the service doesn't answer.
     pub fn take_home_down(&self) {
         self.state().home_down = true;
     }
 
-    /// Sends what a real player would report.
     pub fn send(&self, event: PlayerEvent) {
         let _ = self.0.tx.send(AppEvent::Player(self.0.service, event));
     }
 
-    /// The commands the player and the catalog got, oldest first.
     pub fn commands(&self) -> Vec<String> {
         self.state().commands.clone()
     }
 
-    /// Goes on to the next track where the one playing has ended, as time passes.
     pub fn catch_up(&self) {
         let ended = self
             .state()
@@ -118,7 +105,6 @@ impl Fake {
         }
     }
 
-    // ── Player ───────────────────────────────────────────────────────────────────────────
 
     fn record(&self, command: String) {
         self.state().commands.push(command);
@@ -147,7 +133,6 @@ impl Fake {
         Ok(())
     }
 
-    /// Reports the track that plays now, from its start or where it was left.
     fn announce_track(&self) {
         let (track, position_ms, queue) = {
             let state = self.state();
@@ -198,13 +183,11 @@ impl Fake {
         self.start(context_uri, track_uri.as_deref(), 0)
     }
 
-    /// Records the stream the app resolves ahead of time, like the real players' prefetch.
     pub fn prefetch(&self, uri: &str) -> Result<()> {
         self.state().prefetches.push(uri.to_owned());
         Ok(())
     }
 
-    /// Streams resolved ahead of time, separately from the commands that change playback.
     pub fn prefetches(&self) -> Vec<String> {
         self.state().prefetches.clone()
     }
@@ -317,14 +300,11 @@ impl Fake {
         self.record("shutdown".into());
     }
 
-    // ── Catalog ──────────────────────────────────────────────────────────────────────────
 
     pub async fn me(&self) -> Result<User> {
         Ok(User { id: "tester".into(), name: "Tester".into(), product: None })
     }
 
-    /// A shelf of cards, and on YouTube Music chips and Quick picks too. A chip's Home has a
-    /// shelf named after it.
     pub async fn home(&self, chip: Option<&str>) -> Result<Home> {
         if self.state().home_down {
             bail!("The fake's Home is down");
@@ -473,7 +453,6 @@ impl Fake {
         stream::iter([Found { asked: uris, tracks, reached: true }]).boxed()
     }
 
-    /// Spotify's Web API lists what plays next; YouTube Music's player only says it itself.
     pub async fn upcoming(&self) -> Result<Vec<Track>> {
         if self.0.service == Service::YouTubeMusic {
             bail!("YouTube Music's player says what plays next itself");
@@ -483,7 +462,6 @@ impl Fake {
     }
 }
 
-/// The fake as a catalog, whose songs added to the queue go to its player.
 #[derive(Clone)]
 pub struct Catalog(pub Fake);
 
@@ -526,12 +504,7 @@ fn current(track: &Track) -> CurrentTrack {
     }
 }
 
-// ── The catalog ──────────────────────────────────────────────────────────────────────────────
-//
-// Every service has the same album of five songs and playlist of four, named after it, so a
-// screen shows which service a song came from.
 
-/// How long every fake song lasts.
 pub const SONG: Duration = Duration::from_secs(180);
 
 fn album(service: Service) -> AlbumInfo {

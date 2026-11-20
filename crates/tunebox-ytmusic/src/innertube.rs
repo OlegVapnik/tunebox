@@ -1,6 +1,3 @@
-//! InnerTube, the API music.youtube.com itself talks to: JSON in, deeply nested renderers out.
-//! Signed out, every request is anonymous; signed in, it carries the browser's cookies, the
-//! SAPISIDHASH signature that goes with them, and which of the browser's accounts it acts as.
 
 use std::{
     sync::Mutex,
@@ -21,34 +18,24 @@ use crate::{
 pub(crate) const ORIGIN: &str = "https://music.youtube.com";
 const HOST: &str = "music.youtube.com";
 const API: &str = "https://music.youtube.com/youtubei/v1/";
-/// The web client only answers browsers with its full layout, so requests look like Chrome's.
 const BROWSER: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-/// The Android app's client gets time-synced lyrics; the web client only plain text.
 const ANDROID_VERSION: &str = "7.21.50";
 const ANDROID_AGENT: &str = "com.google.android.apps.youtube.music/7.21.50 (Linux; U; Android 14) gzip";
-/// Tries per request, including the first.
 const MAX_ATTEMPTS: u32 = 3;
 const RETRY_DELAY: Duration = Duration::from_millis(400);
-/// Cookie updates YouTube sends are written back at most this often.
 const SAVE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ClientKind {
-    /// `WEB_REMIX`, what music.youtube.com uses.
     Web,
-    /// `ANDROID_MUSIC`, only for lyrics.
     Android,
 }
 
 pub(crate) struct InnerTube {
     http: reqwest::Client,
-    /// The web client's version. YouTube accepts any recent one, so it follows the date the
-    /// way the site's own version does.
     version: String,
     gl: Option<String>,
-    /// YouTube's ID for this anonymous or signed-in visitor. Continuations only work when
-    /// they come with the visitor that got the first page.
     visitor: Mutex<Option<String>>,
     auth: Mutex<Option<Auth>>,
 }
@@ -56,16 +43,12 @@ pub(crate) struct InnerTube {
 struct Auth {
     jar: Jar,
     identity: Identity,
-    /// Where the cookies are kept; `None` for a sign-in that isn't kept, or no longer is.
     store: Option<Stored>,
-    /// The browser's yt-dlp name, to read the sign-in from it again when YouTube stops
-    /// taking the cookies; `None` for one pasted or saved by an older tunebox.
     browser: Option<String>,
     dirty: bool,
     saved: Instant,
 }
 
-/// The kept sign-in, and what it held when this client read or last wrote it.
 struct Stored {
     secret: Secret,
     bytes: Vec<u8>,
@@ -82,8 +65,6 @@ impl InnerTube {
         Self::with_auth(auth)
     }
 
-    /// Signed in with cookies that aren't kept, to try them before they are. They act as the
-    /// browser's first account until `set_identity` picks another.
     pub fn unsaved(jar: Jar) -> Result<Self> {
         Self::with_auth(signed_in(&jar).then(|| Auth::new(jar, Identity::default(), None, None)))
     }
@@ -97,23 +78,18 @@ impl InnerTube {
         self.auth.lock().unwrap().is_some()
     }
 
-    /// The account the sign-in acts as; `None` signed out.
     pub fn identity(&self) -> Option<Identity> {
         self.auth.lock().unwrap().as_ref().map(|auth| auth.identity.clone())
     }
 
-    /// Acts as another of the browser's accounts from now on, and keeps it with the cookies.
     pub fn set_identity(&self, identity: Identity) {
         if let Some(auth) = self.auth.lock().unwrap().as_mut() {
             auth.dirty |= auth.identity != identity;
             auth.identity = identity;
         }
-        // The visitor YouTube gave the account before isn't this one's.
         *self.visitor.lock().unwrap() = None;
     }
 
-    /// Keeps a sign-in read from the browser again, in place of the stored one; `text` is one
-    /// as [`Auth::text`] writes, cookies with their account notes and the browser's name.
     pub fn replace_sign_in(&self, text: &str) {
         if let Some(auth) = self.auth.lock().unwrap().as_mut() {
             auth.jar = Jar::parse(text);
@@ -122,14 +98,12 @@ impl InnerTube {
             auth.browser = browser;
             auth.dirty = true;
             if let Some(stored) = auth.store.as_mut() {
-                // The file holds it already; writing it again would only churn the disk.
                 stored.bytes = text.as_bytes().to_vec();
             }
         }
         *self.visitor.lock().unwrap() = None;
     }
 
-    /// Calls an endpoint, e.g. `browse` or `music/get_queue`, as the web client.
     pub async fn call(&self, endpoint: &str, body: Value) -> Result<Value> {
         self.call_as(ClientKind::Web, endpoint, body).await
     }
@@ -138,7 +112,6 @@ impl InnerTube {
         self.call("browse", json!({ "browseId": browse_id })).await
     }
 
-    /// The next page of a list, from the token the page before ended with.
     pub async fn continuation(&self, endpoint: &str, token: &str) -> Result<Value> {
         self.call(endpoint, json!({ "continuation": token })).await
     }
@@ -147,7 +120,6 @@ impl InnerTube {
         self.call_with(kind, None, endpoint, body).await
     }
 
-    /// Calls an endpoint as the web client, acting as `identity` for this request only.
     pub async fn call_as_identity(&self, identity: &Identity, endpoint: &str, body: Value) -> Result<Value> {
         self.call_with(ClientKind::Web, Some(identity), endpoint, body).await
     }
@@ -212,7 +184,6 @@ impl InnerTube {
         if value.is_null() {
             return Err(Failure::Retry(anyhow::anyhow!("YouTube Music sent no JSON ({endpoint})")));
         }
-        // The Android client's visitor is one of its own, as is that of another account.
         let own = kind == ClientKind::Web && identity == self.identity();
         if let Some(visitor) = value.pointer("/responseContext/visitorData").and_then(Value::as_str).filter(|_| own) {
             let mut current = self.visitor.lock().unwrap();
@@ -248,8 +219,6 @@ impl InnerTube {
         json!({ "client": client, "user": user })
     }
 
-    /// The headers of a request acting as `identity`, which is the sign-in's own unless one is
-    /// asked for. Signed out, there is none.
     fn headers(&self, kind: ClientKind, identity: Option<&Identity>) -> Vec<(&'static str, String)> {
         let mut headers = vec![("Origin", ORIGIN.to_owned()), ("X-Origin", ORIGIN.to_owned())];
         match kind {
@@ -278,13 +247,11 @@ impl InnerTube {
                     headers.push(("X-Goog-PageId", page_id.clone()));
                 }
             }
-            // Accepts YouTube's cookie consent, which Europe would otherwise ask for first.
             None => headers.push(("Cookie", "SOCS=CAI".into())),
         }
         headers
     }
 
-    /// Keeps the cookies YouTube refreshes, as the browser would, so the sign-in stays valid.
     fn keep_cookies(&self, headers: &HeaderMap) {
         let mut auth = self.auth.lock().unwrap();
         let Some(auth) = auth.as_mut() else { return };
@@ -298,32 +265,25 @@ impl InnerTube {
         }
     }
 
-    /// Writes cookie updates that are still waiting for the next save.
     pub fn flush(&self) {
         if let Some(auth) = self.auth.lock().unwrap().as_mut().filter(|auth| auth.dirty) {
             auth.save();
         }
     }
 
-    /// The cookies as they are now, with what YouTube refreshed; `None` signed out.
     #[cfg(test)]
     pub fn jar(&self) -> Option<Jar> {
         self.auth.lock().unwrap().as_ref().map(|auth| auth.jar.clone())
     }
 
-    /// The sign-in as it is kept: the cookies as they are now, and the account they act as.
-    /// `None` signed out.
     pub fn sign_in_text(&self) -> Option<String> {
         self.auth.lock().unwrap().as_ref().map(Auth::text)
     }
 
-    /// The browser the sign-in came from, as yt-dlp names it; `None` when it isn't known, as
-    /// for a pasted sign-in or one saved by an older tunebox.
     pub fn browser(&self) -> Option<String> {
         self.auth.lock().unwrap().as_ref().and_then(|auth| auth.browser.clone())
     }
 
-    /// Remembers where the sign-in came from, so it can be read again later.
     pub fn set_browser(&self, browser: Option<String>) {
         if let Some(auth) = self.auth.lock().unwrap().as_mut() {
             auth.dirty |= auth.browser != browser;
@@ -337,7 +297,6 @@ impl Auth {
         Self { jar, identity, store, browser, dirty: false, saved: Instant::now() }
     }
 
-    /// The `cookies.txt` it is kept as, with the account and the browser in comments at the end.
     fn text(&self) -> String {
         let mut text = self.jar.to_text() + &self.identity.notes();
         if let Some(browser) = &self.browser {
@@ -348,9 +307,6 @@ impl Auth {
         text
     }
 
-    /// Writes the cookies back, unless the sign-in was replaced or removed since this client
-    /// read it, by `tunebox login` or `logout`: that one stays, and this client keeps its
-    /// cookies to itself from then on.
     fn save(&mut self) {
         self.dirty = false;
         self.saved = Instant::now();
@@ -381,7 +337,6 @@ impl Drop for InnerTube {
     }
 }
 
-/// YouTube said no, e.g. 404 for a song it doesn't know.
 #[derive(Debug)]
 pub(crate) struct ApiError {
     pub status: StatusCode,
@@ -397,24 +352,19 @@ impl std::fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {}
 
-/// The status YouTube answered with, if the error is YouTube's.
 pub(crate) fn status(err: &anyhow::Error) -> Option<StatusCode> {
     err.chain().find_map(|cause| cause.downcast_ref::<ApiError>()).map(|err| err.status)
 }
 
 enum Failure {
-    /// Worth another try: the network, or YouTube having a moment.
     Retry(anyhow::Error),
     Fatal(anyhow::Error),
 }
 
-/// The cookie the signature is made from: `SAPISID`, or its newer secure twin.
 pub(crate) fn sapisid(jar: &Jar) -> Option<&str> {
     jar.get("SAPISID").or_else(|| jar.get("__Secure-3PAPISID"))
 }
 
-/// `SAPISIDHASH <time>_<sha1("<time> <SAPISID> <origin>")>`, which YouTube checks against the
-/// cookies of a signed-in request.
 pub(crate) fn sapisid_hash(sapisid: &str, time: u64, origin: &str) -> String {
     let digest = Sha1::digest(format!("{time} {sapisid} {origin}").as_bytes());
     let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
@@ -425,14 +375,11 @@ fn unix_time() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-/// `1.YYYYMMDD.01.00` for yesterday, which is what the site's own version looks like.
 fn web_version() -> String {
     let (year, month, day) = cookies::civil_from_days(unix_time() / 86_400 - 1);
     format!("1.{year}{month:02}{day:02}.01.00")
 }
 
-/// The country from the locale, e.g. `DE` for `de_DE.UTF-8`, so charts and new releases are
-/// the user's. Without one, YouTube goes by the IP address.
 fn country() -> Option<String> {
     ["LC_ALL", "LC_MESSAGES", "LANG"].iter().filter_map(|name| std::env::var(name).ok()).find_map(|locale| {
         let region = locale.split(['.', '@']).next()?.split_once('_')?.1;
@@ -440,12 +387,10 @@ fn country() -> Option<String> {
     })
 }
 
-/// Whether the cookies are those of a sign-in.
 fn signed_in(jar: &Jar) -> bool {
     jar.get("LOGIN_INFO").is_some() && sapisid(jar).is_some()
 }
 
-/// Reads a sign-in from a cookies file, for checks before it is saved.
 pub(crate) fn check_jar(jar: &Jar) -> Result<()> {
     if jar.is_empty() {
         bail!("No cookies found");
@@ -461,7 +406,6 @@ mod tests {
 
     #[test]
     fn signs_like_the_browser() {
-        // python3 -c 'import hashlib; print(hashlib.sha1(b"1700000000 abc/DEF-123 https://music.youtube.com").hexdigest())'
         assert_eq!(
             sapisid_hash("abc/DEF-123", 1_700_000_000, ORIGIN),
             "SAPISIDHASH 1700000000_2f568e5165ecba49f0ad8ef012883d1978d235fb"
@@ -472,7 +416,6 @@ mod tests {
     fn signed_in_requests_carry_cookies_and_signature() {
         let dir = std::env::temp_dir().join(format!("tunebox-ytm-innertube-{}", std::process::id()));
         let file = dir.join("cookies.txt");
-        // As yt-dlp writes it, with a cookie of another site that must not be sent.
         let text = "# Netscape HTTP Cookie File\n\
             .youtube.com\tTRUE\t/\tTRUE\t1893456000\tSAPISID\tsynthetic/sapisid\n\
             #HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t1893456000\tLOGIN_INFO\tsynthetic-login\n\
@@ -510,7 +453,6 @@ mod tests {
         assert_eq!(headers["X-Goog-PageId"], "100000000000000000099");
         let context = api.context(ClientKind::Web, api.identity().as_ref());
         assert_eq!(context["user"]["onBehalfOfUser"], "100000000000000000099");
-        // One request may ask as another account, which leaves the sign-in's as it is.
         let other = Identity { index: 3, page_id: None };
         let headers: std::collections::HashMap<_, _> = api.headers(ClientKind::Web, Some(&other)).into_iter().collect();
         assert_eq!(headers["X-Goog-AuthUser"], "3");
@@ -519,7 +461,6 @@ mod tests {
         assert_eq!(api.identity(), Some(brand));
         std::fs::remove_dir_all(dir).unwrap();
 
-        // A sign-in being tried acts as the first account until another is picked, and keeps it.
         let api = InnerTube::unsaved(Jar::from_header("SAPISID=a; LOGIN_INFO=b")).unwrap();
         assert_eq!(api.identity(), Some(Identity::default()));
         api.set_identity(Identity { index: 2, page_id: None });
@@ -538,7 +479,6 @@ mod tests {
             let jar = Jar::from_header(&format!("SAPISID={sapisid}; LOGIN_INFO=x"));
             tunebox_core::paths::write_private(&file, jar.to_text().as_bytes()).unwrap();
         };
-        // YouTube refreshes a cookie, which the client writes back right away.
         let refresh = |api: InnerTube, value: &str| {
             let mut headers = HeaderMap::new();
             let cookie = format!("SIDCC={value}; Domain=.youtube.com; Path=/; Secure");
@@ -555,12 +495,10 @@ mod tests {
         let api = refresh(api, "2");
         assert_eq!(saved().get("SIDCC"), Some("2"), "also after the client wrote it itself");
 
-        // `tunebox logout ytmusic` while the interface runs.
         std::fs::remove_file(&file).unwrap();
         drop(refresh(api, "3"));
         assert!(!file.exists(), "signed out stays signed out");
 
-        // `tunebox login ytmusic --force` with another account.
         sign_in("first");
         let api = InnerTube::new(Secret::File(file.clone())).unwrap();
         sign_in("second");
@@ -570,7 +508,6 @@ mod tests {
         drop(refresh(api, "5"));
         assert_eq!(saved().get("SAPISID"), Some("second"));
 
-        // Cookies being tried are never written anywhere.
         let api = refresh(InnerTube::unsaved(Jar::from_header("SAPISID=tried; LOGIN_INFO=x")).unwrap(), "6");
         assert_eq!(api.jar().unwrap().get("SIDCC"), Some("6"));
         assert_eq!(saved().get("SAPISID"), Some("second"));

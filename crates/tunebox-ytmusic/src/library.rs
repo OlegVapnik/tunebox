@@ -1,5 +1,3 @@
-//! The user's library: playlists, albums, subscribed artists and liked songs. All of it needs
-//! a sign-in; signed out, the library is empty and nothing is saved.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -21,9 +19,7 @@ use crate::{
     parse::{self, ALBUM, ARTIST, PLAYLIST, TRACK, find, find_all, list, str_at, text},
 };
 
-/// Pages of a library list at most; YouTube sends 25 to 100 entries per page.
 const MAX_PAGES: usize = 40;
-/// How long the library's contents count as current for "is this saved?".
 const SAVED_TTL: Duration = Duration::from_secs(60);
 const QUEUE_BATCH: usize = 50;
 const QUEUE_CONCURRENCY: usize = 4;
@@ -32,12 +28,9 @@ const PLAYLISTS: &str = "FEmusic_liked_playlists";
 const ALBUMS: &str = "FEmusic_liked_albums";
 const ARTISTS: &str = "FEmusic_library_corpus_artists";
 
-/// What the library learned along the way.
 #[derive(Default)]
 pub(crate) struct Library {
-    /// Album browse ID → the playlist ID the album plays as; saving an album saves that.
     album_playlists: Mutex<HashMap<String, String>>,
-    /// The URIs in each library list, and when they were fetched.
     saved: Mutex<HashMap<&'static str, (Instant, HashSet<String>)>>,
 }
 
@@ -113,7 +106,6 @@ pub(crate) async fn albums(api: &InnerTube, library: &Library) -> Result<Vec<Alb
         .into_iter()
         .filter(|item| item.kind == ItemKind::Album)
         .map(|item| {
-            // "Album • Daft Punk • 2013", with or without the kind up front.
             let parts: Vec<&str> = item.subtitle.split(" • ").collect();
             let year = parts.iter().find(|p| p.len() == 4 && p.chars().all(|c| c.is_ascii_digit()));
             let artists = parts
@@ -154,7 +146,6 @@ fn count(subtitle: &str) -> Option<u32> {
         .and_then(parse::leading_number)
 }
 
-/// Every entry of a library list, following its pages.
 async fn library_items(api: &InnerTube, browse_id: &str) -> Result<Vec<HomeItem>> {
     let page = api.browse(browse_id).await?;
     let (mut items, mut token) = library_page(&page);
@@ -169,8 +160,6 @@ async fn library_items(api: &InnerTube, browse_id: &str) -> Result<Vec<HomeItem>
     Ok(items)
 }
 
-/// The entries of one page of a library list (a grid of cards, or a list of rows) and the
-/// token for the next page.
 pub(crate) fn library_page(page: &Value) -> (Vec<HomeItem>, Option<String>) {
     let container = ["gridRenderer", "musicShelfRenderer", "gridContinuation", "musicShelfContinuation"]
         .iter()
@@ -230,7 +219,6 @@ pub(crate) async fn check_saved(api: &InnerTube, library: &Library, uris: &[Stri
         .collect())
 }
 
-/// The library list a URI would be in.
 fn list_of(uri: &str) -> Option<&'static str> {
     if uri.starts_with(ALBUM) {
         Some(ALBUMS)
@@ -243,7 +231,6 @@ fn list_of(uri: &str) -> Option<&'static str> {
     }
 }
 
-/// Which of the songs are liked, from the like buttons in their queue entries.
 async fn liked_tracks(api: &InnerTube, uris: &[String]) -> Result<HashSet<String>> {
     let ids: Vec<String> = uris.iter().filter_map(|uri| uri.strip_prefix(TRACK)).map(str::to_owned).collect();
     let mut liked = HashSet::new();
@@ -256,7 +243,6 @@ async fn liked_tracks(api: &InnerTube, uris: &[String]) -> Result<HashSet<String
     Ok(liked)
 }
 
-/// Each song of a `music/get_queue` answer and whether it is liked, as far as the answer says.
 pub(crate) fn like_states(page: &Value) -> Vec<(String, bool)> {
     list(&page["queueDatas"])
         .iter()
@@ -271,8 +257,6 @@ pub(crate) fn like_states(page: &Value) -> Vec<(String, bool)> {
         .collect()
 }
 
-/// A like button says so directly; a "Add to/Remove from liked songs" menu entry says what
-/// it would do, which is the opposite of the state.
 fn liked(video: &Value) -> Option<bool> {
     if let Some(status) = find(video, "likeButtonRenderer").and_then(|b| b["likeStatus"].as_str()) {
         return Some(status == "LIKE");

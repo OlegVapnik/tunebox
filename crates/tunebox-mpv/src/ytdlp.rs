@@ -1,5 +1,3 @@
-//! Stream URLs from yt-dlp. Services sign their audio URLs with challenges only a JavaScript
-//! runtime can solve, which yt-dlp does (with deno). A URL is good for about six hours.
 
 use std::{
     collections::hash_map::DefaultHasher,
@@ -13,16 +11,10 @@ use std::{
 use anyhow::{Context, Result, bail};
 use tokio::process::Command;
 
-/// yt-dlp takes about two seconds; one that takes this long has hung.
 const TIMEOUT: Duration = Duration::from_secs(40);
-/// URLs count as stale this long before YouTube's expiry…
 const MARGIN: Duration = Duration::from_secs(30 * 60);
-/// …or, where the URL doesn't say, this long after they were made.
 const LIFETIME: Duration = Duration::from_secs(5 * 60 * 60);
 
-/// YouTube asks the connection to prove it isn't a bot. It does so for signed-out requests
-/// from addresses it finds suspicious, datacenters always and homes now and then, and it
-/// passes by itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BotCheck;
 
@@ -37,7 +29,6 @@ impl std::fmt::Display for BotCheck {
 
 impl std::error::Error for BotCheck {}
 
-/// A stream URL and until when to use it.
 #[derive(Debug, Clone)]
 pub struct Stream {
     pub url: String,
@@ -50,25 +41,26 @@ impl Stream {
     }
 }
 
-/// Resolves the best audio stream at `target`, which is a page, a search (`ytsearch1:…`) or
-/// another yt-dlp input. `service` names it in the error when yt-dlp is missing.
-///
-/// A disk cache (under `cache_dir/stream-cache`) keeps resolved URLs around so a song that
-/// played before doesn't cost another yt-dlp run; entries expire with the URL.
+struct TempCookies(Option<PathBuf>);
+
+impl Drop for TempCookies {
+    fn drop(&mut self) {
+        if let Some(file) = self.0.take() {
+            let _ = fs::remove_file(file);
+        }
+    }
+}
+
 pub async fn resolve(target: &str, cache_dir: Option<PathBuf>, service: &str) -> Result<Stream> {
     resolve_with(target, cache_dir, service, None).await
 }
 
-/// `resolve` with the signed-in cookies of a service, when it has any. YouTube refuses
-/// streams to unsigned requests from many home connections, and its bot check asks for
-/// exactly these cookies.
 pub async fn resolve_with(
     target: &str,
     cache_dir: Option<PathBuf>,
     service: &str,
     cookies: Option<&Path>,
 ) -> Result<Stream> {
-    // Try the disk cache first.
     if let Some(dir) = &cache_dir
         && let Some(stream) = read_cache(dir, target)
     {
@@ -81,7 +73,11 @@ pub async fn resolve_with(
     if let Some(dir) = &cache_dir {
         command.arg("--cache-dir").arg(dir);
     }
-    if let Some(file) = cookies.filter(|file| file.is_file()) {
+    let guard = TempCookies(cookies.filter(|file| file.is_file()).and_then(|file| {
+        let temp = file.with_extension("yt-dlp.tmp");
+        std::fs::copy(file, &temp).is_ok().then_some(temp)
+    }));
+    if let Some(file) = guard.0.as_deref() {
         command.arg("--cookies").arg(file);
     }
     command.arg(target).stdin(Stdio::null()).kill_on_drop(true);
@@ -114,14 +110,12 @@ pub async fn resolve_with(
     }
 }
 
-/// Where a cached stream for `target` lives.
 fn cache_path(dir: &PathBuf, target: &str) -> PathBuf {
     let mut hasher = DefaultHasher::new();
     target.hash(&mut hasher);
     dir.join("stream-cache").join(format!("{:016x}.json", hasher.finish()))
 }
 
-/// Reads a still-fresh stream for `target` from disk, if any.
 fn read_cache(dir: &PathBuf, target: &str) -> Option<Stream> {
     let path = cache_path(dir, target);
     let data = fs::read_to_string(&path).ok()?;
@@ -129,7 +123,6 @@ fn read_cache(dir: &PathBuf, target: &str) -> Option<Stream> {
     let url = value.get("url")?.as_str()?.to_owned();
     let until_epoch = value.get("until")?.as_u64()?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    // Keep a small margin so a URL that is about to expire isn't handed out.
     if until_epoch <= now + 60 {
         let _ = fs::remove_file(&path);
         return None;
@@ -137,7 +130,6 @@ fn read_cache(dir: &PathBuf, target: &str) -> Option<Stream> {
     Some(Stream { url, until: Instant::now() + Duration::from_secs(until_epoch - now) })
 }
 
-/// Writes a resolved stream to disk so the next run can skip yt-dlp.
 fn write_cache(dir: &PathBuf, target: &str, stream: &Stream) {
     let path = cache_path(dir, target);
     if fs::create_dir_all(path.parent().unwrap_or(dir)).is_err() {
@@ -151,12 +143,10 @@ fn write_cache(dir: &PathBuf, target: &str, stream: &Stream) {
     let _ = fs::write(&path, value.to_string());
 }
 
-/// Whether yt-dlp failed on YouTube's "Sign in to confirm you're not a bot".
 fn is_bot_check(stderr: &str) -> bool {
     stderr.contains("confirm you’re not a bot") || stderr.contains("confirm you're not a bot")
 }
 
-/// When to stop using a URL, from its `expire` parameter.
 fn valid_until(url: &str) -> Instant {
     let expires = url::Url::parse(url)
         .ok()
@@ -194,8 +184,6 @@ mod tests {
         assert!(valid_until("https://example.com/a.webm") > Instant::now() + Duration::from_secs(4 * 3600));
     }
 
-    /// With yt-dlp as people install it. Only from a home connection: YouTube asks yt-dlp to sign
-    /// in from datacenters, GitHub's included.
     #[tokio::test]
     #[ignore = "online"]
     async fn yt_dlp_finds_a_stream() {

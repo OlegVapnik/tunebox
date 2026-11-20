@@ -1,6 +1,3 @@
-//! Reading SoundCloud's sign-in from a browser's cookies. SoundCloud keeps it in the
-//! `oauth_token` cookie, which only the browser can hand over. yt-dlp reads every browser's
-//! cookie store and keyring, so tunebox asks it for the cookies and picks that one out.
 
 use std::{
     fs,
@@ -13,23 +10,16 @@ use anyhow::{Context, Result, bail};
 use tokio::process::Command;
 use tunebox_core::paths::Paths;
 
-/// A browser yt-dlp can read cookies from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Browser {
-    /// The name people know, e.g. "Brave".
     pub name: String,
-    /// What `--cookies-from-browser` takes, e.g. `brave`, or `firefox:<profiles>` for forks.
     pub spec: String,
 }
 
-/// A browser tunebox knows.
 struct Known {
     name: &'static str,
-    /// yt-dlp's name for it, or for the browser it is a fork of.
     reader: &'static str,
-    /// Where it keeps its profiles, relative to the home directory.
     dir: &'static str,
-    /// Whether yt-dlp needs the folder: it doesn't know forks.
     fork: bool,
 }
 
@@ -58,7 +48,6 @@ const KNOWN: &[Known] = &[
 const KNOWN: &[Known] = &[
     known("Chromium", "chromium", ".config/chromium"),
     known("Brave", "brave", ".config/BraveSoftware/Brave-Browser"),
-    // Omarchy's Brave, which keeps its profiles apart from Brave's.
     fork("Brave Origin", "brave", ".config/BraveSoftware/Brave-Origin"),
     known("Google Chrome", "chrome", ".config/google-chrome"),
     known("Microsoft Edge", "edge", ".config/microsoft-edge"),
@@ -72,8 +61,6 @@ const KNOWN: &[Known] = &[
 ];
 
 impl Known {
-    /// The browser, when it has a profile in its folder: a folder alone may be left over, or
-    /// made by another program.
     fn found(&self, home: &Path) -> Option<Browser> {
         let dir = home.join(self.dir);
         let profile = match self.reader {
@@ -86,14 +73,12 @@ impl Known {
     }
 }
 
-/// yt-dlp exports the cookies of every site; this many seconds is plenty for that.
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
-/// The browsers on this computer that have a profile yt-dlp could read cookies from.
 pub fn browsers() -> Vec<Browser> {
     let Some(home) = home() else { return Vec::new() };
     let mut found: Vec<Browser> = Vec::new();
@@ -105,7 +90,6 @@ pub fn browsers() -> Vec<Browser> {
     found
 }
 
-/// The `oauth_token` of a browser signed in to SoundCloud, with the browser's name.
 pub async fn oauth_token(paths: &Paths) -> Result<Option<(String, String)>> {
     let mut last: Option<anyhow::Error> = None;
     for browser in browsers() {
@@ -122,7 +106,6 @@ pub async fn oauth_token(paths: &Paths) -> Result<Option<(String, String)>> {
     Ok(None)
 }
 
-/// The `oauth_token` in one browser's cookies, if it is signed in to SoundCloud.
 async fn token_from(paths: &Paths, spec: &str) -> Result<Option<String>> {
     let dir = paths.cache.join("soundcloud");
     fs::create_dir_all(&dir).context("Can't make the SoundCloud cache folder")?;
@@ -136,7 +119,6 @@ async fn token_from(paths: &Paths, spec: &str) -> Result<Option<String>> {
     if token.is_some() {
         return Ok(token);
     }
-    // Chromium keeps its cookie key in the keyring, which yt-dlp needs to be told about.
     if undecrypted(&stderr) && !spec.contains('+') {
         let (token, _) = export(&with_keyring(spec), &file).await?;
         return Ok(token);
@@ -144,7 +126,6 @@ async fn token_from(paths: &Paths, spec: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
-/// Runs yt-dlp for the browser's cookies, and reads `oauth_token` out of them.
 async fn export(spec: &str, file: &Path) -> Result<(Option<String>, String)> {
     let _ = fs::remove_file(file);
     let output = Command::new("yt-dlp")
@@ -173,7 +154,6 @@ fn undecrypted(stderr: &str) -> bool {
     stderr.contains("cannot decrypt") || stderr.contains("failed to decrypt")
 }
 
-/// Adds the keyring yt-dlp should read Chromium's cookie key from.
 fn with_keyring(spec: &str) -> String {
     match spec.split_once(':') {
         Some((reader, profile)) => format!("{reader}+gnomekeyring:{profile}"),
@@ -181,7 +161,6 @@ fn with_keyring(spec: &str) -> String {
     }
 }
 
-/// The `oauth_token` in a Netscape cookies.txt, as yt-dlp writes it.
 fn token_in(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.strip_prefix("#HttpOnly_").unwrap_or(line);

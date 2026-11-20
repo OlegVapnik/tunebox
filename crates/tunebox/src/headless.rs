@@ -1,5 +1,3 @@
-//! Playing without the interface, as `tunebox play` does for every service: a line per song
-//! and a progress bar under it.
 
 use std::{
     io::Write,
@@ -35,7 +33,6 @@ fn clock(duration: Duration) -> String {
     format!("{}:{:02}", secs / 60, secs % 60)
 }
 
-/// Playback position, extrapolated between player events.
 #[derive(Default)]
 pub struct Clock {
     base_ms: u32,

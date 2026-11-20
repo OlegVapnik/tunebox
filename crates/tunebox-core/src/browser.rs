@@ -1,10 +1,3 @@
-//! Reading sign-in cookies from the browsers installed on this computer.
-//!
-//! Chromium encrypts its cookies with a key in the system keyring and Firefox keeps them in an
-//! SQLite database that may be locked while the browser runs. yt-dlp already knows each
-//! browser's store, copies a locked database to a temporary file and opens the keyring, so
-//! tunebox asks it for a cookie jar instead of growing its own platform-specific readers. Only
-//! the jar is written to disk, in a private folder, and removed as soon as the cookie is read.
 
 use std::{
     fs,
@@ -18,24 +11,17 @@ use tokio::process::Command;
 
 use crate::paths::Paths;
 
-/// A browser yt-dlp can read cookies from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Browser {
-    /// The name people know, e.g. "Firefox".
     pub name: String,
-    /// What `--cookies-from-browser` takes, e.g. `brave`, or `firefox:<profiles>` for forks.
     pub spec: String,
 }
 
-/// A browser tunebox knows.
 struct Known {
     ids: &'static [&'static str],
     name: &'static str,
-    /// yt-dlp's name for it, or for the browser it is a fork of.
     reader: &'static str,
-    /// Where it keeps its profiles, relative to the home directory.
     dir: &'static str,
-    /// Whether yt-dlp needs the folder: it doesn't know forks.
     fork: bool,
 }
 
@@ -47,8 +33,6 @@ const fn fork(ids: &'static [&'static str], name: &'static str, reader: &'static
     Known { ids, name, reader, dir, fork: true }
 }
 
-// The four people are most likely to be signed in to come first: the login menu shows them at
-// 1–4, with manual entry last.
 #[cfg(target_os = "macos")]
 const KNOWN: &[Known] = &[
     known(&["org.mozilla.firefox"], "Firefox", "firefox", "Library/Application Support/Firefox"),
@@ -74,7 +58,6 @@ const KNOWN: &[Known] = &[
     known(&["google-chrome.desktop"], "Google Chrome", "chrome", ".config/google-chrome"),
     known(&["microsoft-edge.desktop"], "Microsoft Edge", "edge", ".config/microsoft-edge"),
     known(&["brave-browser.desktop", "brave.desktop"], "Brave", "brave", ".config/BraveSoftware/Brave-Browser"),
-    // Omarchy's Brave, which keeps its profiles apart from Brave's.
     fork(&["brave-origin.desktop"], "Brave Origin", "brave", ".config/BraveSoftware/Brave-Origin"),
     known(&["chromium.desktop", "chromium-browser.desktop"], "Chromium", "chromium", ".config/chromium"),
     known(&["vivaldi-stable.desktop", "vivaldi.desktop"], "Vivaldi", "vivaldi", ".config/vivaldi"),
@@ -85,8 +68,6 @@ const KNOWN: &[Known] = &[
 ];
 
 impl Known {
-    /// The browser, when it has a profile in its folder: a folder alone may be left over, or
-    /// made by another program.
     fn found(&self, home: &Path) -> Option<Browser> {
         let dir = home.join(self.dir);
         let profile = match self.reader {
@@ -103,7 +84,6 @@ fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
-/// The browsers on this computer that have a profile yt-dlp could read cookies from.
 pub fn browsers() -> Vec<Browser> {
     let Some(home) = home() else { return Vec::new() };
     let mut found: Vec<Browser> = Vec::new();
@@ -115,14 +95,12 @@ pub fn browsers() -> Vec<Browser> {
     found
 }
 
-/// The browser that opens links, when tunebox knows it and it has a profile.
 pub fn default_browser() -> Option<Browser> {
     let id = default_browser_id()?;
     let home = home()?;
     KNOWN.iter().filter(|known| known.ids.contains(&id.as_str())).find_map(|known| known.found(&home))
 }
 
-/// The desktop entry of the browser that opens links.
 #[cfg(not(target_os = "macos"))]
 fn default_browser_id() -> Option<String> {
     let asks: [(&str, &[&str]); 3] = [
@@ -142,12 +120,8 @@ fn default_browser_id() -> Option<String> {
     None
 }
 
-/// yt-dlp exports the cookies of every site; this many seconds is plenty for that.
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// The value of `name` in the browser's cookies for `site`, e.g. `sp_dc` on `open.spotify.com`.
-/// `None` when the browser isn't signed in to the site. A cookie that can't be decrypted is
-/// reported as an error rather than taken for an absent sign-in.
 pub async fn cookie(paths: &Paths, browser: &mut Browser, site: &str, domain: &str, name: &str) -> Result<Option<String>> {
     let dir = private_dir(paths)?;
     let file = dir.join("browser-export.txt");
@@ -156,7 +130,6 @@ pub async fn cookie(paths: &Paths, browser: &mut Browser, site: &str, domain: &s
         let _ = fs::remove_file(&file);
         return Ok(Some(value));
     }
-    // Chromium keeps its cookie key in the keyring, which yt-dlp needs to be told about.
     if undecrypted(&stderr) && !browser.spec.contains('+') {
         let spec = with_keyring(&browser.spec, "gnomekeyring");
         (text, stderr) = export(&spec, site, &file).await?;
@@ -190,7 +163,6 @@ pub async fn cookie(paths: &Paths, browser: &mut Browser, site: &str, domain: &s
     Ok(None)
 }
 
-/// Runs yt-dlp for the browser's cookies and reads the Netscape file it writes.
 async fn export(spec: &str, site: &str, file: &Path) -> Result<(String, String)> {
     let _ = fs::remove_file(file);
     let output = Command::new("yt-dlp")
@@ -214,7 +186,6 @@ async fn export(spec: &str, site: &str, file: &Path) -> Result<(String, String)>
     Ok((text, stderr))
 }
 
-/// The folder for the temporary jar, readable by the user only.
 fn private_dir(paths: &Paths) -> Result<PathBuf> {
     let dir = paths.cache.join("browser");
     fs::create_dir_all(&dir).context("Can't make the browser cache folder")?;
@@ -234,7 +205,6 @@ fn locked(stderr: &str) -> bool {
     stderr.contains("database is locked") || stderr.contains("unable to open database file")
 }
 
-/// yt-dlp's last error, unless it's only that the page isn't a video.
 fn reason(stderr: &str) -> String {
     stderr
         .lines()
@@ -243,7 +213,6 @@ fn reason(stderr: &str) -> String {
         .unwrap_or_default()
 }
 
-/// `spec` reading the key from `keyring`: `brave:<profiles>` becomes `brave+gnomekeyring:<profiles>`.
 fn with_keyring(spec: &str, keyring: &str) -> String {
     match spec.split_once(':') {
         Some((browser, profile)) => format!("{browser}+{keyring}:{profile}"),
@@ -251,8 +220,6 @@ fn with_keyring(spec: &str, keyring: &str) -> String {
     }
 }
 
-/// The value of a cookie in a Netscape `cookies.txt`, as yt-dlp writes it. `domain` matches the
-/// cookie's domain or one of its parents, so `open.spotify.com` finds `.spotify.com`.
 fn cookie_in(text: &str, domain: &str, name: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.strip_prefix("#HttpOnly_").unwrap_or(line);

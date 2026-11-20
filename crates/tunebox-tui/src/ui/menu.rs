@@ -1,4 +1,3 @@
-//! The context menu, opened next to the mouse or the selection.
 
 use ratatui::{
     buffer::Buffer,
@@ -39,7 +38,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, screen: Rect) {
         .render(popup, buf);
     let mut hits = vec![(popup, Hit::OverlayArea)];
     if popup.height < 4 {
-        // No room for the title and its rule; the buffer ends right below.
         app.hits.extend(hits);
         return;
     }

@@ -1,8 +1,3 @@
-//! Dev tool: renders the current frame to a PNG, so the UI can be reviewed without a screen.
-//!
-//! Start tunebox with `TUNEBOX_SNAPSHOT_DIR=<dir>`; F12 then writes `<dir>/latest.png`. Fonts come
-//! from `TUNEBOX_SNAPSHOT_FONTS` (default `~/.cache/tunebox/dev-fonts`): JetBrains Mono and the
-//! Nerd Font symbols, which is what Ghostty uses out of the box.
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
@@ -18,37 +13,26 @@ use zeno::{Command, Mask, Placement as GlyphPlacement, Point};
 
 use crate::graphics::{INLINE_CELL, Inline};
 
-/// Font size in pixels; cells come out about 12×26, close to a typical terminal.
 const PX: f32 = 20.0;
 const DEFAULT_BG: [u8; 3] = [18, 17, 21];
 const DEFAULT_FG: [u8; 3] = [237, 234, 226];
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
-/// A rasterized glyph, or `None` if no font has it.
 type Glyph = Option<(GlyphPlacement, Vec<u8>)>;
 
-/// An image the app drew, to paste over its cells in full resolution.
 #[derive(Clone)]
 pub struct Placement {
-    /// The visible cells.
     pub area: Rect,
-    /// The whole image in cells, of which the top `skip` rows are scrolled out of view.
     pub size: Size,
     pub skip: u16,
-    /// Kept only while snapshots are on.
     pub source: Option<Arc<DynamicImage>>,
-    /// The image's cells as drawn, row by row; cells that differ at the end of the frame were
-    /// drawn over. Empty while snapshots are off.
     pub cells: Vec<Cell>,
-    /// The first time a Kitty image is drawn: the upload of its pixels, written after the frame.
     pub upload: Option<String>,
-    /// A Sixel or iTerm2 image, which tunebox writes itself after the frame.
     pub inline: Option<Arc<Inline>>,
 }
 
 pub struct Snapshotter {
     dir: PathBuf,
-    /// With `TUNEBOX_SNAPSHOT_RECORD=<ms>`, a frame is written this often, for recordings.
     record: Option<Duration>,
     regular: Vec<ScalerFont>,
     bold: Vec<ScalerFont>,
@@ -99,13 +83,10 @@ impl Snapshotter {
         })
     }
 
-    /// How often to record a frame, when recording.
     pub fn record_every(&self) -> Option<Duration> {
         self.record
     }
 
-    /// Writes one frame of a recording, named by its time in milliseconds and the mouse
-    /// position, which the terminal doesn't draw: `frame-00001234-x090-y030.png`.
     pub fn save_frame(
         &self,
         buffer: &Buffer,
@@ -119,12 +100,10 @@ impl Snapshotter {
         Ok(())
     }
 
-    /// Renders and writes `latest.png`; returns its path.
     pub fn save(&self, buffer: &Buffer, placements: &[Placement]) -> Result<PathBuf> {
         self.write(buffer, placements, "latest")
     }
 
-    /// Renders and writes `<dir>/{name}.png`; returns its path.
     pub(crate) fn write(&self, buffer: &Buffer, placements: &[Placement], name: &str) -> Result<PathBuf> {
         let image = self.render(buffer, placements);
         let path = self.dir.join(format!("{name}.png"));
@@ -138,7 +117,6 @@ impl Snapshotter {
         let mut glyphs: HashMap<(char, bool), Glyph> = HashMap::new();
         let origin = |x: u16, y: u16| ((x - area.x) as u32 * self.cell_w, (y - area.y) as u32 * self.cell_h);
 
-        // Backgrounds first: glyphs such as Nerd Font icons may overhang into the next cell.
         for y in area.top()..area.bottom() {
             for x in area.left()..area.right() {
                 let (px, py) = origin(x, y);
@@ -153,8 +131,6 @@ impl Snapshotter {
         for placement in placements {
             let Some(source) = &placement.source else { continue };
             let (w, h) = (placement.size.width as u32 * self.cell_w, placement.size.height as u32 * self.cell_h);
-            // Fit the image into its cells, centred, as kitty does; the images of the other
-            // protocols already have about the shape of their cells.
             let fitted = source.resize(w, h, FilterType::Triangle).to_rgba8();
             let mut canvas = RgbaImage::new(w, h);
             let (dx, dy) = ((w - fitted.width()) / 2, (h - fitted.height()) / 2);
@@ -165,7 +141,6 @@ impl Snapshotter {
             let x = (placement.area.x - area.x) as i64 * self.cell_w as i64;
             let y = (placement.area.y - area.y) as i64 * self.cell_h as i64;
             image::imageops::overlay(&mut image, &visible.to_rgba8(), x, y);
-            // Text drawn over the picture, such as a play button, replaces those image cells.
             let cells = placement.area.intersection(area);
             for y in cells.top()..cells.bottom() {
                 for x in cells.left()..cells.right() {
@@ -226,7 +201,6 @@ impl Snapshotter {
         Some((placement, coverage))
     }
 
-    /// Block elements and lines are drawn exactly, like terminals do, so they tile seamlessly.
     fn draw_block(&self, image: &mut RgbaImage, c: char, x: u32, y: u32, fg: [u8; 3]) -> bool {
         let (w, h) = (self.cell_w, self.cell_h);
         let eighth_h = |n: u32| (h * n) / 8;
@@ -259,7 +233,6 @@ impl Snapshotter {
     }
 }
 
-/// Foreground and background of a cell as they end up on screen.
 fn colors(buffer: &Buffer, x: u16, y: u16) -> ([u8; 3], [u8; 3]) {
     let cell = &buffer[(x, y)];
     let (mut fg, mut bg) = (rgb(cell.fg, DEFAULT_FG), rgb(cell.bg, DEFAULT_BG));
@@ -297,7 +270,6 @@ fn fill(image: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, color: [u8; 3], a
     }
 }
 
-/// A glyph outline for zeno, which counts y downwards.
 #[derive(Default)]
 struct Path(Vec<Command>);
 

@@ -1,4 +1,3 @@
-//! Signs in with a real Chromium browser and reads the token its web player obtains.
 
 use std::{process::Stdio, time::Duration};
 
@@ -48,16 +47,12 @@ async fn find_port(dir: &std::path::Path) -> Result<(u16, String)> {
     bail!("The browser didn't open its debugging port")
 }
 
-/// Opens Spotify in Chromium, waits for the user to sign in, and returns the token the web
-/// player received. No cookies are copied: the browser's own session makes the request.
 pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
     let binary = candidates()
         .into_iter()
         .find(|b| std::path::Path::new(b).exists() || which(b))
         .context("No Chromium browser found. Install Chrome/Chromium/Brave, or set CHROME_BIN.")?;
     let dir = paths.cache.join("spotify-cdp");
-    // A port file left by a previous run points at a dead browser; start from an empty profile,
-    // the sign-in cookie is injected below anyway.
     let _ = tokio::fs::remove_dir_all(&dir).await;
     tokio::fs::create_dir_all(&dir).await?;
     let mut child: Child = Command::new(&binary)
@@ -73,7 +68,6 @@ pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("Couldn't start {binary}"))?;
-    // Keep the pipe drained so a chatty browser never blocks on it.
     if let Some(stderr) = child.stderr.take() {
         tokio::spawn(async move {
             let mut lines = BufReader::new(stderr).lines();
@@ -82,8 +76,6 @@ pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
     }
     let result = async {
         let (port, _) = find_port(&dir).await?;
-        // Network/Page domains live on a page target, not on the browser-level socket. Ask the
-        // browser which tab it opened and connect to that one.
         let targets: Vec<Value> = reqwest::get(format!("http://127.0.0.1:{port}/json"))
             .await
             .context("Can't list the browser's tabs")?
@@ -98,8 +90,6 @@ pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
         tracing::debug!("CDP tab: {page_ws}");
         let (mut socket, _) = connect_async(page_ws).await.context("Can't connect to the tab's debugging socket")?;
         socket.send(Message::Text(json!({"id": 1, "method": "Network.enable"}).to_string().into())).await?;
-        // Put the user's sign-in in the browser's own cookie jar, then reload: the web player
-        // makes its token request from inside the page, with all the real browser headers.
         let cookie = json!({
             "id": 3,
             "method": "Network.setCookie",
@@ -110,16 +100,12 @@ pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
         });
         socket.send(Message::Text(cookie.to_string().into())).await?;
         socket.send(Message::Text(json!({"id": 4, "method": "Page.enable"}).to_string().into())).await?;
-        // Fetch pauses the response before the page reads it, which is the only reliable way to
-        // get the body: Network.loadingFinished never arrives for these streamed responses.
         let fetch = json!({
             "id": 7,
             "method": "Fetch.enable",
             "params": {"patterns": [{"urlPattern": "*api/token*", "requestStage": "Response"}]}
         });
         socket.send(Message::Text(fetch.to_string().into())).await?;
-        // The page caches its session token in browser storage. Drop it so the reload makes a
-        // fresh token request that we can watch.
         let clear = json!({
             "id": 6, "method": "Runtime.evaluate",
             "params": {"expression": "localStorage.clear();sessionStorage.clear();'ok'", "returnByValue": true}
@@ -178,8 +164,6 @@ pub async fn login(paths: &Paths, sp_dc: &str) -> Result<(String, u64)> {
 
 fn token_from(body: &str) -> Option<(String, u64)> {
     let value: Value = serde_json::from_str(body).ok()?;
-    // A fresh browser profile also fetches a token, but it belongs to nobody. Only accept the
-    // one made after sp_dc was injected, so we never save an anonymous session as the user's.
     if value["isAnonymous"].as_bool().unwrap_or(true) {
         return None;
     }

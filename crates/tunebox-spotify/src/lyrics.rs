@@ -1,4 +1,3 @@
-//! Song lyrics: Spotify's own (via librespot), with LRCLIB as fallback.
 
 use anyhow::Result;
 use librespot::{
@@ -7,7 +6,6 @@ use librespot::{
 };
 use tunebox_core::lyrics::{self, LyricLine, Lyrics, LyricsQuery};
 
-/// `None` when neither source has lyrics for the track.
 pub async fn fetch(
     session: Option<&Session>,
     http: &reqwest::Client,

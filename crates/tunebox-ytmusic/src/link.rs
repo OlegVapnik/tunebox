@@ -1,21 +1,15 @@
-//! What a link plays: music.youtube.com's and youtube.com's own, or a `ytmusic:` URI.
 
 use anyhow::{Result, bail};
 use url::Url;
 
 use crate::parse::{ALBUM, ARTIST, PLAYLIST, TRACK};
 
-/// What to play: a context, and the song in it to start at, if any. A song by itself is its
-/// own context and plays with its radio after it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Playable {
     pub context: String,
     pub track: Option<String>,
 }
 
-/// What `input` plays: a `ytmusic:` URI, or a link such as
-/// `https://music.youtube.com/watch?v=…` (with `&list=…`, the song in that playlist),
-/// `/playlist?list=…`, `/browse/MPREb_…`, `/channel/UC…`, or a youtube.com or youtu.be link.
 pub fn playable(input: &str) -> Result<Playable> {
     let input = input.trim();
     if [TRACK, ALBUM, PLAYLIST, ARTIST].iter().any(|prefix| input.strip_prefix(prefix).is_some_and(|id| !id.is_empty()))

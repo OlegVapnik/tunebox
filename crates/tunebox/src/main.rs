@@ -1,5 +1,3 @@
-// Without a service, the commands for one have nothing to hand their arguments to, and stop
-// at the first service they would go through.
 #![cfg_attr(
     not(any(feature = "spotify", feature = "ytmusic", feature = "soundcloud")),
     allow(unused_variables, unreachable_code, clippy::never_loop)
@@ -40,19 +38,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Sign in to your music services, or to the one named
     Login {
-        /// The service; every one in use when left out
         #[arg(value_parser = PossibleValuesParser::new(Service::ALL.map(Service::key)))]
         service: Option<String>,
-        /// Sign in again, even where already signed in
         #[arg(long)]
         force: bool,
-        /// Only check, quietly: exit with 0 when signed in, 1 when not
         #[arg(long, conflicts_with = "force")]
         check: bool,
     },
-    /// Sign out of YouTube Music or SoundCloud; both browse and play without an account then
     #[cfg(any(feature = "ytmusic", feature = "soundcloud"))]
     Logout {
         #[arg(value_parser = PossibleValuesParser::new([
@@ -63,46 +56,32 @@ enum Command {
         ]))]
         service: String,
     },
-    /// Check what each of your music services can reach
     Doctor,
-    /// Update tunebox to the latest release
     #[cfg_attr(not(any(feature = "spotify", feature = "ytmusic")), command(hide = true))]
     Update,
-    /// Play a song, album, playlist or artist directly in tunebox
     Play {
-        /// URI or link, e.g. https://open.spotify.com/album/2noRn2Aes5aoNVsU6iWThc or
-        /// https://music.youtube.com/watch?v=d7woYjGWs6k
         uri: String,
-        /// Shuffle
         #[arg(short, long)]
         shuffle: bool,
     },
-    /// Development: run a pathfinder query and print the JSON
     #[cfg(feature = "spotify")]
     #[command(hide = true)]
     Query {
         operation: String,
-        /// Variables as JSON
         #[arg(default_value = "{}")]
         variables: String,
     },
-    /// Development: save the DJ narration for the next songs as MP3, with metadata
     #[cfg(feature = "spotify")]
     #[command(hide = true)]
     DjSample {
-        /// Target directory
         dir: std::path::PathBuf,
     },
-    /// Try the interface with a built-in sample library, no account needed (nothing plays)
     Demo,
-    /// Remote mode: wait until a Spotify app picks tunebox as its device
     #[cfg(feature = "spotify")]
     Connect {
-        /// Name the device shows up as in Spotify
         #[arg(long, default_value = "tunebox")]
         name: String,
     },
-    /// Make tunebox part of Omarchy: a bar widget, the theme's colors, menu entries and a launcher
     #[cfg(target_os = "linux")]
     Omarchy {
         #[command(subcommand)]
@@ -110,8 +89,6 @@ enum Command {
     },
 }
 
-/// The version and the music services built in, like `0.4.0 (spotify)`. The installer reads
-/// them from `tunebox --version`.
 fn version() -> &'static str {
     static VERSION: LazyLock<String> = LazyLock::new(|| {
         let services: Vec<&str> = SERVICES.iter().map(|service| service.key()).collect();
@@ -121,7 +98,6 @@ fn version() -> &'static str {
     &VERSION
 }
 
-/// Like "Spotify in your terminal", naming the services built in.
 fn about() -> &'static str {
     static ABOUT: LazyLock<String> = LazyLock::new(|| {
         let names: Vec<&str> = SERVICES.iter().map(|service| service.name()).collect();
@@ -132,28 +108,17 @@ fn about() -> &'static str {
 }
 
 fn main() -> Result<()> {
-    // Names tunebox's stream in the system volume mixer (read by librespot's PulseAudio output).
-    // SAFETY: no other threads exist yet, so nothing can read the environment concurrently.
     unsafe {
         std::env::set_var("PULSE_PROP_application.name", "tunebox");
         std::env::set_var("PULSE_PROP_application.icon_name", "audio-x-generic");
         std::env::set_var("PULSE_PROP_media.role", "music");
     }
     limit_malloc_arenas();
-    // The main thread belongs to the OS integration; tunebox itself runs on another one.
     tunebox_os::run_main(|| tokio::runtime::Runtime::new()?.block_on(run()))
 }
 
-/// glibc gives each thread that allocates its own heap arena and holds on to memory freed in
-/// it; across tokio's worker pool that adds up to tens of megabytes. Two arenas are plenty.
-///
-/// glibc also raises its mmap threshold to the largest block freed so far, up to 32 MB. After
-/// the first big cover, every image buffer and response body was carved from the arenas, which
-/// only shrink when trimmed. A fixed threshold keeps large blocks in their own mappings, which
-/// go back to the system as soon as they are freed.
 fn limit_malloc_arenas() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
-    // SAFETY: called before any other thread exists.
     unsafe {
         libc::mallopt(libc::M_ARENA_MAX, 2);
         libc::mallopt(libc::M_MMAP_THRESHOLD, 256 * 1024);
@@ -161,7 +126,6 @@ fn limit_malloc_arenas() {
 }
 
 async fn run() -> Result<()> {
-    // reqwest and librespot pull in both rustls backends, so rustls can't pick one by itself.
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     let cli = Cli::parse();
@@ -198,8 +162,6 @@ async fn run() -> Result<()> {
     }
 }
 
-/// The services a command is about: the one `named`, which must be built in, or else every
-/// one in use.
 fn services(paths: &Paths, named: Option<&str>) -> Result<Vec<Service>> {
     let Some(key) = named else {
         let enabled = Config::load(paths)?.enabled_services(SERVICES);
@@ -215,13 +177,11 @@ fn services(paths: &Paths, named: Option<&str>) -> Result<Vec<Service>> {
     Ok(vec![service])
 }
 
-/// Logs go to stderr for CLI commands; the TUI owns the screen, so it logs to a file.
 fn init_logging(paths: &Paths, tui: bool) -> Result<()> {
     let logs = tracing_subscriber::registry().with(log_filter(std::env::var("TUNEBOX_LOG").ok().as_deref()));
     if tui {
         std::fs::create_dir_all(&paths.cache)?;
         std::fs::File::create(paths.log_file())?;
-        // Append mode: the TUI also redirects stderr into this file.
         let file = std::fs::OpenOptions::new().append(true).open(paths.log_file())?;
         logs.with(fmt::layer().with_ansi(false).with_writer(std::sync::Mutex::new(file))).init();
     } else {
@@ -230,8 +190,6 @@ fn init_logging(paths: &Paths, tui: bool) -> Result<()> {
     Ok(())
 }
 
-/// Signs in to the service `named`, or to every one in use; YouTube Music, which plays
-/// without an account too, only when asked to or when the user says yes.
 async fn login(paths: &Paths, named: Option<&str>, force: bool) -> Result<()> {
     let services = services(paths, named)?;
     for &service in &services {
@@ -253,7 +211,6 @@ async fn login(paths: &Paths, named: Option<&str>, force: bool) -> Result<()> {
             #[allow(unreachable_patterns)]
             other => bail!("{} isn't built into this tunebox", other.name()),
         };
-        // Nothing to test after a sign-in that was called off.
         if !signed_in && services.len() == 1 {
             return Ok(());
         }
@@ -262,8 +219,6 @@ async fn login(paths: &Paths, named: Option<&str>, force: bool) -> Result<()> {
     Ok(())
 }
 
-/// Whether the service `named`, or every one in use, has a sign-in saved, wherever it keeps
-/// it: files or the keychain. Nothing goes online, so the installer can ask in passing.
 async fn signed_in(paths: &Paths, named: Option<&str>) -> Result<bool> {
     for service in services(paths, named)? {
         let signed_in: bool = match service {
@@ -283,9 +238,7 @@ async fn signed_in(paths: &Paths, named: Option<&str>) -> Result<bool> {
     Ok(true)
 }
 
-/// Plays a URI or link of a service without the interface.
 async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
-    // Something that isn't any service's goes to the one built in, to say what's wrong with it.
     match link_service(input).or(SERVICES.first().copied()) {
         #[cfg(feature = "spotify")]
         Some(Service::Spotify) => spotify::play(paths, input, shuffle).await,
@@ -299,7 +252,6 @@ async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     }
 }
 
-/// The service of a URI, or of a link to its website; YouTube's own play on YouTube Music.
 fn link_service(input: &str) -> Option<Service> {
     let youtube = ["music.youtube.com/", "www.youtube.com/", "youtube.com/", "m.youtube.com/", "youtu.be/"];
     let site = input.strip_prefix("https://").or_else(|| input.strip_prefix("http://"));
@@ -314,10 +266,6 @@ fn link_service(input: &str) -> Option<Service> {
     }
 }
 
-/// What `TUNEBOX_LOG` asks for, with the same syntax as before, such as `info,librespot=debug`,
-/// without EnvFilter's regexes; errors only when it's unset or unreadable. Empty directives, as in
-/// a trailing comma, are left out: `Targets` reads one as errors only for everything, so
-/// `info,` logged errors only.
 fn log_filter(spec: Option<&str>) -> Targets {
     let errors = || Targets::new().with_default(tracing::Level::ERROR);
     let directives: Vec<&str> = spec.unwrap_or_default().split(',').map(str::trim).filter(|d| !d.is_empty()).collect();

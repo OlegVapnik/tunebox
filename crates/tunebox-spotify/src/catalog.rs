@@ -1,5 +1,3 @@
-//! Typed access to Spotify's catalog: the Web API where it still works, librespot's internal
-//! endpoints where Development Mode apps are locked out.
 
 use std::collections::HashMap;
 
@@ -22,17 +20,11 @@ use tunebox_core::catalog::{AlbumInfo, ArtistInfo, Page, PlaylistInfo, SearchRes
 
 use crate::webapi::WebApi;
 
-/// Items per page of the Web API's paged lists.
 pub const PAGE: u32 = 50;
-/// Pages of one list fetched at the same time, once the first one tells how many there are.
 pub const PAGE_CONCURRENCY: usize = 4;
-/// Maximum URIs per `/me/library` request.
 pub const LIBRARY_BATCH: usize = 40;
-/// Preferred cover width; Spotify offers roughly 64, 300 and 640 px.
 const IMAGE_WIDTH: u32 = 300;
-/// Tracks per metadata request when resolving playlists through librespot.
 pub const METADATA_BATCH: usize = 100;
-/// Concurrent requests when that batch request fails and tracks are asked for one by one.
 const METADATA_CONCURRENCY: usize = 8;
 
 pub async fn me(api: &WebApi) -> Result<User> {
@@ -40,7 +32,6 @@ pub async fn me(api: &WebApi) -> Result<User> {
     Ok(User { name: raw.display_name.unwrap_or_else(|| raw.id.clone()), id: raw.id, product: raw.product })
 }
 
-/// All playlists in the user's library, owned and followed.
 pub async fn playlists(api: &WebApi) -> Result<Vec<PlaylistInfo>> {
     all_pages(api, "/me/playlists", |raw: Option<RawPlaylist>| raw.map(PlaylistInfo::from)).await
 }
@@ -49,7 +40,6 @@ pub async fn saved_albums(api: &WebApi) -> Result<Vec<AlbumInfo>> {
     all_pages(api, "/me/albums", |saved: RawSavedAlbum| Some(AlbumInfo::from(saved.album))).await
 }
 
-/// Followed artists; this endpoint pages with a cursor instead of an offset.
 pub async fn followed_artists(api: &WebApi) -> Result<Vec<ArtistInfo>> {
     let mut all = Vec::new();
     let mut after: Option<String> = None;
@@ -71,8 +61,6 @@ pub async fn saved_shows(api: &WebApi) -> Result<Vec<ShowInfo>> {
     .await
 }
 
-/// Every item of an offset-paged list. The first page tells how many there are; the rest are
-/// then fetched a few at a time instead of one after another, and keep their order.
 async fn all_pages<R, T>(api: &WebApi, path: &str, map: impl Fn(R) -> Option<T>) -> Result<Vec<T>>
 where
     R: DeserializeOwned + Send,
@@ -94,7 +82,6 @@ where
     Ok(std::iter::once(first).chain(rest).flat_map(|page| page.items).filter_map(map).collect())
 }
 
-/// Number of liked songs.
 pub async fn liked_count(api: &WebApi) -> Result<u32> {
     let page: RawPage<RawSavedTrack> = api.get_json("/me/tracks?limit=1").await?;
     Ok(page.total)
@@ -110,7 +97,6 @@ pub async fn liked_tracks(api: &WebApi, offset: u32) -> Result<Page<Track>> {
     })
 }
 
-/// Only works for playlists the user owns or collaborates on (Development Mode restriction).
 pub async fn playlist_tracks(api: &WebApi, id: &str, offset: u32) -> Result<Page<Track>> {
     let page: RawPage<RawPlaylistItem> =
         api.get_json(&format!("/playlists/{id}/items?limit={PAGE}&offset={offset}")).await?;
@@ -142,13 +128,11 @@ pub async fn album_tracks(api: &WebApi, album: &AlbumInfo, offset: u32) -> Resul
     })
 }
 
-/// One track, by its ID.
 pub async fn track(api: &WebApi, id: &str) -> Result<Track> {
     let raw: RawTrack = api.get_json(&format!("/tracks/{id}")).await?;
     Ok(Track::from(raw))
 }
 
-/// Tracks by ID, in the order asked; ones Spotify no longer has are left out.
 pub async fn tracks_by_ids(api: &WebApi, ids: &[String]) -> Result<Vec<Track>> {
     let mut tracks = Vec::new();
     for chunk in ids.chunks(PAGE as usize) {
@@ -169,20 +153,17 @@ pub async fn artist(api: &WebApi, id: &str) -> Result<ArtistInfo> {
     Ok(ArtistInfo::from(raw))
 }
 
-/// An artist's most played songs, in order.
 pub async fn artist_top_tracks(api: &WebApi, id: &str) -> Result<Vec<Track>> {
     let raw: RawTracks = api.get_json(&format!("/artists/{id}/top-tracks?market=from_token")).await?;
     Ok(raw.tracks.into_iter().flatten().map(Track::from).collect())
 }
 
-/// The artist's albums and singles, newest first.
 pub async fn artist_albums(api: &WebApi, id: &str) -> Result<Vec<AlbumInfo>> {
     let page: RawPage<RawAlbum> =
         api.get_json(&format!("/artists/{id}/albums?include_groups=album,single&limit={PAGE}")).await?;
     Ok(page.items.into_iter().map(AlbumInfo::from).collect())
 }
 
-/// Songs Spotify suggests after `seed`, a track ID.
 pub async fn recommendations(api: &WebApi, seed: &str, limit: u32) -> Result<Vec<Track>> {
     let raw: RawTracks = api.get_json(&format!("/recommendations?seed_tracks={seed}&limit={limit}")).await?;
     Ok(raw.tracks.into_iter().flatten().map(Track::from).collect())
@@ -199,7 +180,6 @@ pub async fn search(api: &WebApi, query: &str) -> Result<SearchResults> {
     })
 }
 
-/// Saves tracks (or any other URIs) to the user's library, e.g. Liked Songs.
 pub async fn save(api: &WebApi, uris: &[String]) -> Result<()> {
     library_call(api, Method::PUT, uris).await
 }
@@ -215,7 +195,6 @@ async fn library_call(api: &WebApi, method: Method, uris: &[String]) -> Result<(
     Ok(())
 }
 
-/// Whether each URI is in the user's library, in the same order.
 pub async fn contains(api: &WebApi, uris: &[String]) -> Result<Vec<bool>> {
     let mut saved = Vec::with_capacity(uris.len());
     for batch in uris.chunks(LIBRARY_BATCH) {
@@ -225,13 +204,10 @@ pub async fn contains(api: &WebApi, uris: &[String]) -> Result<Vec<bool>> {
     Ok(saved)
 }
 
-/// Adds a track to the queue of the active device.
 pub async fn queue(api: &WebApi, uri: &str) -> Result<()> {
     api.call(Method::POST, &format!("/me/player/queue?uri={}", encode(uri)), None).await
 }
 
-/// What plays next on the active device, queued songs first. Unlike Spotify's player state,
-/// the list doesn't say which songs were queued. Episodes are left out.
 pub async fn upcoming(api: &WebApi) -> Result<Vec<Track>> {
     let raw: RawQueue = api.get_json("/me/player/queue").await?;
     let tracks = raw.queue.into_iter().filter_map(|item| serde_json::from_value::<RawTrack>(item).ok());
@@ -243,16 +219,12 @@ pub async fn add_to_playlist(api: &WebApi, playlist_id: &str, uris: &[String]) -
     api.call(Method::POST, &format!("/playlists/{playlist_id}/items"), Some(&body)).await
 }
 
-/// The songs of a playlist through librespot, for playlists the Web API won't show (followed
-/// and Spotify-made ones). [`tracks_metadata`] fills in the details.
 pub async fn playlist_track_uris(session: &Session, id: &str) -> Result<Vec<SpotifyUri>> {
     let uri = SpotifyUri::from_uri(&format!("spotify:playlist:{id}"))?;
     let playlist = meta::Playlist::get(session, &uri).await?;
     Ok(playlist.tracks().filter(|uri| matches!(uri, SpotifyUri::Track { .. })).cloned().collect())
 }
 
-/// Details of a batch of tracks, in the given order, from a single request. Should Spotify
-/// refuse the batch, the tracks are asked for one by one. Tracks without details are left out.
 pub async fn tracks_metadata(session: &Session, uris: &[SpotifyUri]) -> Vec<Track> {
     match batched_metadata(session, uris).await {
         Ok(tracks) => tracks,
@@ -278,7 +250,6 @@ async fn batched_metadata(session: &Session, uris: &[SpotifyUri]) -> Result<Vec<
         ..Default::default()
     };
     let response = session.spclient().get_extended_metadata(request).await?;
-    // Entries need not come back in the order they were asked for.
     let mut found: HashMap<String, Track> = response
         .extended_metadata
         .iter()
@@ -294,7 +265,6 @@ async fn batched_metadata(session: &Session, uris: &[SpotifyUri]) -> Result<Vec<
     Ok(uris.iter().filter_map(|uri| found.remove(&uri.to_uri())).collect())
 }
 
-/// The image closest to the preferred width; a missing width counts as a match.
 fn pick_image(images: &[RawImage]) -> Option<String> {
     images
         .iter()
@@ -332,7 +302,6 @@ impl From<RawTrack> for Track {
     }
 }
 
-/// A track from librespot's metadata. Neither type is this crate's, so this can't be a `From`.
 fn metadata_track(track: meta::Track) -> Track {
     Track {
         uri: track.id.to_uri(),
@@ -407,7 +376,6 @@ struct RawSavedTrack {
     track: Option<RawTrack>,
 }
 
-/// Since February 2026 playlist entries carry the track under `item` instead of `track`.
 #[derive(Deserialize)]
 struct RawPlaylistItem {
     item: Option<RawTrack>,
@@ -525,7 +493,6 @@ struct RawPlaylist {
     collaborative: bool,
     #[serde(default, deserialize_with = "nullable")]
     images: Vec<RawImage>,
-    /// `items` since February 2026, `tracks` before.
     items: Option<RawCount>,
     tracks: Option<RawCount>,
 }
@@ -549,7 +516,6 @@ struct RawSearch {
     playlists: Option<RawPage<Option<RawPlaylist>>>,
 }
 
-/// Treats `null` like a missing field (Spotify sends `"images": null` for some playlists).
 fn nullable<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: serde::Deserializer<'de>,

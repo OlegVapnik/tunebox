@@ -1,8 +1,3 @@
-//! Signing in to YouTube Music with a browser's cookies. Google's sign-in for TV apps no longer
-//! works for YouTube Music, so tunebox borrows the session of a browser that is signed in:
-//! yt-dlp reads its cookies (it knows every browser's cookie store and keyring), and tunebox
-//! keeps only those of youtube.com. They sign in every Google account signed in to the
-//! browser, so the sign-in also keeps which one it acts as.
 
 use std::{
     fs,
@@ -22,25 +17,17 @@ use crate::{
     innertube, library,
 };
 
-/// A browser yt-dlp can read cookies from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Browser {
-    /// The name people know, e.g. "Brave".
     pub name: String,
-    /// What `--cookies-from-browser` takes, e.g. `brave`, or `firefox:<profiles>` for forks.
     pub spec: String,
 }
 
-/// A browser tunebox knows.
 struct Known {
-    /// How the system names it: desktop entries on Linux, bundle ids on macOS.
     ids: &'static [&'static str],
     name: &'static str,
-    /// yt-dlp's name for it, or for the browser it is a fork of.
     reader: &'static str,
-    /// Where it keeps its profiles, relative to the home directory.
     dir: &'static str,
-    /// Whether yt-dlp needs the folder: it doesn't know forks.
     fork: bool,
 }
 
@@ -54,8 +41,6 @@ const fn fork(ids: &'static [&'static str], name: &'static str, reader: &'static
 
 #[cfg(target_os = "macos")]
 const KNOWN: &[Known] = &[
-    // The four people are most likely to be signed in to come first: the login menu shows them
-    // at 1–4, with manual entry last.
     known(&["org.mozilla.firefox"], "Firefox", "firefox", "Library/Application Support/Firefox"),
     known(&["com.google.chrome"], "Google Chrome", "chrome", "Library/Application Support/Google/Chrome"),
     known(&["com.microsoft.edgemac"], "Microsoft Edge", "edge", "Library/Application Support/Microsoft Edge"),
@@ -74,14 +59,11 @@ const KNOWN: &[Known] = &[
 ];
 #[cfg(not(target_os = "macos"))]
 const KNOWN: &[Known] = &[
-    // The four people are most likely to be signed in to come first: the login menu shows them
-    // at 1–4, with manual entry last.
     known(&["firefox.desktop"], "Firefox", "firefox", ".mozilla/firefox"),
     known(&["firefox.desktop"], "Firefox", "firefox", ".config/mozilla/firefox"),
     known(&["google-chrome.desktop"], "Google Chrome", "chrome", ".config/google-chrome"),
     known(&["microsoft-edge.desktop"], "Microsoft Edge", "edge", ".config/microsoft-edge"),
     known(&["brave-browser.desktop", "brave.desktop"], "Brave", "brave", ".config/BraveSoftware/Brave-Browser"),
-    // Omarchy's Brave, which keeps its profiles apart from Brave's.
     fork(&["brave-origin.desktop"], "Brave Origin", "brave", ".config/BraveSoftware/Brave-Origin"),
     known(&["chromium.desktop", "chromium-browser.desktop"], "Chromium", "chromium", ".config/chromium"),
     known(&["vivaldi-stable.desktop", "vivaldi.desktop"], "Vivaldi", "vivaldi", ".config/vivaldi"),
@@ -92,8 +74,6 @@ const KNOWN: &[Known] = &[
 ];
 
 impl Known {
-    /// The browser, when it has a profile in its folder: a folder alone may be left over, or
-    /// made by another program.
     fn found(&self, home: &Path) -> Option<Browser> {
         let dir = home.join(self.dir);
         let profile = match self.reader {
@@ -106,23 +86,18 @@ impl Known {
     }
 }
 
-/// YouTube's sign-in, which leads to YouTube Music afterwards.
 const SIGN_IN_URL: &str =
     "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F";
-/// Google's sign-in for one more account, as YouTube's "Add account" opens it: through
-/// YouTube's own sign-in, which gives youtube.com the new account's cookies, to YouTube Music.
 const ADD_ACCOUNT_URL: &str = "https://accounts.google.com/AddSession?service=youtube&passive=false&continue=\
      https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26next%3D\
      https%253A%252F%252Fmusic.youtube.com%252F";
 
-/// yt-dlp exports the cookies of every site; this many seconds is plenty for that.
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
-/// The browsers on this computer that have a profile yt-dlp could read cookies from.
 pub fn browsers() -> Vec<Browser> {
     let Some(home) = home() else { return Vec::new() };
     let mut found: Vec<Browser> = Vec::new();
@@ -134,17 +109,14 @@ pub fn browsers() -> Vec<Browser> {
     found
 }
 
-/// The browser that opens links, when tunebox knows it and it has a profile.
 pub fn default_browser() -> Option<Browser> {
     let id = default_browser_id()?;
     let home = home()?;
     KNOWN.iter().filter(|known| known.ids.contains(&id.as_str())).find_map(|known| known.found(&home))
 }
 
-/// The desktop entry of the browser that opens links.
 #[cfg(not(target_os = "macos"))]
 fn default_browser_id() -> Option<String> {
-    // Omarchy's own entry only hands links on to the browser it names.
     let asks: [(&str, &[&str]); 3] = [
         ("omarchy-cmd-default-browser", &[]),
         ("xdg-settings", &["get", "default-web-browser"]),
@@ -157,7 +129,6 @@ fn default_browser_id() -> Option<String> {
     })
 }
 
-/// The bundle id of the app that opens https links; Safari unless another was picked.
 #[cfg(target_os = "macos")]
 fn default_browser_id() -> Option<String> {
     let plist = home()?.join("Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist");
@@ -177,23 +148,16 @@ fn default_browser_id() -> Option<String> {
     Some(id.to_lowercase())
 }
 
-/// Opens YouTube's sign-in in the browser that opens links; whether it could.
 pub fn open_sign_in() -> bool {
     open::that_detached(SIGN_IN_URL).is_ok()
 }
 
-/// Opens Google's sign-in for one more account in the browser that opens links; whether it
-/// could.
 pub fn open_add_account() -> bool {
     open::that_detached(ADD_ACCOUNT_URL).is_ok()
 }
 
-/// The note in a saved cookie file that says which browser it came from, so a sign-in that
-/// YouTube no longer takes can be re-read from that same browser. Older sign-ins and pasted
-/// ones have no such note: `tunebox login ytmusic --force` records one.
 pub const BROWSER_NOTE: &str = "# tunebox-browser: ";
 
-/// The browser a saved sign-in came from, if it recorded one.
 pub fn browser_of(text: &str) -> Option<String> {
     text.lines()
         .rev()
@@ -204,9 +168,6 @@ pub fn browser_of(text: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// A sign-in read from a browser or pasted, not kept yet: it replaces the one before only once
-/// YouTube Music took it, so one that doesn't work leaves a working one in place. It acts as the
-/// browser's first account until `choose` picks another.
 pub struct SignIn {
     client: YtMusic,
     browser: Option<String>,
@@ -217,35 +178,25 @@ impl SignIn {
         Ok(Self { client: YtMusic::unsaved(jar)?, browser })
     }
 
-    /// The accounts it can act as: each Google account signed in to the browser, in Google's
-    /// order, with its brand accounts. Fails when YouTube turns the cookies down.
     pub async fn accounts(&self) -> Result<Vec<Account>> {
         account::list(self.client.api()).await
     }
 
-    /// Acts as `account` from now on, and once kept.
     pub fn choose(&self, account: &Account) {
         self.client.api().set_identity(account.identity.clone());
     }
 
-    /// Asks YouTube Music whose sign-in it is; fails when it turns the cookies down.
     pub async fn check(&self) -> Result<User> {
         library::me(self.client.api()).await
     }
 
-    /// Keeps it in place of the sign-in before, with the account chosen, the cookies YouTube
-    /// refreshed meanwhile, and the browser it came from (so a refusal can read it again).
     pub fn save(self, paths: &Paths) -> Result<()> {
-        // The browser it came from goes with the cookies, so a refusal can read them again.
         self.client.api().set_browser(self.browser.clone());
         let text = self.client.api().sign_in_text().context("No cookies to keep")?;
         private_dir(paths)?;
         paths.ytmusic_cookies().write(text.as_bytes())
     }
 
-    /// Re-reads the sign-in from `browser`, acting as the same account, and keeps it only when
-    /// YouTube still says it is `was`: a browser that went on using its sign-in has fresh
-    /// cookies for it, and the ones tunebox copied stopped working.
     pub async fn refresh(
         paths: &Paths,
         browser: &mut Browser,
@@ -266,22 +217,14 @@ impl SignIn {
     }
 }
 
-/// Whether cookies re-read from the browser still belong to the account tunebox was acting as.
-/// A missing reference means no account was identified yet in this run (the first `me()` was
-/// refused because the saved cookies expired), so a successful check is accepted on its own.
 fn same_account(was: Option<&User>, now: Option<&User>) -> bool {
     match (was, now) {
-        // The channel or handle tells the accounts apart; the name alone doesn't.
         (Some(was), Some(now)) => was.id == now.id || was.name == now.name,
         (None, Some(_)) => true,
         _ => false,
     }
 }
 
-/// Reads the sign-in of `browser`; `None` while it isn't signed in to YouTube. The browser's
-/// cookie store may be locked while it runs (Chromium-based browsers on Windows); yt-dlp says
-/// so. Where yt-dlp guesses the keyring wrong, on desktops it doesn't know such as Hyprland,
-/// `browser` keeps the keyring that worked, for the next time.
 pub async fn from_browser(paths: &Paths, browser: &mut Browser) -> Result<Option<SignIn>> {
     let (mut jar, mut stderr) = export(paths, &browser.spec).await?;
     let signed_in = |jar: &Jar| innertube::check_jar(jar).is_ok();
@@ -300,7 +243,6 @@ pub async fn from_browser(paths: &Paths, browser: &mut Browser) -> Result<Option
     if signed_in(&jar) {
         return SignIn::new(jar, Some(browser.spec.clone())).map(Some);
     }
-    // Cookies it couldn't decrypt may be the sign-in.
     if undecrypted(&stderr) {
         bail!("yt-dlp can't decrypt {}'s cookies{}", browser.name, reason(&stderr));
     }
@@ -310,11 +252,8 @@ pub async fn from_browser(paths: &Paths, browser: &mut Browser) -> Result<Option
     Ok(None)
 }
 
-/// The cookies of youtube.com in the browser of `spec`, and what yt-dlp printed to stderr.
 async fn export(paths: &Paths, spec: &str) -> Result<(Jar, String)> {
     let dir = private_dir(paths)?;
-    // yt-dlp writes every site's cookies; they stay in this private folder only until tunebox
-    // picked out YouTube's. yt-dlp makes the file: it turns down one that has no cookies yet.
     let file = dir.join("browser-export.txt");
     let _ = fs::remove_file(&file);
     let result = export_cookies(spec, &file).await;
@@ -323,12 +262,10 @@ async fn export(paths: &Paths, spec: &str) -> Result<(Jar, String)> {
     Ok((Jar::parse(&text).youtube_only(), result?))
 }
 
-/// Whether yt-dlp found cookies it couldn't decrypt, for want of the keyring's key.
 fn undecrypted(stderr: &str) -> bool {
     stderr.contains("cannot decrypt") || stderr.contains("failed to decrypt")
 }
 
-/// `spec` reading the key from `keyring`: `brave:<profiles>` becomes `brave+gnomekeyring:<profiles>`.
 fn with_keyring(spec: &str, keyring: &str) -> String {
     match spec.split_once(':') {
         Some((browser, profile)) => format!("{browser}+{keyring}:{profile}"),
@@ -336,14 +273,11 @@ fn with_keyring(spec: &str, keyring: &str) -> String {
     }
 }
 
-/// Runs yt-dlp; returns what it printed to stderr. Its warnings stay on: they tell when it
-/// couldn't decrypt cookies.
 async fn export_cookies(spec: &str, file: &Path) -> Result<String> {
     let mut command = Command::new("yt-dlp");
     command
         .args(["--no-config", "--skip-download", "--cookies-from-browser", spec, "--cookies"])
         .arg(file)
-        // Any youtube.com page will do; yt-dlp saves the cookies even though it can't use it.
         .arg("https://music.youtube.com/")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -359,7 +293,6 @@ async fn export_cookies(spec: &str, file: &Path) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stderr).into_owned())
 }
 
-/// yt-dlp's last error, unless it's only that the page isn't a video.
 fn reason(stderr: &str) -> String {
     stderr
         .lines()
@@ -368,20 +301,16 @@ fn reason(stderr: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Reads a `Cookie` header copied from the browser's developer tools, for when yt-dlp can't
-/// read the browser.
 pub fn from_cookie_header(header: &str) -> Result<SignIn> {
     let jar = Jar::from_header(header);
     innertube::check_jar(&jar)?;
     SignIn::new(jar, None)
 }
 
-/// Forgets the cookies; YouTube Music is signed out on the next start.
 pub fn sign_out(paths: &Paths) -> Result<()> {
     paths.ytmusic_cookies().delete()
 }
 
-/// The folder of the sign-in, readable by the user only.
 fn private_dir(paths: &Paths) -> Result<PathBuf> {
     let cookies = paths.ytmusic_cookies();
     let dir = cookies.file().parent().map(Path::to_path_buf).context("No folder for the cookies")?;
@@ -408,13 +337,10 @@ mod tests {
     #[test]
     fn a_refresh_before_the_first_me_is_accepted() {
         let user = User { id: "UCabc".into(), name: "Oleg".into(), product: None };
-        // The saved cookies are refused before any account was identified in this run.
         assert!(same_account(None, Some(&user)));
         assert!(same_account(Some(&user), Some(&user)));
-        // A different account in the browser must not replace the one tunebox was acting as.
         let other = User { id: "UCxyz".into(), name: "Someone else".into(), product: None };
         assert!(!same_account(Some(&user), Some(&other)));
-        // Cookies the browser no longer has are no good either.
         assert!(!same_account(None, None));
         assert!(!same_account(Some(&user), None));
     }
@@ -438,7 +364,6 @@ mod tests {
         let client = crate::YtMusic::new(&paths).unwrap();
         assert!(client.signed_in());
         assert_eq!(client.api().identity(), Some(Identity::default()), "the first account unless one was picked");
-        // One that YouTube Music turned down is never saved, which leaves this one.
         drop(from_cookie_header("SAPISID=other; LOGIN_INFO=other").unwrap());
         assert_eq!(Jar::parse(&fs::read_to_string(&file).unwrap()).get("SAPISID"), Some("abc"));
         sign_out(&paths).unwrap();
@@ -468,7 +393,6 @@ mod tests {
         SignIn::new(jar, Some("firefox:/home/me/.mozilla/firefox".into())).unwrap().save(&paths).unwrap();
         let client = crate::YtMusic::new(&paths).unwrap();
         assert_eq!(client.api().browser().as_deref(), Some("firefox:/home/me/.mozilla/firefox"));
-        // A pasted one says nothing about where it came from, so nothing can read it again.
         from_cookie_header("SAPISID=abc; LOGIN_INFO=def").unwrap().save(&paths).unwrap();
         assert_eq!(crate::YtMusic::new(&paths).unwrap().api().browser(), None);
         fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
@@ -506,7 +430,6 @@ mod tests {
         let chromium = known(&[], "Chromium", "chromium", "chromium");
         let origin = fork(&[], "Brave Origin", "brave", "Brave-Origin");
         let firefox = known(&[], "Firefox", "firefox", "firefox");
-        // Folders another program left, without a profile.
         fs::create_dir_all(home.join("chromium/NativeMessagingHosts")).unwrap();
         fs::create_dir_all(home.join("firefox")).unwrap();
         assert_eq!(chromium.found(&home), None);
@@ -515,7 +438,6 @@ mod tests {
         fs::write(home.join("firefox/profiles.ini"), "").unwrap();
         assert_eq!(chromium.found(&home).unwrap().spec, "chromium");
         assert_eq!(firefox.found(&home).unwrap().spec, "firefox");
-        // yt-dlp doesn't know forks, so it gets their folder.
         fs::create_dir_all(home.join("Brave-Origin")).unwrap();
         fs::write(home.join("Brave-Origin/Local State"), "{}").unwrap();
         assert_eq!(origin.found(&home).unwrap().spec, format!("brave:{}", home.join("Brave-Origin").display()));

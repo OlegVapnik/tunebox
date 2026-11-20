@@ -39,24 +39,19 @@ use crate::{
 };
 
 const SIDEBAR_WIDTH: u16 = 32;
-/// Below this width only the focused pane is shown.
 const TWO_PANE_MIN_WIDTH: u16 = 90;
 const PLAYER_HEIGHT: u16 = 6;
-/// The character Kitty image cells are made of.
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let p = theme::palette();
     app.begin_frame();
-    // Stale glyphs (inline image placeholders, previous frames' text) must not survive:
-    // set_style only changes colors, so a cell's symbol would otherwise linger.
     frame.buffer_mut().reset();
     let area = frame.area();
     app.screen = area;
     app.hits.clear();
     app.placements.clear();
     frame.buffer_mut().set_style(area, Style::new().bg(p.bg).fg(p.text));
-    // Small windows get compact bars so there is room left for the content.
     let top_height = match area.height {
         30.. => topbar::HEIGHT,
         14.. => 1,
@@ -87,8 +82,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 Layout::horizontal([Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(0)]).areas(main);
             sidebar::draw(frame, app, nav);
             draw_content(frame, app, content);
-            // One hairline between the panes, so they read as the two panels they are. It
-            // stands a column off the sidebar, clear of its scrollbar.
             let divider = nav.right() + 1;
             for y in main.top()..main.bottom() {
                 frame.buffer_mut().set_string(divider, y, "│", Style::new().fg(p.raised).bg(p.bg));
@@ -132,14 +125,10 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect) {
     }
 }
 
-/// Draws a cover centered in `slot`, or nothing while it loads. Returns whether it drew. With
-/// cover art off, a plain tile takes its place.
 pub(super) fn cover(frame: &mut Frame, app: &mut App, url: Option<&str>, size: Size, round: bool, slot: Rect) -> bool {
     cover_in(frame, app, url, size, round, (slot.x, slot.y as i32), slot.as_size(), slot)
 }
 
-/// Like [`cover`], for a slot at `(x, y)` that may reach past `clip` while scrolling: the
-/// visible part of the cover is drawn.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn cover_in(
     frame: &mut Frame,
@@ -151,14 +140,9 @@ pub(super) fn cover_in(
     slot: Size,
     clip: Rect,
 ) -> bool {
-    // Fill the slot with the pane background first, so transparent image corners (round
-    // covers) and any smaller image never show the terminal's own (possibly light)
-    // background or a stale raised tile behind the art.
     {
         let buf = frame.buffer_mut();
         let rect = Rect::new(x, y.max(0) as u16, slot.width, slot.height);
-        // Only the part in view: the rest of a scrolled slot reaches into the top bar and would
-        // repaint its buttons and search field with the pane background.
         let area = rect.intersection(clip).intersection(buf.area);
         if !area.is_empty() {
             buf.set_style(area, Style::new().bg(theme::palette().bg));
@@ -179,8 +163,6 @@ pub(super) fn cover_in(
     }
 }
 
-/// Stands in for a cover with cover art off: one flat color and an icon, which costs nothing to
-/// load or to send to the terminal.
 fn tile(buf: &mut Buffer, (x, y): (u16, i32), size: Size, slot: Size, clip: Rect, round: bool) {
     let p = theme::palette();
     let left = x + slot.width.saturating_sub(size.width) / 2;
@@ -200,15 +182,10 @@ fn tile(buf: &mut Buffer, (x, y): (u16, i32), size: Size, slot: Size, clip: Rect
     }
 }
 
-/// Stands in for a cover nobody has: a gradient picked by the name, with its first letter. A
-/// shelf of these reads as a designed placeholder rather than as a failed load.
 pub(super) fn placeholder(frame: &mut Frame, app: &mut App, area: Rect, name: &str, round: bool) {
     placeholder_in(frame, app, (area.x, area.y as i32), area.as_size(), area, name, round);
 }
 
-/// Like [`placeholder`], for a slot at `(x, y)` that may reach past `clip` while scrolling: the
-/// gradient keeps its rows from the top of the slot, so a half-scrolled card shows the part of
-/// the placeholder that belongs there.
 pub(super) fn placeholder_in(
     frame: &mut Frame,
     app: &mut App,
@@ -218,14 +195,10 @@ pub(super) fn placeholder_in(
     name: &str,
     round: bool,
 ) {
-    // The cells are both the fallback while the image is encoded and the underlay when covers
-    // are off. The encoded version replaces them with a smooth gradient and antialiased corners.
     placeholder_cells(frame.buffer_mut(), (x, y), size, clip, name, round);
     if let Some(picture) = app.placeholder_image(name, size, round) {
         if let Some(placement) = picture_in(frame, picture, (x, y), size, clip) {
             app.placements.push(placement);
-            // Latin and Cyrillic initials are already drawn into the image at cover size; a text
-            // initial on top of them would read as a double letter. Other scripts keep text.
             let drawn_in_image =
                 name.chars().find(|c| !c.is_whitespace()).is_some_and(|c| art::has_glyph(c.to_ascii_uppercase()));
             if !drawn_in_image {
@@ -242,9 +215,6 @@ fn placeholder_cells(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: Rec
     }
     let (from, to) = theme::placeholder_colors(name);
     let height = size.height as usize;
-    // Covers are rounded and portraits are circles, so clear the corner cells: a drawn
-    // placeholder then has the same silhouette as a masked image. A two-step staircase
-    // reads as a smooth curve rather than a single octagonal notch.
     for row in 0..height {
         let screen = y + row as i32;
         if screen < clip.y as i32 || screen >= clip.bottom() as i32 {
@@ -283,13 +253,10 @@ fn placeholder_initial(buf: &mut Buffer, (x, y): (u16, i32), size: Size, clip: R
     buf.set_string(x, y as u16, initial, Style::new().fg(ink.into()).bold());
 }
 
-/// Draws an image centered in `slot`; returns where it went, for dev snapshots.
 pub(super) fn picture_at(frame: &mut Frame, picture: &Picture, slot: Rect) -> Option<Placement> {
     picture_in(frame, picture, (slot.x, slot.y as i32), slot.as_size(), slot)
 }
 
-/// Draws the part of an image centered in a slot at `(x, y)` that lies inside `clip`.
-/// Returns `None` when nothing was drawn.
 pub(super) fn picture_in(
     frame: &mut Frame,
     picture: &Picture,
@@ -303,8 +270,6 @@ pub(super) fn picture_in(
     let top = y + (slot.height.saturating_sub(size.height) / 2) as i32;
     let mut bottom = clip.bottom();
     if let Graphic::Inline(_) = picture.graphic {
-        // Some terminals put the cursor below a Sixel or iTerm2 image, which in the last row
-        // scrolls the whole screen.
         bottom = bottom.min(frame.area().bottom().saturating_sub(1));
     }
     let visible_top = top.max(clip.y as i32);
@@ -315,7 +280,6 @@ pub(super) fn picture_in(
     let skip = (visible_top - top) as u16;
     let area = Rect::new(left, visible_top as u16, size.width, (visible_bottom - visible_top) as u16);
     let (upload, inline) = match &picture.graphic {
-        // Written after the frame, cut to the rows in view; the cells only mark where it goes.
         Graphic::Inline(image) => {
             let buf = frame.buffer_mut();
             for position in area.positions() {
@@ -330,7 +294,6 @@ pub(super) fn picture_in(
             frame.render_widget(Image::new(protocol), area);
             (take_upload(&mut frame.buffer_mut()[(area.x, area.y)]), None)
         }
-        // Kitty placeholders and half blocks are plain cells, so rows can be cut.
         Graphic::Cells(protocol) => {
             let mut scratch = Buffer::empty(Rect::new(0, 0, size.width, size.height));
             Image::new(protocol).render(scratch.area, &mut scratch);
@@ -351,9 +314,6 @@ pub(super) fn picture_in(
     Some(Placement { area, size, skip, source: picture.source.clone(), cells, upload, inline })
 }
 
-/// The first time a Kitty image is drawn, the upload of its pixels rides on its top-left cell.
-/// Takes it off, so that whatever is drawn over that cell, like an overlay, cannot lose it; the
-/// caller writes it out after the frame.
 fn take_upload(cell: &mut Cell) -> Option<String> {
     let symbol = cell.symbol();
     let start = symbol.find(KITTY_PLACEHOLDER).filter(|&start| start > 0)?;
@@ -364,25 +324,15 @@ fn take_upload(cell: &mut Cell) -> Option<String> {
 
 pub(super) const PLAY_BUTTON_WIDTH: u16 = 3;
 
-/// The play button of a hovered card, ending at column `right` in row `y`.
-///
-/// Callers pass the card's right edge, so the button sits flush with the artwork: clearing cells
-/// beside it would punch a rectangular hole in the cover.
 pub(super) fn play_button(buf: &mut Buffer, app: &mut App, right: u16, y: u16, hit: Hit) {
     let p = theme::palette();
     let area = Rect::new(right.saturating_sub(PLAY_BUTTON_WIDTH), y, PLAY_BUTTON_WIDTH, 1).intersection(buf.area);
     let accent = app.accent.color();
-    // Blank the cells rather than only recoloring them: over a cover they hold image cells,
-    // which would keep showing pieces of the picture around the icon.
     buf.set_string(area.x, y, " ".repeat(area.width as usize), Style::new().bg(accent));
-    // A plain triangle: the Nerd Font codepoint may be missing from the user's font and then
-    // paints a dark tofu block. With three cells the icon sits in the middle one.
     buf.set_string(area.x + 1, y, "▸", Style::new().fg(p.bg).bg(accent));
     app.hits.push((area, hit));
 }
 
-/// Where each of `names`, written out joined by ", " from column `x`, lies on screen, cut
-/// off at `width` columns: one rect per visible name, with its index.
 pub(super) fn name_spans(x: u16, y: u16, names: &[String], width: usize) -> Vec<(Rect, usize)> {
     let mut spans = Vec::new();
     let mut offset = 0;
@@ -397,17 +347,14 @@ pub(super) fn name_spans(x: u16, y: u16, names: &[String], width: usize) -> Vec<
     spans
 }
 
-/// The equalizer that marks what plays; it stands still where motion is unwelcome.
 pub(super) fn equalizer(app: &App) -> &'static str {
     text::equalizer(if app.calm() { 0 } else { app.frame() })
 }
 
-/// Whether the mouse is over `area` with nothing in front of it.
 pub(super) fn hovered(app: &App, area: Rect) -> bool {
     app.overlay.is_none() && app.mouse.is_some_and(|position| area.contains(position))
 }
 
-/// A slim scrollbar in column `x`, shown only when the content is longer than the view.
 pub(super) fn scrollbar(buf: &mut Buffer, x: u16, y: u16, height: u16, total: usize, offset: usize, visible: usize) {
     let p = theme::palette();
     if total <= visible || height < 3 || x >= buf.area.right() {
@@ -423,23 +370,17 @@ pub(super) fn scrollbar(buf: &mut Buffer, x: u16, y: u16, height: u16, total: us
     }
 }
 
-/// Lightens whatever clickable thing the mouse is over, and more so what was just clicked;
-/// links get underlined instead.
 fn hover(buf: &mut Buffer, app: &App) {
     let p = theme::palette();
-    // Only while the target is still there: a click that opened another page leaves none.
     let pressed = app.pressed().map(|(hit, area)| (area, hit)).filter(|pressed| app.hits.contains(pressed));
     if let Some((area, _)) = pressed {
         tint(buf, app, area, 0.18);
     }
     let Some(position) = app.mouse else { return };
-    // Only the topmost target counts: an overlay's body hides the rows and cards under it.
     let Some((area, hit)) = app.hits.iter().rev().find(|(area, _)| area.contains(position)) else { return };
     if !hit.is_interactive() {
         return;
     }
-    // A card that is already selected shows its selection wash; tinting it again for the
-    // hovering mouse makes two highlights, so leave it alone.
     if let (Hit::Card { shelf, item }, View::Home(view)) = (hit, &app.view)
         && view.chip.is_none()
         && view.shelf == *shelf
@@ -454,14 +395,12 @@ fn hover(buf: &mut Buffer, app: &App) {
     }
 }
 
-/// Mixes some of the highlight color, white on dark themes, into the background of `area`.
 fn tint(buf: &mut Buffer, app: &App, area: Rect, amount: f32) {
     let p = theme::palette();
     let area = area.intersection(buf.area);
     for y in area.top()..area.bottom() {
         for x in area.left()..area.right() {
             let cell = &mut buf[(x, y)];
-            // Leave image cells alone: their colors carry the picture.
             if cell.symbol().contains(KITTY_PLACEHOLDER)
                 || app.placements.iter().any(|p| p.area.contains((x, y).into()))
             {
@@ -487,7 +426,6 @@ mod tests {
         placeholder_cells(&mut buf, (area.x, area.y as i32), area.as_size(), area, "morning run", false);
         assert_ne!(buf[(2, 0)].bg, buf[(2, 2)].bg, "the gradient runs top to bottom");
         assert_eq!(buf[(2, 1)].symbol(), "M", "the first letter, centered");
-        // The same name always gets the same placeholder.
         let mut other = Buffer::empty(Rect::new(0, 0, 6, 3));
         placeholder_cells(&mut other, (area.x, area.y as i32), area.as_size(), area, "morning run", true);
         assert_eq!(buf[(3, 1)].bg, other[(3, 1)].bg);
@@ -497,7 +435,6 @@ mod tests {
     fn a_scrolled_placeholder_paints_only_its_visible_rows() {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 4));
         let area = buf.area;
-        // A six-row slot scrolled up by two: the screen starts at the slot's third row.
         placeholder_cells(&mut buf, (0, -2), Size::new(6, 6), area, "morning run", false);
         assert_ne!(buf[(0, 0)].bg, Color::Reset, "the visible part is painted");
         assert_eq!(buf[(0, 3)].bg, Color::Reset, "the rounded bottom corner is cleared");

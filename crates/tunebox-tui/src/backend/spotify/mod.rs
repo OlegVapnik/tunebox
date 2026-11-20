@@ -1,5 +1,3 @@
-//! Spotify: the Web API for the library and catalog, librespot for playback and for what only
-//! Spotify's own apps get, like Home, artist pages, DJ and Spotify-made playlists.
 
 mod player;
 mod queue;
@@ -47,19 +45,12 @@ use crate::{
     views::TrackSource,
 };
 
-/// Track metadata requests running at the same time for one playlist.
 const METADATA_BATCHES: usize = 3;
-/// Library checks running at the same time for one list.
 const SAVED_CONCURRENCY: usize = 2;
-/// How long lyrics wait for the session, so a track restored at startup still gets Spotify's
-/// synced lyrics instead of going straight to LRCLIB.
 const LYRICS_SESSION_WAIT: Duration = Duration::from_secs(5);
 const SEARCH_SESSION_WAIT: Duration = Duration::from_secs(5);
-/// Longer, since the cached library shows meanwhile.
 const LIBRARY_SESSION_WAIT: Duration = Duration::from_secs(15);
 
-/// Signed in to the Web API, with or without Premium: without it, songs play through mpv and
-/// YouTube, and the parts only Spotify's own apps get are left out.
 pub struct Account {
     api: Arc<WebApi>,
 }
@@ -73,8 +64,6 @@ impl Account {
         Ok(Self { api })
     }
 
-    /// Connects the player in the background: librespot where streaming credentials are saved,
-    /// and mpv where the account only has the Web API, as a free one does.
     pub fn start(self, launch: Launch) -> Catalog {
         let hashes = launch.paths.pathfinder_hashes();
         if session::is_logged_in(&launch.paths).unwrap_or(false) {
@@ -112,7 +101,6 @@ impl Account {
     }
 }
 
-/// tunebox's Spotify player: librespot for Premium, mpv for a free account.
 pub enum Controller {
     Premium(player::Connect),
     Free(tunebox_spotify::Player),
@@ -268,15 +256,11 @@ impl Controller {
 #[derive(Clone)]
 pub struct Catalog {
     api: Arc<WebApi>,
-    /// librespot's session, where the account has Premium; without it, songs play through mpv.
     session: Option<Arc<watch::Sender<SessionState>>>,
-    /// The mpv player of a free account, filled once it is up.
     free_player: Option<Arc<OnceLock<tunebox_spotify::Player>>>,
     pathfinder: Arc<Mutex<Option<Arc<Pathfinder>>>>,
     pathfinder_hashes: PathBuf,
-    /// The user's Spotify ID, to tell their own playlists from followed ones.
     user_id: Arc<OnceCell<String>>,
-    /// For LRCLIB, where lyrics come from when Spotify has none.
     http: reqwest::Client,
     remote: UnboundedSender<connect::Command>,
 }
@@ -305,7 +289,6 @@ impl Catalog {
         }
     }
 
-    /// The librespot session, once the player has connected.
     async fn session(&self) -> Result<Session> {
         let Some(session) = &self.session else {
             bail!("This needs Spotify Premium; on a free account, tunebox plays its songs through YouTube.");
@@ -319,7 +302,6 @@ impl Catalog {
         }
     }
 
-    /// Recreated after a reconnect, since the old session is shut down.
     async fn pathfinder(&self) -> Result<Arc<Pathfinder>> {
         let session = self.session().await?;
         let mut current = self.pathfinder.lock().unwrap_or_else(PoisonError::into_inner);
@@ -335,8 +317,6 @@ impl Catalog {
         tokio::time::timeout(wait, self.pathfinder()).await.context("Spotify is still connecting")?
     }
 
-    /// The user's ID; asks Spotify itself when `/me` has not answered yet, as happens for a
-    /// playlist restored at startup.
     async fn user_id(&self) -> Option<String> {
         let id = self.user_id.get_or_try_init(|| async { catalog::me(&self.api).await.map(|user| user.id) }).await;
         id.ok().cloned()
@@ -362,7 +342,6 @@ impl Catalog {
         artist::artist(&*self.pathfinder().await?, uri).await
     }
 
-    /// Home without Spotify's own app: the playlists and albums the Web API has.
     async fn free_home(&self) -> Result<Home> {
         let mut shelves = Vec::new();
         if let Ok(playlists) = catalog::playlists(&self.api).await
@@ -421,7 +400,6 @@ impl Catalog {
         Ok(Home { greeting: String::new(), chips: Vec::new(), shelves })
     }
 
-    /// An artist page without Spotify's own app: their top songs and albums from the Web API.
     async fn free_artist(&self, uri: &str) -> Result<ArtistPage> {
         let id = uri.strip_prefix("spotify:artist:").unwrap_or(uri);
         let found = catalog::artist(&self.api, id).await?;
@@ -469,7 +447,6 @@ impl Catalog {
         })
     }
 
-    /// Playlists come from Spotify's own search, which finds the user's mixes.
     pub async fn search(&self, query: &str) -> Result<SearchResults> {
         if self.session.is_none() {
             return catalog::search(&self.api, query).await;
@@ -484,7 +461,6 @@ impl Catalog {
         Ok(results)
     }
 
-    /// Pages after the first are fetched a few at a time and arrive in order.
     pub fn tracks(&self, source: TrackSource) -> BoxStream<'static, Result<Page<Track>>> {
         let this = self.clone();
         stream::once(async move {
@@ -520,8 +496,6 @@ impl Catalog {
         .boxed()
     }
 
-    /// Followed and Spotify-made playlists only resolve through librespot. Their tracks arrive
-    /// in batches, so the first rows show while the rest load.
     async fn internal_playlist(self, id: String) -> BoxStream<'static, Result<Page<Track>>> {
         let listed = async {
             let session = self.session().await?;
@@ -547,7 +521,6 @@ impl Catalog {
                 *requested += len;
                 *delivered += items.len();
                 let last = *requested == count;
-                // Tracks without details are left out, so the final count is what actually arrived.
                 let total = if last { *delivered } else { count } as u32;
                 let next_offset = (!last).then_some(*requested as u32);
                 future::ready(Some(Ok(Page { items, total, next_offset })))
@@ -555,7 +528,6 @@ impl Catalog {
             .boxed()
     }
 
-    /// Spotify's own library, which includes mixes, with song counts from the Web API.
     pub async fn playlists(&self) -> Result<Vec<PlaylistInfo>> {
         if self.session.is_none() {
             return catalog::playlists(&self.api).await;
@@ -594,14 +566,11 @@ impl Catalog {
         catalog::saved_shows(&self.api).await
     }
 
-    /// Spotify's own lyrics, else LRCLIB's.
     pub async fn lyrics(&self, query: LyricsQuery<'_>) -> Result<Option<Lyrics>> {
         let session = tokio::time::timeout(LYRICS_SESSION_WAIT, self.session()).await.ok().and_then(Result::ok);
         lyrics::fetch(session.as_ref(), &self.http, query).await
     }
 
-    /// Each batch reports as soon as it is known, so the first rows of a long list get their
-    /// hearts without waiting for the rest.
     pub fn check_saved(&self, uris: Vec<String>) -> BoxStream<'static, Result<Vec<(String, bool)>>> {
         let api = self.api.clone();
         let batches: Vec<Vec<String>> = uris.chunks(catalog::LIBRARY_BATCH).map(<[_]>::to_vec).collect();
@@ -626,8 +595,6 @@ impl Catalog {
         catalog::add_to_playlist(&self.api, playlist_id, uris).await
     }
 
-    /// Premium queues through the Web API, so it reaches whichever device plays; a free
-    /// account queues in tunebox's own player.
     pub async fn add_to_queue(&self, uri: &str) -> Result<()> {
         if let Some(player) = self.free_player.as_ref().and_then(|player| player.get()) {
             return player.add_to_queue(uri);
@@ -635,8 +602,6 @@ impl Catalog {
         catalog::queue(&self.api, uri).await
     }
 
-    /// From librespot's metadata, a batch at a time. Without a session, nothing reaches
-    /// Spotify; URIs that aren't Spotify's are reported at once, without details.
     pub fn queue_tracks(&self, uris: Vec<String>) -> BoxStream<'static, Found> {
         if self.session.is_none() {
             let api = self.api.clone();
@@ -683,7 +648,6 @@ impl Catalog {
         .boxed()
     }
 
-    /// The Web API's list of what plays next; tunebox's own player says it itself.
     pub async fn upcoming(&self) -> Result<Vec<Track>> {
         if self.session.is_none() {
             bail!("Spotify's own queue needs Premium; tunebox's player says what plays next itself.");
@@ -711,20 +675,17 @@ impl Catalog {
         let _ = self.remote.send(remote::command(command));
     }
 
-    /// Through Spotify Connect, as tunebox's own device.
     pub async fn skip_to(&self, device: &str, entry: &Upcoming) -> Result<()> {
         let session = self.session().await?;
         connect::skip_to(&session, device, &entry.uri, &entry.uid, provider_name(entry.provider)).await
     }
 
-    /// Through Spotify Connect, as tunebox's own device.
     pub async fn set_queue(&self, device: &str, listed: &Listed) -> Result<()> {
         let session = self.session().await?;
         connect::set_queue(&session, device, &listed.next, &listed.previous, &listed.revision).await
     }
 }
 
-/// Spotify's name for where an entry comes from, as commands about the entry name it.
 fn provider_name(provider: Provider) -> &'static str {
     match provider {
         Provider::Queue => "queue",

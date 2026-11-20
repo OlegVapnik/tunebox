@@ -1,6 +1,3 @@
-//! The whole app on the demo, driven by keys and clicks through [`Harness`]. Screens are kept in
-//! `tests/screens`; `TUNEBOX_UPDATE_SCREENS=1 cargo test -p tunebox-tui` takes new ones, and the
-//! diff shows what changed.
 
 use std::time::Duration;
 
@@ -119,9 +116,6 @@ async fn small_windows_get_compact_bars() {
     h.assert_screen("compact");
 }
 
-/// Layout bugs show up at sizes nobody tries: each page, drawn at many sizes, must not panic,
-/// and a frame drawn again without anything happening must come out the same. A test per page,
-/// so they run side by side.
 async fn draws_at_any_size(keys: &[KeyCode]) {
     const WIDTHS: [u16; 9] = [1, 8, 20, 33, 47, 64, 80, 121, 240];
     const HEIGHTS: [u16; 10] = [1, 3, 6, 9, 10, 14, 16, 24, 30, 70];

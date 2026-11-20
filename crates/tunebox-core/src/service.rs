@@ -1,7 +1,4 @@
-//! The music services tunebox plays from. Every URI names its service up front, so a request
-//! about an item goes to the service the item came from.
 
-/// A music service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Service {
     Spotify,
@@ -12,18 +9,15 @@ pub enum Service {
 impl Service {
     pub const ALL: [Service; 3] = [Service::Spotify, Service::YouTubeMusic, Service::SoundCloud];
 
-    /// The service a URI such as `spotify:track:…` or `ytmusic:album:…` belongs to.
     pub fn of(uri: &str) -> Option<Service> {
         let (scheme, _) = uri.split_once(':')?;
         Service::from_key(scheme)
     }
 
-    /// The service with this key, as in `spotify` or `ytmusic`.
     pub fn from_key(key: &str) -> Option<Service> {
         Service::ALL.into_iter().find(|service| service.key() == key)
     }
 
-    /// The name people know it by.
     pub fn name(self) -> &'static str {
         match self {
             Service::Spotify => "Spotify",
@@ -32,7 +26,6 @@ impl Service {
         }
     }
 
-    /// Its key in URIs and in the config file.
     pub fn key(self) -> &'static str {
         match self {
             Service::Spotify => "spotify",
@@ -42,8 +35,6 @@ impl Service {
     }
 }
 
-/// The page of the item a URI names on the service's website, for sharing, and for desktop
-/// widgets that tell services apart by it.
 pub fn web_link(uri: &str) -> Option<String> {
     let (kind, id) = uri.split_once(':').map(|(_, rest)| rest)?.split_once(':')?;
     if id.is_empty() {
@@ -56,8 +47,6 @@ pub fn web_link(uri: &str) -> Option<String> {
         (Service::YouTubeMusic, "album") => format!("https://music.youtube.com/browse/{id}"),
         (Service::YouTubeMusic, "artist") => format!("https://music.youtube.com/channel/{id}"),
         (Service::YouTubeMusic, _) => return None,
-        // SoundCloud's IDs are the paths of its pages: `artist`, `artist/track` and
-        // `artist/sets/playlist` are all valid there.
         (Service::SoundCloud, "track" | "playlist" | "album" | "artist") => {
             format!("https://soundcloud.com/{id}")
         }

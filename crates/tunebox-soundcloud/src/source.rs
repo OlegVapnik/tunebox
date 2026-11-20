@@ -1,4 +1,3 @@
-//! SoundCloud as a playback source: URIs to songs, context pages and stream URLs.
 
 use std::path::PathBuf;
 
@@ -13,7 +12,6 @@ use crate::{SoundCloud, Source, uri_path};
 const TRACK: &str = "soundcloud:track:";
 const SONGS: &str = "soundcloud:songs:";
 
-/// SoundCloud playback: its API for the catalog and streams, yt-dlp where it has none.
 #[derive(Clone)]
 pub struct SoundCloudSource {
     client: SoundCloud,

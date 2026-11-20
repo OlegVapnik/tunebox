@@ -1,4 +1,3 @@
-//! "Your Library" as a full page: filter tabs and a grid of covers.
 
 use ratatui::{
     Frame,
@@ -16,9 +15,7 @@ use crate::{
 
 const COVER: Size = Size { width: 14, height: 7 };
 const GAP: u16 = 4;
-/// Cover, title, subtitle and spacing.
 const CARD_ROWS: u16 = COVER.height + 2 + 3;
-/// Title, gap and tabs above the grid.
 const HEADER_ROWS: u16 = 5;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -56,7 +53,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             .render(grid, frame.buffer_mut());
         return;
     }
-    // Too little room for covers: one entry per row instead.
     let list_mode = grid.height < CARD_ROWS || grid.width < COVER.width;
     let (columns, row_height) =
         if list_mode { (1, 1) } else { (((grid.width + GAP) / (COVER.width + GAP)).max(1) as usize, CARD_ROWS) };
@@ -64,7 +60,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         View::Library(v) => (v.cursor.min(entries.len() - 1), v.top, v.detached),
         _ => return,
     };
-    // Scrolling is by screen rows, so cards slide in and out of view.
     let row_height = row_height as usize;
     let viewport = grid.height as usize;
     let total = entries.len().div_ceil(columns) * row_height;
@@ -82,7 +77,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     if let View::Library(v) = &mut app.view {
         v.columns = columns;
         v.top = top;
-        // The library arrives in parts; a restored cursor may point at one still on its way.
         if !loading {
             v.cursor = cursor;
         }
@@ -106,7 +100,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             let width = grid.width as usize;
             let title_width = if playing { (width / 2).saturating_sub(5) } else { width / 2 };
             buf.set_string(grid.x, y, text::truncate(&title, title_width), title_style);
-            // At the end of the title column, before the subtitle.
             if playing {
                 buf.set_string(grid.x + (width / 2) as u16 - 4, y, marker, Style::new().fg(accent));
             }
@@ -120,13 +113,10 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
         return;
     }
-    // The next screenful of covers, so scrolling down finds them loaded.
     for &entry in entries.iter().take(last + (last - first)).skip(last) {
         let (_, _, image_url, round) = sidebar::describe(app, entry);
         app.prefetch(image_url.as_deref(), COVER, round);
     }
-    // The selection reaches one row above the cards, into the gap below the tabs, and one
-    // column past the cover on both sides, the first column's too.
     let clip = Rect { x: grid.x.saturating_sub(1), y: grid.y - 1, width: grid.width + 2, height: grid.height + 1 };
     for (index, &entry) in entries.iter().enumerate().take(last).skip(first) {
         let x = home::card_x(grid.x, grid.width, columns, index % columns);
@@ -150,7 +140,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         if let Some(row) = home::row(grid, text_y) {
             let width = COVER.width - if playing { 4 } else { 0 };
             buf.set_string(x, row, text::truncate(&title, width as usize), title_style);
-            // Below the cover, so it never lands on image cells.
             if playing {
                 buf.set_string(x + COVER.width - 3, row, marker, Style::new().fg(accent));
             }
@@ -169,7 +158,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-/// Whether `entry` is what plays now, as in the sidebar.
 fn is_playing(app: &App, entry: LibraryEntry) -> bool {
     app.playing_context().is_some_and(|context| app.entry_uri(entry).as_deref() == Some(context))
 }

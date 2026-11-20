@@ -7,15 +7,11 @@ use librespot::{
 };
 use tunebox_core::paths::{Paths, write_private};
 
-/// librespot only streams with Spotify's own client ID, so this login is separate from the
-/// Web API one. The port is free to change: Spotify accepts any port on loopback redirects.
 const OAUTH_REDIRECT: &str = "http://127.0.0.1:8975/login";
 const AUDIO_CACHE_LIMIT: u64 = 1 << 30;
-/// Downloading a track takes seconds, and every write refreshes the file's modified time.
 const STALE_TMP_AGE: Duration = Duration::from_secs(60 * 60);
 const CORRUPTED: &str = "Stored streaming credentials corrupted – run `tunebox login`";
 
-/// The scopes Spotify's desktop client requests (the same list librespot uses).
 const OAUTH_SCOPES: &[&str] = &[
     "app-remote-control",
     "playlist-modify",
@@ -45,8 +41,6 @@ const OAUTH_SCOPES: &[&str] = &[
     "user-top-read",
 ];
 
-/// A session with cached credentials that is not connected yet. Spirc connects it on its
-/// own; everything else calls [`PendingSession::connect`].
 pub struct PendingSession {
     pub session: Session,
     pub credentials: Credentials,
@@ -71,16 +65,10 @@ pub fn is_logged_in(paths: &Paths) -> Result<bool> {
     Ok(stored_credentials(paths, &cache(paths, !paths.keychain)?)?.is_some())
 }
 
-/// Whether the account streams with librespot: Spotify's `product` attribute says premium.
-/// Free accounts sign in just the same, but Spotify refuses to play their songs, so tunebox
-/// plays them through YouTube instead.
 pub fn is_premium(session: &Session) -> bool {
     session.get_user_attribute("product").is_some_and(|product| product == "premium")
 }
 
-/// Updates the credentials in the keychain when Spotify handed out new ones while connecting;
-/// for files, librespot does that itself. [`PendingSession::connect`] calls it; connections
-/// that Spirc makes need to call it themselves.
 pub fn remember(paths: &Paths, session: &Session) -> Result<()> {
     if !paths.keychain {
         return Ok(());
@@ -107,8 +95,6 @@ fn stored_credentials(paths: &Paths, cache: &Cache) -> Result<Option<Credentials
     }
 }
 
-/// Interactive OAuth login. Connecting once stores reusable credentials: librespot writes
-/// them to a file, which `remember` moves into the keychain right away in keychain mode.
 pub async fn login(paths: &Paths) -> Result<Session> {
     let config = config(paths)?;
     let token = OAuthClientBuilder::new(&config.client_id, OAUTH_REDIRECT, OAUTH_SCOPES.to_vec())
@@ -126,7 +112,6 @@ pub async fn login(paths: &Paths) -> Result<Session> {
     .await
 }
 
-/// librespot keeps the credentials in a file only with `credentials_file`.
 fn cache(paths: &Paths, credentials_file: bool) -> Result<Cache> {
     let session_dir = paths.session_dir();
     let audio_dir = paths.audio_cache();
@@ -134,7 +119,6 @@ fn cache(paths: &Paths, credentials_file: bool) -> Result<Cache> {
     Ok(Cache::new(credentials, Some(&session_dir), Some(&audio_dir), Some(AUDIO_CACHE_LIMIT))?)
 }
 
-/// Keeps the device ID stable so Spotify shows one tunebox device, not a new one per start.
 fn config(paths: &Paths) -> Result<SessionConfig> {
     let mut config = SessionConfig::default();
     let path = paths.device_id();
@@ -142,8 +126,6 @@ fn config(paths: &Paths) -> Result<SessionConfig> {
         Ok(id) if !id.trim().is_empty() => config.device_id = id.trim().to_owned(),
         _ => write_private(&path, config.device_id.as_bytes())?,
     }
-    // librespot buffers each streamed track in a temp file that stays open until the track
-    // ends. /tmp is often tmpfs, where that file would hold 10–15 MB of RAM per track.
     let tmp = paths.audio_tmp();
     fs::create_dir_all(&tmp)?;
     remove_stale_tmp_files(&tmp);
@@ -151,9 +133,6 @@ fn config(paths: &Paths) -> Result<SessionConfig> {
     Ok(config)
 }
 
-/// A killed tunebox leaves its half-streamed tracks behind, which tmpfs used to drop at boot.
-/// Only old files go: another tunebox process may have just created one and not yet reopened
-/// it by name. Files that are open keep working after removal, so nothing else is at risk.
 fn remove_stale_tmp_files(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {

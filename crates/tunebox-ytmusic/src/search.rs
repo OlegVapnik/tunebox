@@ -1,5 +1,3 @@
-//! Search, one filtered search per kind at the same time: the unfiltered one has only a few
-//! results of each kind.
 
 use anyhow::Result;
 use serde_json::{Value, json};
@@ -10,7 +8,6 @@ use crate::{
     parse::{self, ALBUM, ARTIST, Byline, IMAGE_SIZE, Link, PLAYLIST, find_all, list, runs, text},
 };
 
-/// The `params` of music.youtube.com's filter chips.
 const SONGS: &str = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D";
 const ALBUMS: &str = "EgWKAQIYAWoKEAkQBRAKEAMQBA%3D%3D";
 const ARTISTS: &str = "EgWKAQIgAWoKEAkQBRAKEAMQBA%3D%3D";
@@ -27,7 +24,6 @@ pub(crate) async fn search(api: &InnerTube, query: &str) -> Result<SearchResults
         filtered(COMMUNITY_PLAYLISTS),
     );
     let songs = songs?;
-    // The other kinds are a bonus: a failure there still leaves the songs.
     let rows = |page: Result<Value>| match page {
         Ok(page) => rows(&page),
         Err(err) => {
@@ -56,7 +52,6 @@ fn parse_suggestions(page: &Value) -> Vec<String> {
     found.into_iter().map(|s| text(&s["suggestion"])).filter(|s| !s.is_empty()).collect()
 }
 
-/// The rows of the result shelves.
 fn rows(page: &Value) -> Vec<Value> {
     let mut shelves = Vec::new();
     find_all(page, "musicShelfRenderer", &mut shelves);
@@ -71,7 +66,6 @@ fn track(row: &Value) -> Option<Track> {
     parse::list_item_track(row)
 }
 
-/// The title, where the row links to, and its byline.
 fn row_parts(row: &Value) -> Option<(String, Link, Byline)> {
     let columns: Vec<&[Value]> = list(&row["flexColumns"])
         .iter()

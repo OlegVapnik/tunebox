@@ -70,22 +70,16 @@ const GENERAL: Section = (
     ],
 );
 
-/// Everything in one column where the window is tall enough.
 const ONE_COLUMN: &[&[Section]] = &[&[NAVIGATION, PLAYBACK, LIBRARY, GENERAL]];
-/// Short windows get two columns side by side.
 const TWO_COLUMNS: &[&[Section]] = &[&[NAVIGATION, LIBRARY], &[PLAYBACK, GENERAL]];
 const ONE_COLUMN_WIDTH: u16 = 58;
 const TWO_COLUMN_WIDTH: u16 = 100;
-/// Two columns narrower than this would cut most descriptions short.
 const TWO_COLUMN_MIN_WIDTH: u16 = 72;
-/// Room for the keys in front of each description.
 const KEY_WIDTH: usize = 13;
-/// Space between the border and the text, and between columns.
 const PADDING: u16 = 3;
 
 pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let p = theme::palette();
-    // Keys of commands for what the service lacks, like DJ, are left out.
     let hidden: Vec<&str> =
         [Command::Dj, Command::Crossfade, Command::Devices, Command::Update, Command::SwitchService]
             .into_iter()
@@ -104,8 +98,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         .style(Style::new().bg(p.raised))
         .render(popup, buf);
 
-    // Whatever doesn't fit above the bottom border is left out; the buffer ends right there
-    // in short windows.
     let bottom = popup.bottom().saturating_sub(1);
     let count = columns.len() as u16;
     let column_width = popup.width.saturating_sub(PADDING * (count + 1)) / count;
@@ -139,8 +131,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     }
 }
 
-/// Rows the popup needs for `columns` without the `hidden` keys: borders, a blank line at the
-/// top and each section's title, keys and the blank line after it.
 fn height(columns: &[&[Section]], hidden: &[&str]) -> u16 {
     let shown = |keys: &[(&str, &str)]| keys.iter().filter(|(key, _)| !hidden.contains(key)).count() as u16;
     let rows = |sections: &[Section]| sections.iter().map(|(_, keys)| shown(keys) + 2).sum::<u16>();

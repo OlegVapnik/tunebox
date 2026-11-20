@@ -1,6 +1,3 @@
-//! What tunebox shares between music services: the data model the interface shows, where files
-//! go, settings, updates, and what players report. Nothing in here knows Spotify's protocols,
-//! so a build without Spotify leaves librespot out entirely.
 
 pub mod artist;
 pub mod browser;

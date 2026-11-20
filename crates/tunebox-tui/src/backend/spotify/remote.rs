@@ -1,4 +1,3 @@
-//! Commands for another Spotify Connect device, through the Web API.
 
 use std::sync::Arc;
 
@@ -7,7 +6,6 @@ use tunebox_spotify::{connect, webapi::WebApi};
 
 use crate::{app::AppEvent, backend::Remote, loader::DataEvent, playback::Repeat};
 
-/// Spotify's form of a command.
 pub fn command(remote: Remote) -> connect::Command {
     match remote {
         Remote::Play => connect::Command::Play,
@@ -22,7 +20,6 @@ pub fn command(remote: Remote) -> connect::Command {
     }
 }
 
-/// The Web API's "off", "context" or "track".
 fn repeat_name(mode: Repeat) -> &'static str {
     match mode {
         Repeat::Off => "off",
@@ -31,8 +28,6 @@ fn repeat_name(mode: Repeat) -> &'static str {
     }
 }
 
-/// Sends remote commands one at a time, so they reach Spotify in the order they were given.
-/// Volume and seek commands that pile up meanwhile collapse into the newest one.
 pub async fn send_remote(
     api: Arc<WebApi>,
     tx: UnboundedSender<AppEvent>,
@@ -47,8 +42,6 @@ pub async fn send_remote(
     }
 }
 
-/// Waits for the next command to send and collapses the ones queued behind it that it makes
-/// pointless. Returns it with the number of commands it stands for.
 async fn next_remote(
     commands: &mut mpsc::UnboundedReceiver<connect::Command>,
     waiting: &mut Option<connect::Command>,
@@ -69,7 +62,6 @@ async fn next_remote(
     Some((command, count))
 }
 
-/// Whether `newer` makes `older` pointless: only the last volume or position counts.
 fn supersedes(newer: &connect::Command, older: &connect::Command) -> bool {
     use connect::Command::{Seek, Volume};
     matches!((newer, older), (Volume(_), Volume(_)) | (Seek(_), Seek(_)))

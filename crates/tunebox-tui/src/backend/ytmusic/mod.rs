@@ -1,6 +1,3 @@
-//! YouTube Music: InnerTube for the catalog and the library, mpv for playback. Signed out, it
-//! browses and plays; the library and likes need the sign-in `tunebox login ytmusic` borrows
-//! from a browser.
 
 use std::sync::{Arc, OnceLock};
 
@@ -23,25 +20,19 @@ use tunebox_ytmusic::{Source, YtMusic};
 use super::{Found, Launch};
 use crate::{app::AppEvent, backend::Player, playback::Repeat, views::TrackSource};
 
-/// Where the volume starts without a last session's: half, as for Spotify.
 const DEFAULT_VOLUME: u16 = u16::MAX / 2;
-/// Songs asked about at once: whether they are liked, or their details for the queue.
 const BATCH: usize = 50;
-/// Batches of library checks running at the same time.
 const SAVED_CONCURRENCY: usize = 2;
 
-/// YouTube Music, signed in or not.
 pub struct Account {
     client: YtMusic,
 }
 
 impl Account {
-    /// Reads the sign-in, if there is one; signed out is fine.
     pub fn open(paths: &Paths) -> Result<Self> {
         Ok(Self { client: YtMusic::new(paths)? })
     }
 
-    /// Starts mpv in the background; the catalog works without it.
     pub fn start(self, launch: Launch) -> Catalog {
         let player = Arc::new(OnceLock::new());
         let catalog = Catalog { client: self.client.clone(), player: player.clone() };
@@ -71,7 +62,6 @@ impl Account {
     }
 }
 
-/// tunebox's own YouTube Music player: mpv, and the queue it plays from.
 pub struct Controller(tunebox_ytmusic::Player);
 
 impl Controller {
@@ -131,7 +121,6 @@ impl Controller {
         self.0.prefetch(uri)
     }
 
-    /// The queue is tunebox's own, so the player jumps there itself.
     pub fn skip_to(&self, uri: &str) -> Result<bool> {
         self.0.skip_to(uri).map(|()| true)
     }
@@ -144,7 +133,6 @@ impl Controller {
 #[derive(Clone)]
 pub struct Catalog {
     client: YtMusic,
-    /// The player once mpv is up, which songs added to the queue go to.
     player: Arc<OnceLock<tunebox_ytmusic::Player>>,
 }
 
@@ -194,17 +182,14 @@ impl Catalog {
         self.client.followed_artists().await
     }
 
-    /// tunebox plays no podcasts from YouTube Music.
     pub async fn saved_shows(&self) -> Result<Vec<ShowInfo>> {
         Ok(Vec::new())
     }
 
-    /// YouTube Music's own lyrics, time-synced where it has them, else LRCLIB's.
     pub async fn lyrics(&self, query: LyricsQuery<'_>) -> Result<Option<Lyrics>> {
         self.client.lyrics(&query).await
     }
 
-    /// A batch at a time, so the first rows of a long list get their hearts early.
     pub fn check_saved(&self, uris: Vec<String>) -> BoxStream<'static, Result<Vec<(String, bool)>>> {
         let client = self.client.clone();
         let batches: Vec<Vec<String>> = uris.chunks(BATCH).map(<[_]>::to_vec).collect();
@@ -225,7 +210,6 @@ impl Catalog {
         self.client.add_to_playlist(&format!("ytmusic:playlist:{playlist_id}"), uris).await
     }
 
-    /// tunebox's player keeps the queue, so the song goes there.
     pub async fn add_to_queue(&self, uri: &str) -> Result<()> {
         let player = self.player.get().context("YouTube Music's player isn't running")?;
         player.add_to_queue(uri)
@@ -250,7 +234,6 @@ impl Catalog {
             .boxed()
     }
 
-    /// The player always says what plays next itself.
     pub async fn upcoming(&self) -> Result<Vec<Track>> {
         bail!("YouTube Music's player says what plays next itself")
     }

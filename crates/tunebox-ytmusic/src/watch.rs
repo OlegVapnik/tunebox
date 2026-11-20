@@ -1,5 +1,3 @@
-//! The player's side of InnerTube: `next`, which lists what plays after a song (its radio, or
-//! the rest of a mix), and `music/get_queue`, which has the details of any songs by ID.
 
 use std::collections::HashMap;
 
@@ -13,22 +11,17 @@ use crate::{
     parse::{self, TRACK, find, list, str_at, text},
 };
 
-/// Songs per `music/get_queue` request.
 const QUEUE_BATCH: usize = 50;
 const QUEUE_CONCURRENCY: usize = 4;
 
-/// One page of `next`: songs, and what else the watch page links to.
 #[derive(Debug, Default)]
 pub(crate) struct Watch {
     pub tracks: Vec<Track>,
-    /// The queue's title, e.g. "Daft Punk Mix".
     pub title: Option<String>,
     pub continuation: Option<String>,
-    /// The browse ID of the first song's lyrics, when it has any.
     pub lyrics: Option<String>,
 }
 
-/// What plays with `video`, or the songs of the mix `playlist`.
 pub(crate) async fn next(api: &InnerTube, video: Option<&str>, playlist: Option<&str>) -> Result<Watch> {
     let mut body = json!({
         "enablePersistentPlaylistPanel": true,
@@ -73,7 +66,6 @@ pub(crate) fn parse_next(page: &Value) -> Watch {
     }
 }
 
-/// A song's radio: the song first, then about a hundred more.
 pub(crate) async fn radio(api: &InnerTube, track_uri: &str) -> Result<Vec<Track>> {
     let video = parse::id(track_uri, TRACK)?;
     let first = next(api, Some(video), Some(&parse::radio_playlist(video))).await?;
@@ -88,7 +80,6 @@ pub(crate) async fn radio(api: &InnerTube, track_uri: &str) -> Result<Vec<Track>
     Ok(tracks)
 }
 
-/// Leaves out songs listed before, which radios repeat now and then.
 pub(crate) fn dedup(tracks: &mut Vec<Track>) {
     let mut seen = std::collections::HashSet::new();
     tracks.retain(|track| seen.insert(track.uri.clone()));
@@ -105,8 +96,6 @@ pub(crate) async fn tracks_by_uri(api: &InnerTube, uris: &[String]) -> Result<Ve
     Ok(uris.iter().filter_map(|uri| found.remove(uri)).collect())
 }
 
-/// The queue entries of a batch of songs. YouTube refuses a whole batch for one song it
-/// doesn't know (a removed video, say); then the songs are asked for one by one.
 async fn queue(api: &InnerTube, batch: Vec<String>) -> Result<Vec<Value>> {
     match api.call("music/get_queue", json!({ "videoIds": batch })).await {
         Ok(page) => Ok(vec![page]),

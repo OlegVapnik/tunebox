@@ -1,6 +1,3 @@
-//! Desktop notifications sent to the desktop's notification server itself, rather than through
-//! the terminal: that way they carry the cover, and they also work in terminals without
-//! notifications of their own.
 
 use std::{
     collections::HashMap,
@@ -18,7 +15,6 @@ use super::{bus, media};
 
 const SERVER: &str = "org.freedesktop.Notifications";
 const PATH: &str = "/org/freedesktop/Notifications";
-/// A Nerd Font note, which Omarchy shows where a notification has no image.
 const GLYPH: &str = "󰝚";
 
 pub struct Notifications {
@@ -26,23 +22,19 @@ pub struct Notifications {
     shown: Arc<Mutex<Shown>>,
 }
 
-/// The notification on screen, which the next one replaces, and its cover file.
 #[derive(Default)]
 struct Shown {
     id: u32,
     image: Option<PathBuf>,
     written: u64,
-    /// Whether the server reads markup in the body, once asked.
     markup: Option<bool>,
 }
 
-/// Whether a click on a notification brings tunebox's window to the front: on Hyprland.
 pub fn click_raises() -> bool {
     media::can_raise()
 }
 
 impl Notifications {
-    /// `None` without a session bus, or without a notification server on it.
     pub fn new() -> Option<Self> {
         let connection = bus::run(async {
             let connection = bus::session().await?;
@@ -55,8 +47,6 @@ impl Notifications {
         Some(Self { connection, shown })
     }
 
-    /// Shows `title` and `body`, with `image` (JPEG, PNG or WebP) where there is one, in place of
-    /// the notification shown before.
     pub fn show(&self, title: &str, body: &str, image: Option<Arc<[u8]>>) {
         let (connection, shown) = (self.connection.clone(), self.shown.clone());
         let (title, body) = (title.to_owned(), body.to_owned());
@@ -96,9 +86,6 @@ impl Drop for Notifications {
 
 type NotifyArguments<'a> = (&'a str, u32, &'a str, &'a str, &'a str, &'a [&'a str], HashMap<&'a str, Variant<'a>>, i32);
 
-/// What `Notify` takes: app, the notification it replaces, icon, title, body, actions, hints
-/// and how long it shows (the server's choice). `clickable` where a click brings tunebox to the
-/// front.
 fn notify_arguments<'a>(
     replaces: u32,
     title: &'a str,
@@ -109,20 +96,15 @@ fn notify_arguments<'a>(
     let mut hints = HashMap::from([
         ("desktop-entry", Variant::from("tunebox")),
         ("omarchy-glyph", Variant::from(GLYPH)),
-        // Low: a new song is worth a glance, not an interruption.
         ("urgency", Variant::U8(0)),
     ]);
     if let Some(url) = image.and_then(|path| url::Url::from_file_path(path).ok()) {
         hints.insert("image-path", Variant::from(url.to_string()));
     }
-    // The action a click on the notification takes; it shows no button. A slice, since a fixed
-    // array would go over the bus as a structure, which `Notify` doesn't take.
     let actions: &[&str] = if clickable { &["default", "Show tunebox"] } else { &[] };
     ("tunebox", replaces, "tunebox", title, body, actions, hints, -1)
 }
 
-/// Whether a notification server runs or the bus starts one when asked: without, notifications
-/// would go nowhere, as on a desktop without one or a server reached over SSH.
 async fn has_server(connection: &Connection) -> bool {
     let found = async {
         let bus = fdo::DBusProxy::new(connection).await?;
@@ -135,8 +117,6 @@ async fn has_server(connection: &Connection) -> bool {
     found.await.inspect_err(|err| tracing::debug!("notification server: {err}")).unwrap_or(false)
 }
 
-/// Whether the server reads markup in the body; asked only once there is something to show, as
-/// asking starts a server that isn't running yet.
 async fn takes_markup(connection: &Connection) -> bool {
     let reply = connection.call_method(Some(SERVER), PATH, Some(SERVER), "GetCapabilities", &()).await;
     match reply.and_then(|reply| reply.body().deserialize::<Vec<String>>()) {
@@ -148,8 +128,6 @@ async fn takes_markup(connection: &Connection) -> bool {
     }
 }
 
-/// Brings tunebox's window to the front when the notification on screen is clicked, for as long
-/// as there are notifications.
 async fn raise_on_click(connection: Connection, shown: Weak<Mutex<Shown>>) {
     let clicks = async { Proxy::new(&connection, SERVER, PATH, SERVER).await?.receive_signal("ActionInvoked").await };
     let mut clicks = match clicks.await {
@@ -169,8 +147,6 @@ async fn raise_on_click(connection: Connection, shown: Weak<Mutex<Shown>>) {
 }
 
 impl Shown {
-    /// Writes `image` to a file of its own, the server taking images by path, and removes the
-    /// one before: the notification it belonged to is being replaced.
     fn write(&mut self, image: &[u8]) -> Option<PathBuf> {
         if let Some(old) = self.image.take() {
             let _ = fs::remove_file(old);
@@ -178,7 +154,6 @@ impl Shown {
         self.written += 1;
         let name = format!("tunebox-{}-notification-{}.{}", process::id(), self.written, media::extension(image));
         let path = media::cover_dir().join(name);
-        // A new file only, as with the media controls' covers.
         let written = OpenOptions::new().write(true).create_new(true).open(&path).and_then(|mut f| f.write_all(image));
         if let Err(err) = written {
             tracing::warn!("cover for the notification: {}: {err}", path.display());
@@ -190,7 +165,6 @@ impl Shown {
     }
 }
 
-/// For servers that read markup in the body, text that looks like it is escaped.
 fn escape(text: &str) -> String {
     text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }

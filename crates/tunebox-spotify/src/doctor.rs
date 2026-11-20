@@ -1,4 +1,3 @@
-//! Probes which Spotify features are reachable, and through which path.
 
 use anyhow::Result;
 use librespot::{
@@ -18,7 +17,6 @@ const ALBUM: &str = "2noRn2Aes5aoNVsU6iWThc"; // Discovery
 const TRACK: &str = "0DiWol3AO6WpXZgp0goxAV"; // One More Time
 const EDITORIAL_PLAYLIST: &str = "37i9dQZF1DXcBWIGoYBM5M"; // Today's Top Hits
 
-/// Turns a successful response body into the detail shown next to a check.
 type Detail = fn(&Value) -> String;
 
 pub async fn web_api(api: &WebApi) -> Section {
@@ -204,7 +202,6 @@ fn check_response(name: &str, expect: Expect, response: Result<crate::webapi::Ap
     Check { name: name.into(), expect, outcome }
 }
 
-/// Development Mode apps only get playlist contents for playlists the user owns or collaborates on.
 async fn playlist_contents(api: &WebApi, name: &str, id: &str) -> Check {
     let outcome = match api.get(&format!("/playlists/{id}")).await {
         Ok(r) if r.status.is_success() => {
@@ -220,7 +217,6 @@ async fn playlist_contents(api: &WebApi, name: &str, id: &str) -> Check {
     Check { name: name.into(), expect: Expect::Removed, outcome }
 }
 
-/// The first playlist the user owns, and the first one they only follow.
 async fn pick_playlists(api: &WebApi, my_id: &str) -> (Option<String>, Option<String>) {
     let Ok(response) = api.get("/me/playlists?limit=50").await else {
         return (None, None);

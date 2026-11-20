@@ -1,5 +1,3 @@
-//! The commands for SoundCloud: signing in with a browser's `oauth_token` cookie, out again,
-//! and playing without the interface.
 
 use std::time::Duration;
 
@@ -15,11 +13,8 @@ use crate::{
     prompt, style,
 };
 
-/// Half, as Spotify's `tunebox play` starts.
 const VOLUME: u16 = u16::MAX / 2;
 
-/// Signs in with the `oauth_token` cookie of a browser signed in to SoundCloud. Returns
-/// whether it is signed in now.
 pub async fn login(paths: &Paths, force: bool) -> Result<bool> {
     let client = SoundCloud::new(paths)?;
     if client.signed_in() && !force {
@@ -54,8 +49,6 @@ pub async fn login(paths: &Paths, force: bool) -> Result<bool> {
     Ok(true)
 }
 
-/// Signs in with the `oauth_token` of a browser signed in to SoundCloud, which yt-dlp reads
-/// from its cookies. `false` when no browser holds one.
 async fn browser_sign_in(paths: &Paths) -> Result<bool> {
     let Some((browser, token)) = tunebox_soundcloud::browser::oauth_token(paths).await? else {
         println!("  {} no browser is signed in to SoundCloud", style::dim("·"));
@@ -73,7 +66,6 @@ async fn browser_sign_in(paths: &Paths) -> Result<bool> {
     }
 }
 
-/// Forgets the SoundCloud sign-in; browsing and playing work without it.
 pub fn logout(paths: &Paths) -> Result<()> {
     let signed_in = SoundCloud::new(paths)?.signed_in();
     paths.soundcloud_token().delete()?;
@@ -82,7 +74,6 @@ pub fn logout(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// What `tunebox doctor` finds for SoundCloud, each section handed to `report` as soon as it is done.
 pub async fn doctor(paths: &Paths, mut report: impl FnMut(Section)) -> Result<()> {
     let client = SoundCloud::new(paths)?;
     report(tunebox_soundcloud::doctor::programs().await);
@@ -91,12 +82,10 @@ pub async fn doctor(paths: &Paths, mut report: impl FnMut(Section)) -> Result<()
     Ok(())
 }
 
-/// Whether a sign-in is saved; nothing goes online.
 pub fn signed_in(paths: &Paths) -> Result<bool> {
     Ok(SoundCloud::new(paths)?.signed_in())
 }
 
-/// Plays a song with its radio, or a playlist, album or artist, until Ctrl+C or the end.
 pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     let client = SoundCloud::new(paths)?;
     let (context, track) = playable(&client, input).await?;
@@ -155,7 +144,6 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     result
 }
 
-/// The context to play, and the song to start at within it.
 async fn playable(client: &SoundCloud, input: &str) -> Result<(String, Option<String>)> {
     let path = uri_path(input).with_context(|| format!("Not a SoundCloud link: {input}"))?;
     let (kind, is_album) = client.kind(path).await?;
@@ -168,7 +156,6 @@ async fn playable(client: &SoundCloud, input: &str) -> Result<(String, Option<St
     })
 }
 
-/// Hands a request from the system's media controls to the player.
 fn control(player: &Player, command: Command, paused: bool) -> Result<()> {
     match command {
         Command::Play if paused => player.toggle(true),

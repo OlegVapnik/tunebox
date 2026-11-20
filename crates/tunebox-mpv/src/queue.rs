@@ -1,6 +1,3 @@
-//! What plays, and in which order: the context (a playlist, album or artist), the songs the
-//! user queued, which go first, and the radio that follows once the context ran out, the way
-//! YouTube Music goes on after the last song.
 
 use std::{
     collections::{HashSet, VecDeque},
@@ -9,12 +6,10 @@ use std::{
 
 use tunebox_core::{catalog::Track, player::QueueTrack};
 
-/// Upcoming songs reported at most; the rest of a long playlist follows as it moves on.
 const REPORTED: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Origin {
-    /// From the context, at this index of `context`.
     Context(usize),
     Queue,
     Autoplay,
@@ -30,9 +25,7 @@ pub(crate) struct Entry {
 pub(crate) struct Queue {
     pub context_uri: String,
     context: Vec<Track>,
-    /// Indices of `context` in play order: the identity, or shuffled.
     order: Vec<usize>,
-    /// Where in `order` the last song from the context is.
     position: Option<usize>,
     queued: VecDeque<Track>,
     autoplay: VecDeque<Track>,
@@ -44,8 +37,6 @@ pub(crate) struct Queue {
 }
 
 impl Queue {
-    /// Starts a context, at `start` if given (a URI in `tracks`), else at its first song.
-    /// Songs the user queued stay queued.
     pub fn load(&mut self, context_uri: String, tracks: Vec<Track>, start: Option<&str>, shuffle: bool) -> bool {
         self.context_uri = context_uri;
         self.context = tracks;
@@ -75,8 +66,6 @@ impl Queue {
         true
     }
 
-    /// More songs of the context, as later pages of a playlist arrive. Shuffled, they mix in
-    /// with the songs that haven't played yet.
     pub fn extend(&mut self, tracks: Vec<Track>) {
         let start = self.context.len();
         self.context.extend(tracks);
@@ -95,7 +84,6 @@ impl Queue {
         self.current.as_ref().map(|e| &e.track)
     }
 
-    /// What follows the current song when it ends.
     pub fn peek(&self) -> Option<&Track> {
         if self.repeat_track {
             return self.current();
@@ -103,7 +91,6 @@ impl Queue {
         self.peek_next()
     }
 
-    /// What "next" moves to.
     fn peek_next(&self) -> Option<&Track> {
         if let Some(track) = self.queued.front() {
             return Some(track);
@@ -125,8 +112,6 @@ impl Queue {
         }
     }
 
-    /// Moves on: because the song ended (`natural`, which repeats a song on repeat), or
-    /// because the user skipped. `None` at the end of everything.
     pub fn advance(&mut self, natural: bool) -> Option<&Track> {
         if natural && self.repeat_track && self.current.is_some() {
             return self.current();
@@ -144,14 +129,12 @@ impl Queue {
         self.current()
     }
 
-    /// Goes back to the song before; `None` when there is none.
     pub fn back(&mut self) -> Option<&Track> {
         let previous = self.history.pop()?;
         if let Some(current) = self.current.take() {
             match current.origin {
                 Origin::Queue => self.queued.push_front(current.track),
                 Origin::Autoplay => self.autoplay.push_front(current.track),
-                // The context goes on from this song again, also when a queued song came before.
                 Origin::Context(index) => {
                     if let Some(at) = self.order.iter().position(|&i| i == index) {
                         self.position = at.checked_sub(1);
@@ -166,14 +149,11 @@ impl Queue {
         self.current()
     }
 
-    /// Jumps to an upcoming song. Queued songs before it are dropped, as in Spotify.
     pub fn skip_to(&mut self, uri: &str) -> Option<&Track> {
         if let Some(at) = self.queued.iter().position(|t| t.uri == uri) {
             self.queued.drain(..at);
             return self.advance(false);
         }
-        // Where it comes up next: a playlist can have a song twice. One that played already is
-        // found further back.
         let next = self.position.map_or(0, |p| p + 1).min(self.order.len());
         let found = (next..self.order.len()).chain(0..next).find(|&at| self.context[self.order[at]].uri == uri);
         if let Some(at) = found {
@@ -197,7 +177,6 @@ impl Queue {
         self.queued.clear();
     }
 
-    /// Shuffles what hasn't played yet, or puts the context back in order, keeping its place.
     pub fn set_shuffle(&mut self, on: bool) {
         self.shuffle = on;
         let current = self.position.map(|p| self.order[p]);
@@ -214,17 +193,14 @@ impl Queue {
         }
     }
 
-    /// Whether the radio should be asked for more: nothing is left after the current song.
     pub fn wants_autoplay(&self) -> bool {
         self.queued.is_empty() && self.next_position().is_none() && self.autoplay.len() < 2
     }
 
-    /// The song the radio continues from.
     pub fn seed(&self) -> Option<&Track> {
         self.autoplay.back().or(self.current())
     }
 
-    /// Adds radio songs, leaving out the ones that already played or are listed.
     pub fn add_autoplay(&mut self, tracks: Vec<Track>) {
         let mut known: HashSet<&str> = self.context.iter().map(|t| t.uri.as_str()).collect();
         known.extend(self.history.iter().map(|e| e.track.uri.as_str()));
@@ -234,8 +210,6 @@ impl Queue {
         self.autoplay.extend(fresh);
     }
 
-    /// What plays next, as the player reports it: queued songs, the rest of the context, then
-    /// the radio.
     pub fn upcoming(&self) -> Vec<QueueTrack> {
         let entry = |track: &Track, provider: &str| QueueTrack { uri: track.uri.clone(), provider: provider.into() };
         let start = self.position.map_or(0, |p| p + 1).min(self.order.len());
@@ -249,7 +223,6 @@ impl Queue {
     }
 }
 
-/// Fisher–Yates with the standard library's random keys, which is plenty for a playlist.
 fn shuffle_slice(items: &mut [usize]) {
     for i in (1..items.len()).rev() {
         items.swap(i, random_below(i + 1));

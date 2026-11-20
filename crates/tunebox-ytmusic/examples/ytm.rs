@@ -1,22 +1,3 @@
-//! A command line for trying the YouTube Music backend without the interface:
-//!
-//! ```text
-//! cargo run -p tunebox-ytmusic --example ytm -- home [chip ID]
-//! cargo run -p tunebox-ytmusic --example ytm -- search daft punk
-//! cargo run -p tunebox-ytmusic --example ytm -- playlist|album|artist|radio|lyrics <uri>
-//! cargo run -p tunebox-ytmusic --example ytm -- suggest|tracks|saved|me|accounts|browsers|doctor …
-//! cargo run -p tunebox-ytmusic --example ytm -- play <uri> [--demo] [--ao=null …mpv options]
-//! cargo run -p tunebox-ytmusic --example ytm -- raw <endpoint> '<json body>' > response.json
-//! cargo run -p tunebox-ytmusic --example ytm -- capture <dir>
-//! ```
-//!
-//! `play` prints the player's events and reads commands from stdin: `n` next, `p` previous,
-//! `t` play/pause, `s <seconds>` seek, `v <percent>` volume, `sh` shuffle, `r` repeat,
-//! `q <uri>` queue, `j <uri>` skip to, `w <seconds>` wait (for a file of commands), `x` quit.
-//! `--demo` runs through pause, seek, a gapless transition, next and previous by itself.
-//! `RUST_LOG=tunebox_ytmusic=debug` shows what the player does, and the gap between songs.
-//!
-//! `capture` saves the raw responses the parser tests use; `tests/fixtures/` has them trimmed.
 
 use std::{
     fs,
@@ -171,7 +152,6 @@ async fn main() -> Result<()> {
         "saved" => println!("{:?}", client.check_saved(rest).await?),
         "me" => println!("{:?}\n{:?}", client.me().await?, client.account().await?),
         "browsers" => println!("{:#?}\ndefault: {:?}", auth::browsers(), auth::default_browser()),
-        // Reads the default browser's sign-in without keeping it.
         "browser-sign-in" => {
             let mut browser = auth::default_browser().ok_or_else(|| anyhow::anyhow!("no default browser known"))?;
             match auth::from_browser(&paths, &mut browser).await? {
@@ -205,8 +185,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Saves the raw responses the parser tests read, in one session so continuations work.
-/// `tests/fixtures/` holds them trimmed down.
 async fn capture(client: &YtMusic, dir: &Path) -> Result<()> {
     fs::create_dir_all(dir)?;
     let save = |name: &str, value: &Value| -> Result<()> {
@@ -272,7 +250,6 @@ async fn capture(client: &YtMusic, dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Calls `visit` with every key and value, depth first.
 fn walk(value: &Value, visit: &mut impl FnMut(&str, &Value)) {
     match value {
         Value::Object(map) => map.iter().for_each(|(k, v)| {
@@ -312,7 +289,6 @@ async fn play(client: YtMusic, paths: &Paths, args: &[String]) -> Result<()> {
     }
     let mut stdin = BufReader::new(tokio::io::stdin()).lines();
     let (mut shuffle, mut repeat, mut done) = (false, 0, false);
-    // `w <seconds>` holds off the next command, so a file of commands can drive the player.
     let mut wait = Box::pin(tokio::time::sleep(Duration::ZERO));
     let mut waiting = false;
     loop {
@@ -380,7 +356,6 @@ fn print_event(ms: u128, event: &PlayerEvent) {
     }
 }
 
-/// Waits for an event that matches, printing everything on the way.
 async fn wait_for(
     events: &mut mpsc::UnboundedReceiver<PlayerEvent>,
     stamp: impl Fn() -> u128,
@@ -433,7 +408,6 @@ async fn run_demo(
     player.toggle(true)?;
     wait_for(events, stamp, "resume", is_playing).await?;
 
-    // Near the end of the song, to see mpv move on to the one loaded ahead.
     let duration = LAST_DURATION.load(Ordering::Relaxed);
     let at = stamp();
     player.seek(duration.saturating_sub(6_000))?;
@@ -470,5 +444,4 @@ async fn run_demo(
     Ok(())
 }
 
-/// The length of the last song in a TrackChanged, for the demo's seek to its end.
 static LAST_DURATION: AtomicU32 = AtomicU32::new(0);

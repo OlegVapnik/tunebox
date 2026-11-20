@@ -1,5 +1,3 @@
-//! Spotify as a playback source without Premium: the Web API for the catalog, and streams
-//! found on YouTube by yt-dlp. Spotify's own audio stays with librespot, which needs Premium.
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -14,13 +12,9 @@ use tunebox_mpv::{Source as PlaybackSource, Stream, ytdlp};
 
 use crate::{catalog, webapi::WebApi};
 
-/// How many songs Spotify suggests for playback to go on with.
 const AUTOPLAY: u32 = 20;
-/// A list this long is surely a loop going wrong, not a playlist.
 const MAX_PAGES: usize = 200;
 
-/// Spotify playback through mpv: the Web API knows the songs, and yt-dlp finds each one on
-/// YouTube by its artists and name.
 #[derive(Clone)]
 pub struct SpotifySource {
     api: Arc<WebApi>,
@@ -32,7 +26,6 @@ impl SpotifySource {
         Self { api, cache_dir: Some(paths.cache.join("spotify").join("yt-dlp")) }
     }
 
-    /// The context's songs in pages, and the empty page that ends it.
     async fn pages(&self, context: &str) -> Result<Vec<Vec<Track>>> {
         let pages = if let Some(id) = id_of(context, "track") {
             vec![vec![catalog::track(&self.api, id).await?]]
@@ -69,7 +62,6 @@ impl SpotifySource {
     }
 }
 
-/// Every page of a paged list, in order.
 async fn paged(mut fetch: impl FnMut(u32) -> BoxFuture<'static, Result<Page<Track>>>) -> Result<Vec<Vec<Track>>> {
     let mut pages = Vec::new();
     let mut offset = 0;
@@ -85,7 +77,6 @@ async fn paged(mut fetch: impl FnMut(u32) -> BoxFuture<'static, Result<Page<Trac
     Ok(pages)
 }
 
-/// The ID in a URI such as `spotify:track:abc`.
 fn id_of<'a>(uri: &'a str, kind: &str) -> Option<&'a str> {
     uri.strip_prefix("spotify:")?.strip_prefix(kind)?.strip_prefix(':')
 }

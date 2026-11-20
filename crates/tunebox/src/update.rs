@@ -1,4 +1,3 @@
-//! `tunebox update`, and starting the new binary after the interface installed an update.
 
 use std::{
     io::{IsTerminal, Write},
@@ -36,7 +35,6 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-/// The download's progress line, redrawn when what it shows changes. Nothing when piped.
 #[derive(Default)]
 struct Progress {
     shown: Option<String>,
@@ -67,7 +65,6 @@ impl Progress {
         }
     }
 
-    /// Takes the line away, before anything else is printed.
     fn clear(&self) {
         if self.shown.is_some() {
             print!("\r\x1b[2K");
@@ -76,8 +73,6 @@ impl Progress {
     }
 }
 
-/// Starts the binary the interface closed for, after the user installed an update and asked
-/// to restart.
 pub fn restart_if_asked(binary: Option<PathBuf>) -> Result<()> {
     match binary {
         Some(binary) => restart(&binary),
@@ -85,7 +80,6 @@ pub fn restart_if_asked(binary: Option<PathBuf>) -> Result<()> {
     }
 }
 
-/// Starts `binary` in place of this process, with the same arguments.
 #[cfg(unix)]
 fn restart(binary: &Path) -> Result<()> {
     use std::os::unix::process::CommandExt;

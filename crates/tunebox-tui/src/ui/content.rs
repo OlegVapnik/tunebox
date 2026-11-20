@@ -20,32 +20,22 @@ use crate::{
     views::{QueueRow, QueueView, SearchEntry, SearchView, TrackSource, TrackView, View},
 };
 
-/// Rows down to the column header: label, title, meta line, buttons, gap and the header.
 const HEADER_ROWS: u16 = 6;
-/// Cover in the header of playlists and albums, when the window is tall enough for it.
 const HEADER_COVER: Size = Size { width: 14, height: 7 };
 const COVER_HEADER_MIN_HEIGHT: u16 = 22;
-/// Search result thumbnails, the size the sidebar uses.
 const THUMB: Size = Size { width: 4, height: 2 };
-/// Rows per search result with a thumbnail: two lines of text beside it, then a gap.
 const RESULT_ROWS: u16 = THUMB.height + 1;
-/// Shorter result lists drop the thumbnails and give each result one row.
 const RESULT_THUMBS_MIN_HEIGHT: u16 = 3 * RESULT_ROWS;
 
-/// A thumbnail to draw once the buffer is free: slot, cover URL, whether it is round, and the
-/// name its placeholder takes.
 type Thumb = (Rect, Option<String>, bool, String);
 
-/// Colors and state shared by every row of a list.
 struct RowStyle<'a> {
     accent: Color,
     selection: Color,
     focused: bool,
     playing_uri: Option<String>,
     playing: bool,
-    /// The track on its way to the player.
     loading_uri: Option<String>,
-    /// For the spinner, which keeps turning even where the equalizer stands still.
     frame: u64,
     equalizer: &'static str,
     saved: &'a HashMap<String, bool>,
@@ -57,7 +47,6 @@ impl RowStyle<'_> {
     }
 
     fn heart(&self, uri: &str) -> Span<'static> {
-        // Saved is a state, not a focus: it stays in the text color, clear but quiet.
         if self.is_saved(uri) {
             Span::styled(format!("{} ", icons().saved), theme::palette().text)
         } else {
@@ -94,7 +83,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    // Save button state: own playlists and Liked Songs have none.
     let page_saved = match &app.view {
         View::Tracks(v) => match &v.source {
             TrackSource::Liked => None,
@@ -132,7 +120,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-/// Draws a track list view and returns the number of list rows.
 fn tracks(
     buf: &mut Buffer,
     view: &mut TrackView,
@@ -156,7 +143,6 @@ fn tracks(
         TrackSource::Playlist(p) => {
             ("PLAYLIST", p.name.clone(), format!("By {} · {count} songs · {length}", p.owner_name))
         }
-        // An album opened from a link may not know its year yet.
         TrackSource::Album(a) => {
             let parts = [a.artists.join(", "), a.year.clone(), format!("{count} songs"), length];
             let meta = parts.into_iter().filter(|part| !part.is_empty()).collect::<Vec<_>>().join(" · ");
@@ -168,11 +154,9 @@ fn tracks(
     } else {
         meta
     };
-    // The header and its divider need seven rows; below six list rows they are not worth it.
     if area.height < 13 {
         return track_rows(buf, view, area, style, hits);
     }
-    // With a cover the text sits beside it, vertically centered.
     let (text_x, text_y, header_y) = if with_cover {
         (area.x + HEADER_COVER.width + 3, area.y + 1, area.y + HEADER_COVER.height + 1)
     } else {
@@ -197,7 +181,6 @@ fn tracks(
 
     let columns = Columns::new(area.width);
     buf.set_line(area.x, header_y, &columns.header(), area.width);
-    // A thin divider under the column header, as wide as the row highlight, like Spotify's.
     let divider = "─".repeat(area.width as usize + 2);
     buf.set_string(area.x.saturating_sub(1), header_y + 1, divider, Style::new().fg(p.raised));
 
@@ -215,7 +198,6 @@ fn tracks(
     track_rows(buf, view, list, style, hits)
 }
 
-/// The track list itself; also all there is of a track view in small windows.
 fn track_rows(
     buf: &mut Buffer,
     view: &mut TrackView,
@@ -232,7 +214,6 @@ fn track_rows(
         let line = columns.row(index, track, style);
         buf.set_line(list.x, y, &line, list.width);
         hits.push((row_band(list, y, 1), Hit::Row(index)));
-        // Artist and album names lead to their pages.
         if columns.artist > 0 {
             let x = list.x + (Columns::INDEX + columns.title + 2) as u16;
             let linked = &track.artists[..track.artist_uris.len().min(track.artists.len())];
@@ -251,8 +232,6 @@ fn track_rows(
     list.height as usize
 }
 
-/// Draws the search results and returns how many fit on a page. Thumbnails are left in
-/// `thumbs` for the caller.
 fn search(
     buf: &mut Buffer,
     view: &mut SearchView,
@@ -301,7 +280,6 @@ fn search(
         let entry = &view.entries[index];
         let Some(mut result) = Summary::of(entry) else {
             if let SearchEntry::Header(title) = entry {
-                // A blank row above each section title, where results have room to breathe.
                 let y = if grid.thumbnails { y + 1 } else { y };
                 buf.set_string(list.x, y, *title, Style::new().fg(p.text).bold());
             }
@@ -318,9 +296,6 @@ fn search(
     fitting
 }
 
-/// Draws the queue page and returns how many rows fit on a page. Laid out like the search
-/// results, so a song looks the same in both. Thumbnails are left in `thumbs` for the caller.
-/// How long a queue runs, in hours and minutes: `1 hr 34 min`.
 fn queue(
     buf: &mut Buffer,
     view: &mut QueueView,
@@ -331,7 +306,6 @@ fn queue(
 ) -> usize {
     let p = theme::palette();
     buf.set_string(area.x, area.y, "Queue", Style::new().fg(p.text).bold());
-    // A quiet count on the right says how long the queue is before it is read.
     let songs: Vec<&Track> = view.rows.iter().filter_map(QueueRow::track).collect();
     if !songs.is_empty() {
         let total: u64 = songs.iter().map(|t| u64::from(t.duration_ms)).sum();
@@ -340,8 +314,6 @@ fn queue(
         let x = area.right().saturating_sub(caption.width() as u16);
         buf.set_string(x, area.y, caption, Style::new().fg(p.faint));
     }
-    // A blank row under the page title; with thumbnails, section titles bring another one, as
-    // they do between sections.
     let list = Rect { y: area.y + 2, height: area.height.saturating_sub(2), ..area };
     let grid = ResultGrid::new(list.width, list.height >= RESULT_THUMBS_MIN_HEIGHT);
     if view.rows.is_empty() {
@@ -354,8 +326,6 @@ fn queue(
     view.entry_rows = grid.rows;
     let fitting = (list.height / grid.rows) as usize;
     let mut visible = view.list.visible(fitting, view.rows.len());
-    // A section title on the last visible row has none of its songs in view, so it would read
-    // as a stray heading; leave it for the next scroll.
     if visible.len() > 1 && matches!(view.rows.get(visible.end - 1), Some(QueueRow::Header(_))) {
         visible.end -= 1;
     }
@@ -383,7 +353,6 @@ fn queue(
         grid.draw(buf, row, index, &result, style, hits, thumbs);
     }
 
-    // With nothing after the playing song, say why, where the next section would start.
     let has_next = view.rows.iter().any(|row| matches!(row, QueueRow::Next { .. }));
     let y = list.y + shown as u16 * grid.rows + u16::from(grid.thumbnails);
     if !has_next && y < list.bottom() {
@@ -399,28 +368,20 @@ fn queue(
     fitting
 }
 
-/// What a search result shows, whatever its kind.
 struct Summary<'a> {
     uri: &'a str,
     name: &'a str,
     song: bool,
-    /// The song that plays now, marked like in every other list.
     playing: bool,
-    /// Under the name, or beside it in one-row results.
     meta: String,
-    /// The names in `meta` that lead to artist pages: a song's artists.
     linked: &'a [String],
-    /// A song's album, beside its name where there is room, and whether it can be opened.
     album: Option<(&'a str, bool)>,
-    /// Right-aligned at the end: a song's length or an album's year.
     field: String,
     icon: &'static str,
     image_url: Option<&'a str>,
     round: bool,
 }
 
-/// A name compared without case or stray spaces: an album that merely repeats the title adds
-/// nothing to the row.
 fn normalized(name: &str) -> String {
     name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
 }
@@ -482,28 +443,20 @@ impl<'a> Summary<'a> {
     }
 }
 
-/// The column grid every search result follows, so names, details, hearts and the right
-/// edge line up from one section to the next: a lead (thumbnail or icon), the name, a second
-/// column and a tail with the heart and a short right-aligned field.
 struct ResultGrid {
     thumbnails: bool,
-    /// Screen rows per result.
     rows: u16,
     lead: u16,
     name: usize,
-    /// With thumbnails a song's album, else the meta line; 0 when there is no room.
     second: usize,
 }
 
 impl ResultGrid {
-    /// Heart plus a five-column field.
     const TAIL: usize = 7;
 
     fn new(width: u16, thumbnails: bool) -> Self {
         let lead = if thumbnails { THUMB.width + 2 } else { 5 };
         let text = (width as usize).saturating_sub(lead as usize + 2 + Self::TAIL);
-        // With thumbnails the meta line sits under the name, so the second column only holds
-        // a song's album and is worth it in wide windows only.
         let name = if thumbnails && width < 80 { text } else { text * 55 / 100 };
         let second = text.saturating_sub(name + 2);
         Self { thumbnails, rows: if thumbnails { RESULT_ROWS } else { 1 }, lead, name, second }
@@ -527,12 +480,10 @@ impl ResultGrid {
             let slot = Rect::new(row.x, y, THUMB.width, THUMB.height);
             thumbs.push((slot, result.image_url.map(str::to_owned), result.round, result.name.to_owned()));
         } else {
-            // Songs get a quiet note; the other kinds stand out.
             let color = if result.song { p.faint } else { style.accent };
             buf.set_string(row.x + 2, y, result.icon, Style::new().fg(color));
         }
 
-        // The playing song shows in the accent color with a moving equalizer, as in the sidebar.
         let current = result.playing;
         let name = text::truncate(result.name, self.name.saturating_sub(if current { 5 } else { 0 }));
         let name_style = if current { Style::new().fg(style.accent).bold() } else { Style::new().fg(p.text) };
@@ -566,7 +517,6 @@ impl ResultGrid {
     }
 }
 
-/// A row of pill buttons; the primary one is filled with the accent color.
 pub(super) fn buttons(
     buf: &mut Buffer,
     x: u16,
@@ -588,7 +538,6 @@ pub(super) fn buttons(
     }
 }
 
-/// Selection background plus the accent marker in the left padding, over `height` rows.
 fn highlight(buf: &mut Buffer, list: Rect, y: u16, height: u16, selected: bool, style: &RowStyle) {
     if !selected {
         return;
@@ -602,14 +551,10 @@ fn highlight(buf: &mut Buffer, list: Rect, y: u16, height: u16, selected: bool, 
     }
 }
 
-/// Rows from `y` of a list plus one column of padding on each side: where the selection and the
-/// click area go, so a hovered row lights up as wide as a selected one.
 pub(super) fn row_band(list: Rect, y: u16, height: u16) -> Rect {
     Rect::new(list.x.saturating_sub(1), y, list.width + 2, height)
 }
 
-/// Column widths of a track list; narrower windows drop the album, then fold the artist
-/// into the title column.
 struct Columns {
     title: usize,
     artist: usize,
@@ -618,7 +563,6 @@ struct Columns {
 
 impl Columns {
     const INDEX: usize = 5;
-    /// Heart plus duration.
     const TAIL: usize = 9;
 
     fn new(width: u16) -> Self {
@@ -630,7 +574,6 @@ impl Columns {
             let artist = flexible * 28 / 100;
             Self { title, artist, album: flexible - title - artist }
         } else if width >= 48 {
-            // Low enough for the narrowest two-pane window, where the list is 52 columns.
             let flexible = flexible.saturating_sub(2);
             let title = flexible * 58 / 100;
             Self { title, artist: flexible - title, album: 0 }
@@ -673,7 +616,6 @@ impl Columns {
             spans.push(Span::raw("  "));
             spans.push(Span::styled(fit(&track.artists.join(", "), self.artist), p.muted));
         } else {
-            // Too narrow for an artist column: the artists trail the title where they fit.
             let name = text::truncate(&track.name, self.title);
             let rest = self.title.saturating_sub(name.width());
             let artists = if rest >= 6 { format!(" · {}", track.artists.join(", ")) } else { String::new() };

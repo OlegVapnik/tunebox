@@ -1,5 +1,3 @@
-//! Now Playing and remote commands through the MediaPlayer framework. Both are only touched
-//! from the main thread.
 
 use std::{cell::RefCell, ptr::NonNull, sync::Arc, time::Duration};
 
@@ -33,9 +31,7 @@ impl Controls {
 }
 
 fn register(on_command: &Arc<dyn Fn(Command) + Send + Sync>) {
-    // SAFETY: the shared command center lives for the whole process.
     let center = unsafe { MPRemoteCommandCenter::sharedCommandCenter() };
-    // SAFETY: getters of the command center's fixed set of commands.
     let simple = unsafe {
         [
             (center.playCommand(), Command::Play),
@@ -54,12 +50,10 @@ fn register(on_command: &Arc<dyn Fn(Command) + Send + Sync>) {
     }
 
     let on_command = on_command.clone();
-    // SAFETY: as above.
     let position = unsafe { center.changePlaybackPositionCommand() };
     handle(&position, move |event| {
         let target = event
             .downcast_ref::<MPChangePlaybackPositionCommandEvent>()
-            // SAFETY: a plain property getter.
             .and_then(|event| Duration::try_from_secs_f64(unsafe { event.positionTime() }).ok());
         match target {
             Some(position) => {
@@ -75,9 +69,7 @@ fn handle(
     command: &MPRemoteCommand,
     handler: impl Fn(&MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus + 'static,
 ) {
-    // SAFETY: the framework passes a valid event that outlives the call.
     let block = RcBlock::new(move |event: NonNull<MPRemoteCommandEvent>| handler(unsafe { event.as_ref() }));
-    // SAFETY: the command keeps the block alive for as long as it may call it.
     unsafe {
         command.setEnabled(true);
         command.addTargetWithHandler(&block);
@@ -85,10 +77,8 @@ fn handle(
 }
 
 fn publish(state: &State) {
-    // SAFETY: the default center lives for the whole process.
     let center = unsafe { MPNowPlayingInfoCenter::defaultCenter() };
     let Some(track) = &state.track else {
-        // SAFETY: clearing is allowed at any time.
         unsafe {
             center.setNowPlayingInfo(None);
             center.setPlaybackState(MPNowPlayingPlaybackState::Stopped);
@@ -97,7 +87,6 @@ fn publish(state: &State) {
     };
     let info = now_playing_info(track, state);
     let playback = if state.playing { MPNowPlayingPlaybackState::Playing } else { MPNowPlayingPlaybackState::Paused };
-    // SAFETY: the dictionary only holds the documented keys with values of their documented types.
     unsafe {
         center.setNowPlayingInfo(Some(&info));
         center.setPlaybackState(playback);
@@ -114,7 +103,6 @@ fn now_playing_info(track: &Track, state: &State) -> Retained<NSDictionary<NSStr
     let media_type = NSNumber::new_usize(MPNowPlayingInfoMediaType::Audio.0);
     let artwork = track.artwork.as_ref().and_then(artwork);
 
-    // SAFETY: the keys are immutable constants of the framework.
     let mut keys: Vec<&NSString> = unsafe {
         vec![
             MPMediaItemPropertyTitle,
@@ -136,21 +124,18 @@ fn now_playing_info(track: &Track, state: &State) -> Retained<NSDictionary<NSStr
         media_type.as_ref(),
     ];
     if let Some(artwork) = &artwork {
-        // SAFETY: as above.
         keys.push(unsafe { MPMediaItemPropertyArtwork });
         values.push(artwork.as_ref());
     }
     NSDictionary::from_slices(&keys, &values)
 }
 
-/// Artwork with the cover it was made from.
 struct CachedArtwork {
     cover: Arc<[u8]>,
     artwork: Retained<MPMediaItemArtwork>,
 }
 
 thread_local! {
-    /// The artwork shown last, so updates of the position don't decode the cover again.
     static ARTWORK: RefCell<Option<CachedArtwork>> = const { RefCell::new(None) };
 }
 
@@ -163,9 +148,7 @@ fn artwork(cover: &Arc<[u8]>) -> Option<Retained<MPMediaItemArtwork>> {
         }
         let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(cover))?;
         let size = image.size();
-        // The system scales the image itself, whatever size it asks for.
         let handler = RcBlock::new(move |_: CGSize| NonNull::from(&*image));
-        // SAFETY: the handler returns an image that it keeps alive itself.
         let artwork = unsafe {
             MPMediaItemArtwork::initWithBoundsSize_requestHandler(MPMediaItemArtwork::alloc(), size, &handler)
         };

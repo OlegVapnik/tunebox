@@ -1,10 +1,8 @@
-//! Other devices of the user's account and what plays on them, as plain data.
 
 #[derive(Debug, Clone)]
 pub struct Device {
     pub id: String,
     pub name: String,
-    /// The service's device type, e.g. "Computer", "Smartphone", "Speaker".
     pub kind: String,
     pub active: bool,
     pub volume_percent: Option<u32>,
@@ -16,10 +14,8 @@ pub struct Playback {
     pub playing: bool,
     pub progress_ms: u32,
     pub shuffle: bool,
-    /// "off", "context" or "track".
     pub repeat: String,
     pub track: Option<PlayingTrack>,
-    /// The playlist, album or artist being played, if any.
     pub context: Option<String>,
 }
 

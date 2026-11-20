@@ -19,30 +19,23 @@ pub enum Overlay {
         refreshing: bool,
     },
     Menu(Menu),
-    /// Asks DJ for something or jumps to different picks, like the DJ button in Spotify's apps.
     Dj {
         picker: Picker<DjChoice>,
         suggestions: Vec<String>,
         loading: bool,
     },
-    /// Asks for a star on GitHub, once; `cursor` is on the star (0) or on no thanks (1).
     Star {
         cursor: usize,
     },
 }
 
-/// A row of the DJ panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DjChoice {
-    /// Asks for what was typed.
     Ask,
-    /// Jumps to different picks.
     Jump,
-    /// Asks for one of Spotify's suggestions.
     Suggestion(usize),
 }
 
-/// The DJ panel's rows: what was typed, different picks, then Spotify's suggestions.
 pub fn dj_items(query: &str, suggestions: &[String]) -> Vec<PickItem<DjChoice>> {
     let item = |label: String, detail: &str, value| PickItem { label, detail: detail.into(), image_url: None, value };
     let query = query.trim();
@@ -53,10 +46,8 @@ pub fn dj_items(query: &str, suggestions: &[String]) -> Vec<PickItem<DjChoice>> 
         .collect()
 }
 
-/// The right-click menu of one item.
 pub struct Menu {
     pub target: ContextTarget,
-    /// Screen position the menu opens at.
     pub anchor: (u16, u16),
     pub items: Vec<(MenuAction, String)>,
     pub cursor: usize,
@@ -86,23 +77,17 @@ pub enum TargetKind {
     Episode,
 }
 
-/// Something a menu or button can act on, with what it needs to open or play it.
 #[derive(Debug, Clone)]
 pub struct ContextTarget {
     pub uri: String,
     pub name: String,
     pub kind: TargetKind,
-    /// The context a track plays in: its playlist, album or Liked Songs.
     pub context: Option<String>,
-    /// Album URI and name.
     pub album: Option<(String, String)>,
-    /// First artist's URI and name.
     pub artist: Option<(String, String)>,
     pub image_url: Option<String>,
-    /// Playlists the user owns (or Liked Songs) can't be followed.
     pub owned: bool,
     pub liked_songs: bool,
-    /// The queue entry a track of the queue page stands for: playing it skips ahead to it.
     pub upcoming: Option<crate::queue::Upcoming>,
 }
 
@@ -130,7 +115,6 @@ pub enum PaletteAction {
 pub struct PickItem<T> {
     pub label: String,
     pub detail: String,
-    /// Shown as a thumbnail; pickers with images get two-line rows.
     pub image_url: Option<String>,
     pub value: T,
 }
@@ -151,15 +135,12 @@ impl<T> PickerOutcome<T> {
     }
 }
 
-/// A filterable list: type to fuzzy-match, arrows to move, enter to pick.
 pub struct Picker<T> {
     pub query: String,
     pub items: Vec<PickItem<T>>,
-    /// Indices into `items`, best match first.
     pub matches: Vec<usize>,
     pub cursor: ListCursor,
     matcher: Matcher,
-    /// Whether typing narrows the list; otherwise the text is free and every item stays.
     filter: bool,
 }
 
@@ -187,7 +168,6 @@ impl<T: Copy> Picker<T> {
         }
     }
 
-    /// A picker whose text is free, like a request, rather than a filter of the list.
     pub fn free_text(items: Vec<PickItem<T>>) -> Self {
         Self { filter: false, ..Self::new(items) }
     }
@@ -217,7 +197,6 @@ impl<T: Copy> Picker<T> {
         PickerOutcome::Stay
     }
 
-    /// Swaps in fresh items, keeping the query and the selection on the item `selected` finds.
     pub fn set_items(&mut self, items: Vec<PickItem<T>>, selected: impl Fn(&T) -> bool) {
         self.items = items;
         let query = std::mem::take(&mut self.query);
@@ -227,12 +206,10 @@ impl<T: Copy> Picker<T> {
         }
     }
 
-    /// The item under the cursor.
     pub fn selected(&self) -> Option<&T> {
         self.matches.get(self.cursor.selected).map(|&index| &self.items[index].value)
     }
 
-    /// Picks the match at `position` (as shown, best match first).
     pub fn select(&self, position: usize) -> PickerOutcome<T> {
         match self.matches.get(position) {
             Some(&index) => PickerOutcome::Select(self.items[index].value),
@@ -277,7 +254,6 @@ mod tests {
         }
         picker.on_key(KeyEvent::from(KeyCode::Down));
         let kept = picker.items[*picker.selected().unwrap()].label.clone();
-        // A new device shows up and the order changes.
         let fresh = ["Living room speaker", "TV", "Kitchen speaker", "Phone"];
         picker.set_items(items(&fresh), |&value| fresh[value] == kept);
         assert_eq!(picker.query, "speaker");
@@ -295,7 +271,6 @@ mod tests {
             let query = picker.query.clone();
             picker.set_items(dj_items(&query, &suggestions), |_| false);
         }
-        // Nothing is filtered away, and enter asks for what was typed.
         assert_eq!(picker.matches.len(), 3);
         assert!(matches!(picker.on_key(KeyEvent::from(KeyCode::Enter)), PickerOutcome::Select(DjChoice::Ask)));
     }

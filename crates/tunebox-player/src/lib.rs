@@ -18,26 +18,19 @@ use librespot::{
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tunebox_spotify::session::PendingSession;
 
-/// Preferred audio outputs, best first; librespot's default (rodio) is the fallback.
 #[cfg(target_os = "linux")]
 const PREFERRED_BACKENDS: &[&str] = &["pulseaudio"];
 #[cfg(not(target_os = "linux"))]
 const PREFERRED_BACKENDS: &[&str] = &[];
 
-/// Half volume, librespot's own default.
 pub const DEFAULT_VOLUME: u16 = u16::MAX / 2;
 
-/// Local audio playback through librespot.
 pub struct Engine {
     pub player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
 }
 
 impl Engine {
-    /// `crossfade` overlaps consecutive tracks by that long; zero plays them back to back.
-    ///
-    /// The receiver gets the name of each audio output that goes away during playback, such as
-    /// headphones being unplugged; playback should pause then.
     pub fn new(session: &Session, crossfade: Duration) -> Result<(Self, UnboundedReceiver<String>)> {
         let backend = PREFERRED_BACKENDS
             .iter()
@@ -52,15 +45,10 @@ impl Engine {
         Ok((Self { player, mixer }, lost_rx))
     }
 
-    /// The volume playback has now.
     pub fn volume(&self) -> u16 {
         self.mixer.volume()
     }
 
-    /// Registers the player as a Spotify Connect device. Spirc connects the session itself,
-    /// which is why it takes a pending session. It starts at `initial_volume` (0 to 65535):
-    /// Spirc ignores volume changes until the device is first activated. The player reports
-    /// what plays next whenever a context loads or the queue changes.
     pub async fn connect_device(
         &self,
         pending: PendingSession,
@@ -78,7 +66,6 @@ impl Engine {
     }
 }
 
-/// On macOS, an output that follows the system's default output.
 #[cfg(target_os = "macos")]
 fn open_output(backend: SinkBuilder, lost: UnboundedSender<String>) -> Box<dyn Sink> {
     match macos::FollowingSink::new(lost) {
@@ -87,7 +74,6 @@ fn open_output(backend: SinkBuilder, lost: UnboundedSender<String>) -> Box<dyn S
     }
 }
 
-/// PulseAudio follows the default output by itself.
 #[cfg(not(target_os = "macos"))]
 fn open_output(backend: SinkBuilder, _lost: UnboundedSender<String>) -> Box<dyn Sink> {
     backend(None, AudioFormat::default())

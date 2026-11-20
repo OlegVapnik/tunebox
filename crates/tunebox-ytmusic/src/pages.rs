@@ -1,4 +1,3 @@
-//! Playlist, album and artist pages, and the songs of playlists and albums page by page.
 
 use anyhow::{Context, Result, bail};
 use futures::{Stream, stream};
@@ -15,11 +14,8 @@ use crate::{
     watch,
 };
 
-/// The playlist of the user's liked songs.
 pub(crate) const LIKED: &str = "LM";
 
-/// Radios only play: a song's (`RDAMVM…`), an artist's (`RDEM…`), an album's (`RDAMPL…`).
-/// Other mixes (`RDTMAK…`, `RDCLAK…`) have a playlist page like any playlist.
 pub(crate) fn is_mix(playlist: &str) -> bool {
     ["RDAMVM", "RDEM", "RDAMPL", "RDMM", "RDAO"].iter().any(|prefix| playlist.starts_with(prefix))
 }
@@ -30,7 +26,6 @@ pub(crate) async fn playlist_info(api: &InnerTube, uri: &str) -> Result<Playlist
         let page = browse_playlist(api, id).await?;
         match parse_playlist(&page, id) {
             Ok((info, _, _)) => return Ok(info),
-            // Mixes of a kind tunebox doesn't know yet might only play.
             Err(_) if id.starts_with("RD") => {}
             Err(err) => return Err(err),
         }
@@ -46,7 +41,6 @@ async fn browse_playlist(api: &InnerTube, id: &str) -> Result<Value> {
     api.browse(&format!("VL{id}")).await
 }
 
-/// The first page of a mix; a song's radio starts with the song.
 async fn mix(api: &InnerTube, id: &str) -> Result<watch::Watch> {
     let video = id.strip_prefix("RDAMVM");
     watch::next(api, video, Some(id)).await
@@ -70,7 +64,6 @@ fn mix_info(id: &str, watch: &watch::Watch) -> PlaylistInfo {
     }
 }
 
-/// A playlist page: what it is, its first songs, and the token for the rest.
 fn parse_playlist(page: &Value, id: &str) -> Result<(PlaylistInfo, Vec<Track>, Option<String>)> {
     let shelf = find(page, "musicPlaylistShelfRenderer").or_else(|| find(page, "musicShelfRenderer"));
     let header = find(page, "musicResponsiveHeaderRenderer")
@@ -111,7 +104,6 @@ fn parse_playlist(page: &Value, id: &str) -> Result<(PlaylistInfo, Vec<Track>, O
     Ok((info, tracks, token))
 }
 
-/// The number of songs in `1.6M views • 496 tracks • 31+ hours`.
 fn song_count(subtitle: &str) -> Option<u32> {
     subtitle
         .split('•')
@@ -120,7 +112,6 @@ fn song_count(subtitle: &str) -> Option<u32> {
         .and_then(parse::leading_number)
 }
 
-/// The album, the ID of the playlist it plays as (which saving it needs), and its songs.
 pub(crate) async fn album_info(api: &InnerTube, uri: &str) -> Result<(AlbumInfo, Option<String>)> {
     let page = api.browse(parse::id(uri, ALBUM)?).await?;
     let (album, playlist, _) = parse_album(&page, uri)?;
@@ -168,7 +159,6 @@ fn parse_album(page: &Value, uri: &str) -> Result<(AlbumInfo, Option<String>, Ve
 
 pub(crate) async fn artist(api: &InnerTube, uri: &str) -> Result<ArtistPage> {
     let (mut artist, _) = artist_songs(api, uri).await?;
-    // The artist page leaves out how long the top songs are.
     let missing: Vec<String> =
         artist.top_tracks.iter().filter(|t| t.track.duration_ms == 0).map(|t| t.track.uri.clone()).collect();
     if !missing.is_empty() {
@@ -186,13 +176,11 @@ pub(crate) async fn artist(api: &InnerTube, uri: &str) -> Result<ArtistPage> {
     Ok(artist)
 }
 
-/// The artist's page, and the playlist of their songs, which plays when the artist is played.
 pub(crate) async fn artist_songs(api: &InnerTube, uri: &str) -> Result<(ArtistPage, Option<String>)> {
     let page = api.browse(parse::id(uri, ARTIST)?).await?;
     parse_artist(&page, uri)
 }
 
-/// The subscribe button's channel, which can differ from the artist page's.
 pub(crate) async fn artist_channel(api: &InnerTube, uri: &str) -> Result<String> {
     let page = api.browse(parse::id(uri, ARTIST)?).await?;
     let button = find(&page, "subscribeButtonRenderer").context("This artist can't be followed")?;
@@ -200,7 +188,6 @@ pub(crate) async fn artist_channel(api: &InnerTube, uri: &str) -> Result<String>
 }
 
 fn parse_artist(page: &Value, uri: &str) -> Result<(ArtistPage, Option<String>)> {
-    // musicImmersiveHeaderRenderer, or musicVisualHeaderRenderer for artists without a banner.
     let header = page["header"].as_object().and_then(|h| h.values().next()).context("Artist not found")?;
     let sections = find(page, "sectionListRenderer").unwrap_or(&Value::Null);
     let songs = list(&sections["contents"]).iter().find_map(|s| s.get("musicShelfRenderer"));
@@ -310,7 +297,6 @@ async fn more(client: YtMusic, kind: More, token: String, count: u32, total: u32
                 .collect();
             (tracks, parse::continuation_in(items))
         }
-        // Mixes go on forever; one more page is plenty.
         More::Mix => (watch::next_page(client.api(), &token).await?.tracks, None),
     };
     Ok(page(client, kind, tracks, token, count, total))
@@ -334,7 +320,6 @@ fn page(
     }
 }
 
-/// The items of a continuation page, in the newer or the older shape.
 fn continuation_items(page: &Value) -> &[Value] {
     if let Some(items) = list(&page["onResponseReceivedActions"])
         .iter()

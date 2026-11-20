@@ -1,4 +1,3 @@
-//! Artist pages: popular tracks, discography and related artists in one query.
 
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
@@ -80,7 +79,6 @@ fn top_track(track: &Value) -> Option<TopTrack> {
     })
 }
 
-/// Albums and singles; grouped sections wrap each release in `releases.items[0]`.
 fn releases(section: &Value, grouped: bool) -> Vec<HomeItem> {
     list(section.get("items"))
         .filter_map(|item| if grouped { item.pointer("/releases/items/0") } else { Some(item) })

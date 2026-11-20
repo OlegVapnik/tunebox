@@ -1,4 +1,3 @@
-//! Keeps the system's media controls (media keys, Control Center) in step with playback.
 
 use std::{sync::Arc, time::Duration};
 
@@ -8,25 +7,17 @@ use tunebox_os::media::{Controls, State, Track};
 use crate::clock::Instant;
 use crate::playback::NowPlaying;
 
-/// How far the system's own clock may drift from the player before it gets corrected, which
-/// is how seeks reach it.
 const DRIFT: Duration = Duration::from_millis(1500);
-/// How long a cover that failed to load waits before it is tried again.
 const ARTWORK_RETRY: Duration = Duration::from_secs(30);
 
-/// Sends the controls an update whenever what they show would change.
 pub struct MediaSync {
     send: Box<dyn Fn(State)>,
     shown: Shown,
-    /// Cover art for the controls, by URL.
     artwork: Option<(String, Arc<[u8]>)>,
-    /// The cover last asked for, so it gets loaded once.
     requested: Option<String>,
-    /// A cover that failed to load, and when.
     failed: Option<(String, Instant)>,
 }
 
-/// What the controls were told last.
 #[derive(Default)]
 struct Shown {
     uri: Option<String>,
@@ -38,7 +29,6 @@ struct Shown {
 }
 
 impl Shown {
-    /// Where the system thinks playback is now.
     fn position(&self) -> Duration {
         match self.at {
             Some(at) if self.playing => self.position + at.elapsed(),
@@ -56,7 +46,6 @@ impl MediaSync {
         Self { send, shown: Shown::default(), artwork: None, requested: None, failed: None }
     }
 
-    /// The cover the controls should show but don't have yet. Returned once per cover.
     pub fn missing_artwork(&mut self, track: Option<&CurrentTrack>) -> Option<String> {
         let url = track.and_then(artwork_url)?;
         let failed_lately = self.failed.as_ref().is_some_and(|(f, at)| f == url && at.elapsed() < ARTWORK_RETRY);
@@ -76,7 +65,6 @@ impl MediaSync {
         }
     }
 
-    /// Lets a cover that failed to load be tried again, after a while.
     pub fn artwork_failed(&mut self, url: String) {
         if self.requested.as_deref() == Some(url.as_str()) {
             self.requested = None;
@@ -84,8 +72,6 @@ impl MediaSync {
         }
     }
 
-    /// Shows tunebox's playback, or nothing while another device plays: that one has controls
-    /// of its own, and showing it here would take them over.
     pub fn sync(&mut self, now: &NowPlaying, local: bool) {
         let track = now.track.as_ref().filter(|_| local);
         let artwork = track.and_then(|t| self.artwork(t)).cloned();
@@ -120,14 +106,12 @@ impl MediaSync {
         (self.send)(State { track, playing, position, volume: now.volume });
     }
 
-    /// The cover of `track` the controls show, once it has loaded.
     pub fn artwork(&self, track: &CurrentTrack) -> Option<&Arc<[u8]>> {
         let (url, bytes) = self.artwork.as_ref()?;
         (artwork_url(track) == Some(url.as_str())).then_some(bytes)
     }
 }
 
-/// The largest cover: the controls show it bigger than the player bar does.
 fn artwork_url(track: &CurrentTrack) -> Option<&str> {
     track.cover_url_large.as_deref().or(track.cover_url.as_deref())
 }
@@ -200,7 +184,6 @@ mod tests {
         media.sync(&now, true);
         now.playing = true;
         media.sync(&now, true);
-        // A jump a running clock can't explain.
         now = paused_at(60_000);
         now.playing = true;
         media.sync(&now, true);

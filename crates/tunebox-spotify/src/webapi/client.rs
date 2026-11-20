@@ -10,15 +10,10 @@ use tunebox_core::paths::Secret;
 use super::auth::{self, Token};
 
 const API_BASE: &str = "https://api.spotify.com/v1";
-/// Tries per read request, including the first.
 const MAX_ATTEMPTS: u32 = 3;
-/// Pause before repeating a read that failed on the way (timeout, 502, 503).
 const RETRY_DELAY: Duration = Duration::from_millis(300);
-/// Longest rate-limit wait worth sitting out; longer ones are reported instead.
 const MAX_RETRY_AFTER: u64 = 10;
 
-/// Web API client signed in with the `sp_dc` cookie of Spotify's web player. The token is
-/// spotify's own, so the API doesn't apply the "premium owner" rule of developer apps.
 pub struct WebApi {
     http: reqwest::Client,
     sp_dc: String,
@@ -29,12 +24,10 @@ pub struct WebApi {
 #[derive(Debug)]
 pub struct ApiResponse {
     pub status: StatusCode,
-    /// `Value::Null` when the response has no JSON body.
     pub body: Value,
 }
 
 impl ApiResponse {
-    /// Status plus Spotify's error message, e.g. `403 Forbidden`.
     pub fn error_text(&self) -> String {
         let message = self.body.pointer("/error/message").and_then(Value::as_str).unwrap_or_default();
         format!("{} {message}", self.status.as_u16()).trim_end().to_owned()
@@ -50,7 +43,6 @@ impl WebApi {
             Some(bytes) => {
                 let token: Token =
                     serde_json::from_slice(&bytes).context("Stored token corrupted – run `tunebox login`")?;
-                // An old OAuth token or a cookie that has since changed can't be reused.
                 (token.cookie_hash == cookie_hash).then_some(token)
             }
             None => None,
@@ -62,7 +54,6 @@ impl WebApi {
         self.token.lock().await.is_some()
     }
 
-    /// Fetches a fresh web token so `is_logged_in` becomes true before any API call.
     pub async fn login(&self) -> Result<()> {
         let token = auth::access_token(&self.http, &self.sp_dc).await?;
         self.persist(&token)?;
@@ -70,7 +61,6 @@ impl WebApi {
         Ok(())
     }
 
-    /// Saves a token obtained by signing in with a real browser session.
     pub async fn save_browser_token(&self, access_token: String, expires_at: u64) -> Result<()> {
         let token = Token { access_token, expires_at, cookie_hash: auth::cookie_hash(&self.sp_dc) };
         self.persist(&token)?;
@@ -82,7 +72,6 @@ impl WebApi {
         self.request(Method::GET, path, None).await
     }
 
-    /// GET that fails on non-2xx and deserializes the body.
     pub async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let response = self.get(path).await?;
         if !response.status.is_success() {
@@ -91,7 +80,6 @@ impl WebApi {
         serde_json::from_value(response.body).with_context(|| format!("Unexpected response from {path}"))
     }
 
-    /// A write request that only has to succeed.
     pub async fn call(&self, method: Method, path: &str, body: Option<&Value>) -> Result<()> {
         let response = self.request(method, path, body).await?;
         if !response.status.is_success() {
@@ -100,8 +88,6 @@ impl WebApi {
         Ok(())
     }
 
-    /// Reads are retried after a rate limit or a passing network failure. Writes never are:
-    /// a play or save must not happen twice, or seconds after the user asked for it.
     pub async fn request(&self, method: Method, path: &str, body: Option<&Value>) -> Result<ApiResponse> {
         let token = self.access_token().await?;
         let url = format!("{API_BASE}{path}");
@@ -111,7 +97,6 @@ impl WebApi {
             let mut request = self.http.request(method.clone(), &url).bearer_auth(&token);
             request = match body {
                 Some(body) => request.json(body),
-                // Spotify rejects body-less writes without a Content-Length (411).
                 None if method != Method::GET => request.body(Vec::new()),
                 None => request,
             };
@@ -146,8 +131,6 @@ impl WebApi {
         }
     }
 
-    /// Reuses a fresh token, otherwise exchanges the `sp_dc` cookie for a new one. A failed
-    /// refresh clears the old token so the next call retries the exchange instead of 401s.
     async fn access_token(&self) -> Result<String> {
         let mut guard = self.token.lock().await;
         if let Some(token) = guard.as_ref()
@@ -173,7 +156,6 @@ impl WebApi {
     }
 }
 
-/// How long Spotify asks to wait after a rate limit; `None` when that is too long to sit out.
 fn retry_after(response: &reqwest::Response) -> Option<Duration> {
     let seconds = response
         .headers()

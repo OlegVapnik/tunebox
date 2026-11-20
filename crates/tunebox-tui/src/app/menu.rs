@@ -1,4 +1,3 @@
-//! Context menus: what can be done with the selected item, reachable by right-click or `.`.
 
 use std::io::Write;
 
@@ -19,13 +18,11 @@ use crate::{
 };
 
 impl App {
-    /// Opens the menu for the current selection at `anchor`.
     pub(super) fn open_menu(&mut self, anchor: (u16, u16)) {
         let Some(target) = self.context_target() else { return };
         self.show_menu(target, anchor);
     }
 
-    /// Opens the menu for the playing track at `anchor`, as a right-click on the player does.
     pub(super) fn open_playing_menu(&mut self, anchor: (u16, u16)) {
         let Some(track) = &self.now.track else { return };
         let target = current_track_target(track, self.playing_context().map(str::to_owned));
@@ -38,7 +35,6 @@ impl App {
         self.overlay_fx_pending = true;
     }
 
-    /// The selected item in the focused pane.
     pub(super) fn context_target(&self) -> Option<ContextTarget> {
         if self.focus == Focus::Nav {
             let NavItem::Library(entry) = *self.nav_items().get(self.nav.selected)? else { return None };
@@ -83,7 +79,6 @@ impl App {
         }
     }
 
-    /// The playlist, album or artist a page shows, for its header buttons.
     pub(super) fn page_target(&self) -> Option<ContextTarget> {
         match &self.view {
             View::Tracks(v) => Some(match &v.source {
@@ -128,7 +123,6 @@ impl App {
     }
 
     fn home_target(&self, item: &HomeItem) -> ContextTarget {
-        // A song shown as its radio is the song, as in YouTube Music's own menus.
         if item.is_song() {
             return target(&item.context_uri, &item.title, TargetKind::Track, item.image_url.clone());
         }
@@ -147,7 +141,6 @@ impl App {
         }
     }
 
-    /// Liked Songs of the service shown as a playable context.
     pub(super) fn liked_uri(&self) -> Option<String> {
         let service = self.loader.service()?;
         let user = self.players.get(&service).and_then(Player::user).or_else(|| Some(self.me.as_ref()?.id.clone()));
@@ -155,7 +148,6 @@ impl App {
     }
 
     pub(super) fn run_menu(&mut self, action: MenuAction, target: ContextTarget) {
-        // A song of the queue page plays from where it is in the queue.
         if action == MenuAction::Play
             && let Some(entry) = target.upcoming
         {
@@ -200,13 +192,10 @@ impl App {
         }
     }
 
-    /// The Spotify URI behind a library entry.
     pub fn entry_uri(&self, entry: LibraryEntry) -> Option<String> {
         self.library_target(entry).map(|target| target.uri)
     }
 
-    /// A short name for a playing context, like “Playlist · Deep Focus”, from the pages of the
-    /// service it belongs to, shown or not.
     pub fn context_label(&self, uri: &str) -> Option<String> {
         if Some(uri) == self.liked_uri().as_deref() || backend::is_liked_context(uri) {
             return Some("Liked Songs".into());
@@ -218,7 +207,6 @@ impl App {
         (!name.is_empty()).then(|| format!("{kind} · {name}"))
     }
 
-    /// Opens the page of a playlist, album or artist known only by its URI.
     pub(super) fn open_context(&mut self, uri: String) {
         if backend::is_liked_context(&uri) {
             return self.open_library_entry(LibraryEntry::Liked);
@@ -306,7 +294,6 @@ fn track_target(track: &Track, context: Option<String>) -> ContextTarget {
     }
 }
 
-/// The playing track or episode; `context` is what it plays from.
 fn current_track_target(track: &CurrentTrack, context: Option<String>) -> ContextTarget {
     let kind = if backend::is_episode(&track.uri) { TargetKind::Episode } else { TargetKind::Track };
     ContextTarget {
@@ -317,7 +304,6 @@ fn current_track_target(track: &CurrentTrack, context: Option<String>) -> Contex
     }
 }
 
-/// The first artist's URI and name, where Spotify named one.
 fn first_artist(uris: &[String], names: &[String]) -> Option<(String, String)> {
     let uri = uris.first().filter(|uri| !uri.is_empty())?;
     Some((uri.clone(), names.first().cloned().unwrap_or_default()))
@@ -327,12 +313,10 @@ fn album_target(album: &AlbumInfo) -> ContextTarget {
     target(&album.uri, &album.name, TargetKind::Album, album.image_url.clone())
 }
 
-/// The menu behind a page's "more" button: everything except opening the page itself.
 pub(super) fn page_menu_items(target: &ContextTarget, saved: bool) -> Vec<(MenuAction, String)> {
     menu_items(target, saved).into_iter().filter(|(action, _)| *action != MenuAction::Open).collect()
 }
 
-/// The actions offered for a target, in menu order.
 fn menu_items(target: &ContextTarget, saved: bool) -> Vec<(MenuAction, String)> {
     let i = icons();
     let mut items = Vec::new();
@@ -386,9 +370,7 @@ fn menu_items(target: &ContextTarget, saved: bool) -> Vec<(MenuAction, String)> 
     items
 }
 
-/// OSC 52: the terminal puts the text on the clipboard, which also works over SSH.
 pub(super) fn copy_to_clipboard(text: &str) {
-    // Tests have no terminal to tell.
     if cfg!(test) {
         return;
     }

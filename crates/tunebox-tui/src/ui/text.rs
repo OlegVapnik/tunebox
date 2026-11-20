@@ -1,16 +1,12 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-/// Three thin bars drawn with braille dots, bouncing out of phase.
 const EQUALIZER: [&str; 8] = ["⡄⡇⡆", "⡆⡄⡇", "⡇⡆⡄", "⡆⡇⡆", "⡄⡆⡇", "⡇⡄⡆", "⡆⡇⡄", "⡄⡆⡆"];
 
-/// Drops zero-width and variation-selector characters (emoji joiners, combining marks) that
-/// terminals render at no width but `unicode-width` may count, so columns stay aligned.
 pub fn sanitize(text: &str) -> String {
     text.chars().filter(|c| c.width().unwrap_or(0) != 0 || c.is_whitespace()).collect()
 }
 
-/// Cuts `text` to `width` columns with an ellipsis, then pads it to exactly `width`.
 pub fn fit(text: &str, width: usize) -> String {
     let mut out = truncate(text, width);
     let pad = width.saturating_sub(out.width());
@@ -18,15 +14,11 @@ pub fn fit(text: &str, width: usize) -> String {
     out
 }
 
-/// Splits `text` into at most two lines of `width` columns. The second line gets the
-/// ellipsis when the text overflows; the first never does, so a title can run on.
 pub fn wrap_two(text: &str, width: usize) -> (String, String) {
     let text = sanitize(text);
     if text.width() <= width || width == 0 {
         return (text.to_owned(), String::new());
     }
-    // Break after the last space that fits, so words stay whole; a single word wider than the
-    // line is cut.
     let chars: Vec<char> = text.chars().collect();
     let (mut used, mut fit, mut space) = (0usize, 0usize, None);
     for (i, c) in chars.iter().enumerate() {
@@ -71,18 +63,15 @@ pub fn right(text: &str, width: usize) -> String {
     format!("{text:>width$}")
 }
 
-/// `icon  label`: Nerd Font icons spill into the cell after them, so one space would vanish.
 pub fn icon_label(icon: &str, label: &str) -> String {
     format!("{icon}  {label}")
 }
 
-/// `3:58`
 pub fn duration(ms: u32) -> String {
     let secs = ms / 1000;
     format!("{}:{:02}", secs / 60, secs % 60)
 }
 
-/// `2 hr 51 min`, or `43 min` below an hour.
 pub fn total_duration(ms: u64) -> String {
     let minutes = ms / 60_000;
     match (minutes / 60, minutes % 60) {
@@ -91,7 +80,6 @@ pub fn total_duration(ms: u64) -> String {
     }
 }
 
-/// `28118277` → `28,118,277`
 pub fn grouped(n: u64) -> String {
     let digits = n.to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);

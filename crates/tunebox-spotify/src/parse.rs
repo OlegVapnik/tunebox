@@ -1,12 +1,9 @@
-//! Helpers for the internal API's responses.
 
 use serde_json::Value;
 use tunebox_core::catalog::PlaylistInfo;
 
-/// Preferred cover width; Spotify offers roughly 64, 300 and 640 px.
 const IMAGE_WIDTH: u64 = 300;
 
-/// The internal API sends no song count.
 pub fn playlist(data: &Value) -> Option<PlaylistInfo> {
     if data.get("__typename")?.as_str()? != "Playlist" {
         return None;
@@ -28,7 +25,6 @@ pub fn playlist(data: &Value) -> Option<PlaylistInfo> {
     })
 }
 
-/// The source closest to the preferred width.
 pub fn image(sources: Option<&Value>) -> Option<String> {
     sources?
         .as_array()?
@@ -55,7 +51,6 @@ fn last_part(uri: &str) -> String {
     uri.rsplit(':').next().unwrap_or_default().to_owned()
 }
 
-/// Playlist descriptions contain links like `<a href=…>Artist</a>`.
 pub fn strip_html(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut in_tag = false;

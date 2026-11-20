@@ -1,7 +1,3 @@
-//! Which account a sign-in acts as. A browser's YouTube cookies sign in every Google account
-//! signed in to that browser at once; YouTube tells them apart by their index among them
-//! (`X-Goog-AuthUser`), and a brand account by its page ID (`X-Goog-PageId`). Signing in picks
-//! one, and the sign-in keeps it along with the cookies.
 
 use anyhow::Result;
 use serde_json::{Value, json};
@@ -11,25 +7,18 @@ use crate::{
     parse::{self, find, find_all, str_at, text},
 };
 
-/// Google lets this many accounts be signed in to a browser at once.
 const MAX_ACCOUNTS: u32 = 10;
 
-/// The comments in the sign-in's `cookies.txt` that say which account it acts as.
 const INDEX_NOTE: &str = "# tunebox-authuser: ";
 const PAGE_NOTE: &str = "# tunebox-pageid: ";
 
-/// The account requests act as.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Identity {
-    /// The Google account's index among those signed in to the browser; 0 is the one signed
-    /// in first.
     pub index: u32,
-    /// A brand account's page ID; `None` for the Google account's own.
     pub page_id: Option<String>,
 }
 
 impl Identity {
-    /// Reads the account from the sign-in's `cookies.txt`; the first one where it names none.
     pub(crate) fn parse(text: &str) -> Self {
         let mut identity = Self::default();
         for line in text.lines().map(|line| line.trim_end_matches('\r')) {
@@ -42,7 +31,6 @@ impl Identity {
         identity
     }
 
-    /// The lines that keep it in a `cookies.txt`, as comments other readers skip.
     pub(crate) fn notes(&self) -> String {
         let mut notes = format!("{INDEX_NOTE}{}\n", self.index);
         if let Some(page) = &self.page_id {
@@ -52,24 +40,16 @@ impl Identity {
     }
 }
 
-/// An account the cookies can act as.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     pub identity: Identity,
-    /// The name YouTube shows, which a work and a private account may share.
     pub name: String,
-    /// The Google account's address; a brand account's is that of the Google account it
-    /// belongs to.
     pub email: Option<String>,
-    /// The channel's handle, such as `@name`.
     pub handle: Option<String>,
-    /// What tells Google accounts apart: the address, else Google's ID of the account.
     google: String,
 }
 
 impl Account {
-    /// The name with what tells it apart: "Ada · ada@example.com", or for a brand account
-    /// "Band · brand account of ada@example.com".
     pub fn label(&self) -> String {
         let of = self.email.as_deref().or(self.handle.as_deref());
         match (of, &self.identity.page_id) {
@@ -79,22 +59,17 @@ impl Account {
         }
     }
 
-    /// Whether it is the same account, wherever it is among the browser's.
     pub fn same_as(&self, other: &Account) -> bool {
         self.google == other.google && self.identity.page_id == other.identity.page_id
     }
 }
 
-/// Every account the cookies can act as: each Google account signed in to the browser, in
-/// Google's order, each followed by its brand accounts. YouTube lists the accounts of one
-/// index at a time, and an index past the last one answers as if signed out.
 pub(crate) async fn list(api: &InnerTube) -> Result<Vec<Account>> {
     let mut accounts: Vec<Account> = Vec::new();
     for index in 0..MAX_ACCOUNTS {
         let identity = Identity { index, page_id: None };
         let page = match api.call_as_identity(&identity, "account/accounts_list", json!({})).await {
             Ok(page) => page,
-            // The first answers for the cookies as a whole.
             Err(err) if index == 0 => return Err(err),
             Err(err) => {
                 tracing::debug!("account {index}: {err:#}");
@@ -111,7 +86,6 @@ pub(crate) async fn list(api: &InnerTube) -> Result<Vec<Account>> {
     Ok(accounts)
 }
 
-/// The account the sign-in acts as, as `list` shows it.
 pub(crate) async fn current(api: &InnerTube) -> Result<Option<Account>> {
     let Some(identity) = api.identity() else { return Ok(None) };
     let page = api.call("account/accounts_list", json!({})).await?;
@@ -119,8 +93,6 @@ pub(crate) async fn current(api: &InnerTube) -> Result<Option<Account>> {
     Ok(accounts.into_iter().find(|account| account.identity == identity))
 }
 
-/// The accounts on a page of `account/accounts_list`, as those of the Google account at
-/// `index`. Disabled ones can't be used, so they are left out.
 fn parse(page: &Value, index: u32) -> Vec<Account> {
     let mut sections = Vec::new();
     find_all(page, "accountSectionListRenderer", &mut sections);
@@ -137,7 +109,6 @@ fn parse(page: &Value, index: u32) -> Vec<Account> {
             let tokens = tokens.map_or(&[][..], parse::list);
             let page_id = tokens.iter().find_map(|token| str_at(token, "/pageIdToken/pageId")).map(str::to_owned);
             let gaia = tokens.iter().find_map(|token| str_at(token, "/accountStateToken/obfuscatedGaiaId"));
-            // Without an address, the Google account's own entry names it for its brand accounts.
             if google.is_none() && page_id.is_none() {
                 google = gaia.map(str::to_owned);
             }
@@ -170,7 +141,6 @@ mod tests {
         serde_json::from_str(include_str!("../tests/fixtures/accounts_list.json")).unwrap()
     }
 
-    /// An account item as YouTube sends it, with a brand account's page ID where given.
     fn item(name: &str, handle: &str, gaia: &str, page_id: Option<&str>, disabled: bool) -> Value {
         let mut tokens = vec![json!({ "accountStateToken": { "hasChannel": true, "obfuscatedGaiaId": gaia } })];
         if let Some(page_id) = page_id {
@@ -243,7 +213,6 @@ mod tests {
         let first = Identity::default();
         assert_eq!(first.notes(), "# tunebox-authuser: 0\n");
         assert_eq!(Identity::parse(&first.notes()), first);
-        // Sign-ins saved before tunebox kept the account act as the first one.
         assert_eq!(Identity::parse("# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tx\n"), first);
     }
 }

@@ -1,4 +1,3 @@
-//! Playlist search through the internal API, which also finds the user's mixes.
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};

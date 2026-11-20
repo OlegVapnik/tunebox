@@ -1,4 +1,3 @@
-//! The Settings page: moving through it, and what each change does right away.
 
 use std::time::Duration;
 
@@ -20,12 +19,10 @@ impl App {
         self.demo
     }
 
-    /// Whether this terminal can show desktop notifications.
     pub fn can_notify(&self) -> bool {
         self.notifier.is_some()
     }
 
-    /// Where settings are saved, with the home directory as `~`.
     pub fn config_path(&self) -> String {
         let path = self.paths.config_file();
         match std::env::var_os("HOME").and_then(|home| path.strip_prefix(home).ok().map(|p| p.to_owned())) {
@@ -43,7 +40,6 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// The settings that mean something here; crossfade, say, only with a service that has it.
     fn shown_settings(&self) -> Vec<Setting> {
         let shown = |setting: &Setting| match setting {
             Setting::Crossfade => self.loader.services().into_iter().any(backend::supports_crossfade),
@@ -73,7 +69,6 @@ impl App {
         }
     }
 
-    /// Moves `setting` to its next or previous choice, applies it and saves it.
     pub(super) fn change_setting(&mut self, setting: Setting, forward: bool) {
         self.prefs.step(setting, forward);
         match setting {
@@ -108,8 +103,6 @@ impl App {
         self.save_setting(setting);
     }
 
-    /// Moves the accent to the color the setting, the cover or the palette gives it now. The
-    /// cover's is tuned to the background here, so it follows a change of colors.
     pub(super) fn show_accent(&mut self) {
         let cover = self.cover_accent.map(theme::cover_accent);
         let color = self.prefs.accent.fixed().or(cover).unwrap_or(theme::palette().accent);
@@ -120,9 +113,6 @@ impl App {
         }
     }
 
-    /// Draws with new colors from the next frame on when they changed, by the setting, Omarchy's
-    /// theme or `theme.toml`. The accent goes along where it comes from the palette, and the
-    /// fixed ones adapt to a light background. Returns whether the colors changed.
     pub fn poll_colors(&mut self) -> bool {
         let Some(palette) = self.colors.as_mut().and_then(Colors::poll) else { return false };
         theme::set_palette(palette);
@@ -130,12 +120,10 @@ impl App {
         true
     }
 
-    /// Whether the terminal told its colors, for the Terminal choice.
     pub fn knows_terminal_colors(&self) -> bool {
         self.colors.as_ref().is_some_and(Colors::knows_terminal)
     }
 
-    /// Writes `setting` to the config file. The demo keeps changes until it closes.
     pub(super) fn save_setting(&mut self, setting: Setting) {
         if self.demo {
             return;
@@ -146,15 +134,12 @@ impl App {
         }
     }
 
-    /// Loads the player's cover, unless cover art is off.
     pub(super) fn load_cover(&mut self, url: String) {
         if self.prefs.covers {
             self.loader.cover(url, COVER_SIZE);
         }
     }
 
-    /// With cover art turned off: forgets every cover, here and in the terminal, and hands the
-    /// memory back.
     fn drop_covers(&mut self) {
         for (_, slot) in self.images.drain() {
             if let ImageSlot::Ready(picture) = slot {

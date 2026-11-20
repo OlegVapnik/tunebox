@@ -1,5 +1,3 @@
-//! What people set on the Settings page. Every change goes to `config.toml` right away, so
-//! nobody has to edit it by hand, and what's in the file shows up here.
 
 use tunebox_core::config::{Config, Value};
 use tunebox_os::settings::Settings;
@@ -13,7 +11,6 @@ const CROSSFADE_STEPS: [u64; 5] = [0, 3, 6, 9, 12];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Preferences {
-    /// Seconds consecutive tracks overlap.
     pub crossfade: u64,
     pub covers: bool,
     pub images: ImageProtocol,
@@ -54,12 +51,10 @@ impl Preferences {
                 _ => PowerSaving::Auto,
             },
             notifications: config.notifications != Some(false),
-            // This build comes from a private repo without releases, so it asks only when told to.
             update_check: config.update_check == Some(true),
         }
     }
 
-    /// The system's settings with the user's choice for power saving applied.
     pub fn apply(&self, system: Settings) -> Settings {
         let low_power = match self.power_saving {
             PowerSaving::Auto => system.low_power,
@@ -69,7 +64,6 @@ impl Preferences {
         Settings { low_power, ..system }
     }
 
-    /// The setting as shown on the page.
     pub fn value(&self, setting: Setting) -> String {
         let on_off = |on: bool| if on { "On" } else { "Off" }.to_owned();
         match setting {
@@ -86,7 +80,6 @@ impl Preferences {
         }
     }
 
-    /// For settings that are switched rather than chosen: whether it's on.
     pub fn switch(&self, setting: Setting) -> Option<bool> {
         match setting {
             Setting::Covers => Some(self.covers),
@@ -101,7 +94,6 @@ impl Preferences {
         }
     }
 
-    /// Moves the setting to its next or previous choice, wrapping around; switches flip.
     pub fn step(&mut self, setting: Setting, forward: bool) {
         match setting {
             Setting::Crossfade => self.crossfade = cycle(&CROSSFADE_STEPS, &self.crossfade, forward),
@@ -116,8 +108,6 @@ impl Preferences {
         }
     }
 
-    /// The setting's key in `config.toml` and its value there; `None` for the default, which
-    /// leaves the file without the key.
     pub fn entry(&self, setting: Setting) -> (&'static str, Option<Value>) {
         let off = |on: bool| (!on).then(|| Value::from(false));
         match setting {
@@ -132,20 +122,17 @@ impl Preferences {
             Setting::Icons => ("icons", self.icons.config().map(Value::from)),
             Setting::PowerSaving => ("power_saving", self.power_saving.config().map(Value::from)),
             Setting::Notifications => ("notifications", off(self.notifications)),
-            // Checking for updates is the one switch that starts off, so it writes only when on.
             Setting::UpdateCheck => ("update_check", self.update_check.then(|| Value::from(true))),
         }
     }
 }
 
-/// The item after (or before) `current` in `items`, wrapping around.
 fn cycle<T: Clone + PartialEq>(items: &[T], current: &T, forward: bool) -> T {
     let index = items.iter().position(|item| item == current).unwrap_or(0);
     let next = if forward { (index + 1) % items.len() } else { (index + items.len() - 1) % items.len() };
     items[next].clone()
 }
 
-/// One line on the Settings page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Setting {
     Crossfade,
@@ -159,7 +146,6 @@ pub enum Setting {
     UpdateCheck,
 }
 
-/// The Settings page: section titles with their settings, in order.
 pub const SECTIONS: [(&str, &[Setting]); 4] = [
     ("Playback", &[Setting::Crossfade]),
     ("Display", &[Setting::Covers, Setting::Images, Setting::Colors, Setting::Accent, Setting::Icons]),
@@ -168,7 +154,6 @@ pub const SECTIONS: [(&str, &[Setting]); 4] = [
 ];
 
 impl Setting {
-    /// Every setting in page order.
     pub fn all() -> impl Iterator<Item = Setting> {
         SECTIONS.iter().flat_map(|(_, settings)| settings.iter().copied())
     }
@@ -204,10 +189,7 @@ impl Setting {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccentChoice {
-    /// The dominant color of the playing cover.
     Cover,
-    /// The accent of the colors in use: `theme.toml`'s or, with Colors on Auto, Omarchy's
-    /// theme's; tunebox's own mauve otherwise. This is what the default theme uses.
     Theme,
     Fixed(NamedColor),
 }
@@ -252,7 +234,6 @@ impl AccentChoice {
         }
     }
 
-    /// The color to show, if it doesn't depend on the cover.
     pub fn fixed(self) -> Option<Rgb> {
         match self {
             AccentChoice::Cover => None,
@@ -283,10 +264,8 @@ impl NamedColor {
         }
     }
 
-    /// Bright enough to read on a dark background, like the colors taken from covers.
     fn rgb(self) -> Rgb {
         match self {
-            // tunebox's own green, whatever accent the palette has.
             NamedColor::Green => Palette::DEFAULT.accent,
             NamedColor::Violet => Rgb(167, 139, 250),
             NamedColor::Pink => Rgb(255, 143, 177),
@@ -296,15 +275,10 @@ impl NamedColor {
     }
 }
 
-/// Where the interface's colors come from. `theme.toml` in the config folder goes over any of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorChoice {
-    /// Omarchy's theme where there is one, tunebox's own colors elsewhere.
     Auto,
-    /// tunebox's own dark colors, also on Omarchy.
     Tunebox,
-    /// The terminal's background and text, with the shades in between; tunebox's own colors
-    /// when the terminal doesn't tell them.
     Terminal,
 }
 
@@ -330,7 +304,6 @@ impl ColorChoice {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconChoice {
-    /// Nerd Font icons in terminals that bundle the font, text icons elsewhere.
     Auto,
     Nerd,
     Text,
@@ -339,7 +312,6 @@ pub enum IconChoice {
 impl IconChoice {
     const ALL: [IconChoice; 3] = [IconChoice::Auto, IconChoice::Nerd, IconChoice::Text];
 
-    /// The value [`crate::icons::init`] takes, which is also the one in the config file.
     pub fn config(self) -> Option<&'static str> {
         match self {
             IconChoice::Auto => None,
@@ -359,7 +331,6 @@ impl IconChoice {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerSaving {
-    /// Follows the system: Low Power Mode on macOS, the power-saver profile on Linux.
     Auto,
     On,
     Off,
@@ -389,7 +360,6 @@ impl PowerSaving {
 mod tests {
     use super::*;
 
-    /// What the file says after storing every setting, read back the way tunebox starts.
     fn round_trip(preferences: &Preferences) -> Preferences {
         let mut document = toml_edit::DocumentMut::new();
         for setting in Setting::all() {
@@ -413,8 +383,6 @@ mod tests {
     fn every_choice_survives_a_restart() {
         let mut preferences = Preferences::default();
         for setting in Setting::all() {
-            // Two steps from the default reach a non-default value for every kind of setting,
-            // except switches, which are back where they started.
             for steps in 1..=2 {
                 preferences.step(setting, true);
                 assert_eq!(round_trip(&preferences), preferences, "{setting:?} after {steps} steps");

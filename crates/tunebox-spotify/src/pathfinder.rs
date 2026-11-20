@@ -1,8 +1,3 @@
-//! Spotify's internal GraphQL API ("pathfinder"), which the official clients use for Home and
-//! other views the Web API no longer offers.
-//!
-//! Queries are persisted: Spotify only accepts known query hashes, and those rotate every few
-//! weeks. The current ones are read from the web player's JavaScript and cached on disk.
 
 use std::{
     collections::HashMap,
@@ -20,18 +15,14 @@ use tunebox_core::paths::write_private;
 
 const ENDPOINT: &str = "https://api-partner.spotify.com/pathfinder/v2/query";
 const WEB_PLAYER: &str = "https://open.spotify.com/";
-/// Used until the web player has been read once.
 const KNOWN_HASHES: &[(&str, &str)] = &[
     ("home", "5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1"),
     ("libraryV3", "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455"),
     ("searchPlaylists", "d520014e748f9ea44f7707d8df1819867ac1205e8b7f3e28f22fe5fc858921b1"),
 ];
-/// Greetings and shelf titles come back in this language, matching the English UI.
 const ACCEPT_LANGUAGE: &str = "en";
-/// The web player's JavaScript bundles are large; reading them may take a while.
 const BUNDLE_TIMEOUT: Duration = Duration::from_secs(60);
 const CHUNK_CONCURRENCY: usize = 16;
-/// Minimum time between two reads of the web player.
 const REFRESH_PAUSE: Duration = Duration::from_secs(10 * 60);
 const USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36";
@@ -41,7 +32,6 @@ pub struct Pathfinder {
     session: Session,
     cache_path: PathBuf,
     hashes: Mutex<HashMap<String, String>>,
-    /// Also held while reading, so concurrent queries read it once.
     refreshed: Mutex<Option<Instant>>,
 }
 
@@ -67,7 +57,6 @@ impl Pathfinder {
         self.session.is_invalid()
     }
 
-    /// Runs a persisted query and returns its `data`. Refreshes the hash once if it is stale.
     pub async fn query(&self, operation: &str, variables: Value) -> Result<Value> {
         let hash = self.hashes.lock().await.get(operation).cloned();
         if let Some(hash) = hash {
@@ -116,13 +105,11 @@ impl Pathfinder {
         body.get_mut("data").map(Value::take).context("pathfinder: response without data")
     }
 
-    /// Reads all persisted-query hashes from the web player and caches them.
     async fn refresh_hashes(&self) -> Result<()> {
         let mut refreshed = self.refreshed.lock().await;
         if refreshed.is_some_and(|at| at.elapsed() < REFRESH_PAUSE) {
             return Ok(());
         }
-        // Before reading, so a failed read pauses too.
         *refreshed = Some(Instant::now());
         let html = self.http.get(WEB_PLAYER).send().await?.text().await?;
         let mut found = HashMap::new();
@@ -132,7 +119,6 @@ impl Pathfinder {
             found.extend(persisted_hashes(&source));
             chunks.extend(chunk_urls(&script, &source));
         }
-        // Search and most pages live in chunks loaded on demand.
         let mut failed = 0;
         let mut sources = stream::iter(chunks.clone())
             .map(|url| async move { self.script(&url).await })
@@ -155,7 +141,6 @@ impl Pathfinder {
     }
 
     async fn script(&self, url: &str) -> Result<String> {
-        // The bundles are several megabytes, more than the default timeout allows for.
         let response = self.http.get(url).timeout(BUNDLE_TIMEOUT).send().await?.error_for_status()?;
         Ok(response.text().await?)
     }
@@ -166,7 +151,6 @@ fn is_stale(err: &anyhow::Error) -> bool {
     text.contains("PersistedQueryNotFound") || text.contains("HTTP 412")
 }
 
-/// `<script src="…">` URLs of a page.
 fn script_urls(html: &str) -> impl Iterator<Item = String> + '_ {
     html.split("<script").skip(1).filter_map(|tag| {
         let src = tag.split("src=\"").nth(1)?.split('"').next()?;
@@ -174,8 +158,6 @@ fn script_urls(html: &str) -> impl Iterator<Item = String> + '_ {
     })
 }
 
-/// From webpack's chunk map in the main bundle:
-/// `(({1872:"xpui-routes-playlist"})[e]||e)+"."+({1872:"1072dd2e",934:"07549133"})[e]+".js"`
 fn chunk_urls(script: &str, source: &str) -> Vec<String> {
     let (Some((base, _)), Some((names, hashes))) = (script.rsplit_once('/'), chunk_maps(source)) else {
         return Vec::new();
@@ -184,7 +166,6 @@ fn chunk_urls(script: &str, source: &str) -> Vec<String> {
     map_entries(hashes).map(|(id, hash)| format!("{base}/{}.{hash}.js", names.get(id).unwrap_or(&id))).collect()
 }
 
-/// The name and hash maps around `)+"."+(`, skipping the ones for CSS.
 fn chunk_maps(source: &str) -> Option<(&str, &str)> {
     const JOIN: &str = ")+\".\"+({";
     source.match_indices(JOIN).find_map(|(at, _)| {
@@ -203,7 +184,6 @@ fn chunk_maps(source: &str) -> Option<(&str, &str)> {
     })
 }
 
-/// `1872:"1072dd2e",934:"07549133"` as pairs.
 fn map_entries(map: &str) -> impl Iterator<Item = (&str, &str)> {
     map.split(',').filter_map(|entry| {
         let (key, value) = entry.split_once(':')?;
@@ -214,7 +194,6 @@ fn map_entries(map: &str) -> impl Iterator<Item = (&str, &str)> {
     })
 }
 
-/// Finds `"<operation>","query","<sha256>"` triples in minified JavaScript.
 fn persisted_hashes(source: &str) -> HashMap<String, String> {
     const MARKER: &str = "\",\"query\",\"";
     let mut hashes = HashMap::new();
@@ -232,7 +211,6 @@ fn persisted_hashes(source: &str) -> HashMap<String, String> {
     hashes
 }
 
-/// The system time zone, which Home needs for its greeting and time-of-day shelves.
 pub fn time_zone() -> String {
     iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".into())
 }

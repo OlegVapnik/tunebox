@@ -1,5 +1,3 @@
-//! "Your Library" in memory: fresh lists from Spotify, and likes, saves and follows shown at
-//! once while Spotify confirms them.
 
 use std::{collections::HashSet, time::Duration};
 
@@ -17,21 +15,16 @@ use crate::{
     views::{QueueRow, SearchEntry, TrackSource, View},
 };
 
-/// Confirmed changes are followed by a reload of their list, once things have been quiet for
-/// this long, so a burst of saves costs one reload.
 const RELOAD_DELAY: Duration = Duration::from_secs(1);
 
-/// Something the user can add to their library.
 #[derive(Clone)]
 pub(super) enum LibraryItem {
     Playlist(PlaylistInfo),
     Album(AlbumInfo),
     Artist(ArtistInfo),
-    /// A song in Liked Songs.
     Track(Track),
 }
 
-/// A list of the library that can be loaded again on its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum LibraryPart {
     Playlists,
@@ -65,8 +58,6 @@ impl App {
         self.edit_library(|app| app.shows = fresh);
     }
 
-    /// Takes a freshly loaded list as the truth, except for changes Spotify has not confirmed
-    /// yet, which it may not reflect. Items that left the library no longer count as saved.
     fn reconcile<T: Clone>(&mut self, old: Vec<T>, mut fresh: Vec<T>, uri: impl Fn(&T) -> &str) -> Vec<T> {
         let unconfirmed = |app: &Self, item: &T| app.save_in_progress(uri(item));
         let mut list: Vec<T> = old
@@ -87,8 +78,6 @@ impl App {
         list
     }
 
-    /// Changes the library lists while keeping what points into them by position (the
-    /// sidebar cursor, the library page cursor, open pickers) on the same items.
     pub(super) fn edit_library(&mut self, edit: impl FnOnce(&mut Self)) {
         let nav = self.nav_items().get(self.nav.selected).and_then(|item| self.nav_uri(*item));
         let page = match &self.view {
@@ -105,7 +94,6 @@ impl App {
         {
             self.nav.selected = index;
         }
-        // While the library is still arriving, a restored cursor may point past what is there.
         if !self.playlists_loading && !self.library_loading {
             self.nav.selected = self.nav.selected.min(self.nav_len().saturating_sub(1));
         }
@@ -129,8 +117,6 @@ impl App {
         }
     }
 
-    /// Open pickers refer to playlists by position; points them at the same playlists after
-    /// the list changed, or at nothing when one is gone.
     fn remap_playlist_pickers(&mut self, old: &[String]) {
         let position = |index: usize| {
             old.get(index).and_then(|uri| self.playlists.iter().position(|p| &p.uri == uri)).unwrap_or(usize::MAX)
@@ -152,8 +138,6 @@ impl App {
         }
     }
 
-    /// Shows a like, save or follow (or undoing one) at once in the sidebar, the library page
-    /// and Liked Songs. `saved` is the new state.
     pub(super) fn show_library_change(&mut self, uri: &str, saved: bool) {
         if backend::is_track(uri) {
             return self.show_liked_change(uri, saved);
@@ -181,7 +165,6 @@ impl App {
         };
         let mut removed = None;
         for view in std::iter::once(&mut self.view).chain(&mut self.history) {
-            // A list still loading gets the change from Spotify itself.
             let View::Tracks(v) = view else { continue };
             if !matches!(v.source, TrackSource::Liked) || v.loading {
                 continue;
@@ -220,7 +203,6 @@ impl App {
         }
     }
 
-    /// Removes a playlist, album or artist from the library lists; returns where it was.
     fn take_library_item(&mut self, uri: &str) -> Option<(usize, LibraryItem)> {
         if let Some(index) = self.playlists.iter().position(|p| p.uri == uri) {
             return Some((index, LibraryItem::Playlist(self.playlists.remove(index))));
@@ -232,7 +214,6 @@ impl App {
         Some((index, LibraryItem::Artist(self.artists.remove(index))))
     }
 
-    /// What a newly saved playlist, album or artist looks like, from the page it was saved on.
     fn find_library_item(&self, uri: &str) -> Option<LibraryItem> {
         match &self.view {
             View::Tracks(v) => match &v.source {
@@ -261,7 +242,6 @@ impl App {
                         image_url,
                     }));
                 }
-                // Releases on an artist page are subtitled with year and type, not artists.
                 let item = page.into_iter().flat_map(|p| &p.shelves).flat_map(|s| &s.items).find(|i| i.uri == uri);
                 if let Some(item) = item {
                     return library_item(item, Some(&v.name));
@@ -279,7 +259,6 @@ impl App {
         library_item(item, None)
     }
 
-    /// A song the user just liked, from the page it was liked on or the player.
     fn find_track(&self, uri: &str) -> Option<Track> {
         let listed = match &self.view {
             View::Tracks(v) => v.tracks.iter().find(|t| t.uri == uri).cloned(),
@@ -296,7 +275,6 @@ impl App {
         listed.or_else(|| self.now.track.as_ref().filter(|t| t.uri == uri).map(CurrentTrack::to_track))
     }
 
-    /// Loads the list a confirmed change touched again, as the service's final word on it.
     pub(super) fn schedule_reload(&mut self, uri: &str) {
         let part = match uri.split(':').nth(1) {
             Some("playlist") => LibraryPart::Playlists,
@@ -323,7 +301,6 @@ impl App {
     }
 }
 
-/// A Home or artist page card as a library item; `artist` names the artist page it is on.
 fn library_item(item: &HomeItem, artist: Option<&str>) -> Option<LibraryItem> {
     let id = item.uri.rsplit(':').next().unwrap_or_default().to_owned();
     let (uri, name, image_url) = (item.uri.clone(), item.title.clone(), item.image_url.clone());

@@ -1,5 +1,3 @@
-//! The media controls as MPRIS, the D-Bus interface through which media keys, the desktop's
-//! media widgets and playerctl find and control players.
 
 use std::{
     borrow::Cow,
@@ -26,18 +24,15 @@ use zbus::{
 use super::bus;
 use crate::media::{Command, State, Track};
 
-/// The name clients look for. A second tunebox adds its process ID, as MPRIS asks.
 const NAME: &str = "org.mpris.MediaPlayer2.tunebox";
 const PATH: &str = "/org/mpris/MediaPlayer2";
 const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
-/// How far the position may move other than by playing before clients hear of a seek.
 const SEEK_TOLERANCE: Duration = Duration::from_secs(1);
 
 type Callback = Arc<dyn Fn(Command) + Send + Sync>;
 
 pub struct Controls {
     updates: watch::Sender<State>,
-    /// The cover file clients were pointed to last.
     cover: Arc<Mutex<Option<PathBuf>>>,
 }
 
@@ -51,13 +46,11 @@ impl Controls {
     }
 
     pub fn update(&self, state: State) {
-        // Only the latest state matters, so this never waits for the D-Bus thread.
         self.updates.send_replace(state);
     }
 }
 
 impl Drop for Controls {
-    /// Removes the cover file right away: the D-Bus thread may not get to it before tunebox exits.
     fn drop(&mut self) {
         if let Some(path) = self.cover.lock().unwrap_or_else(PoisonError::into_inner).take() {
             let _ = fs::remove_file(path);
@@ -65,8 +58,6 @@ impl Drop for Controls {
     }
 }
 
-/// Puts tunebox on the session bus with a connection of its own, which takes it off again
-/// when dropped.
 async fn connect(on_command: Callback) -> Option<Connection> {
     let connected = async {
         let connection = connection::Builder::session()
@@ -88,7 +79,6 @@ async fn connect(on_command: Callback) -> Option<Connection> {
     connected.await.inspect_err(|err| tracing::info!("no media controls: {err}")).ok()
 }
 
-/// Shows each new state until the controls are dropped.
 async fn serve(connection: Connection, mut states: watch::Receiver<State>, mut cover: CoverFile) {
     let player = match connection.object_server().interface::<_, Player>(PATH).await {
         Ok(player) => player,
@@ -104,8 +94,6 @@ async fn serve(connection: Connection, mut states: watch::Receiver<State>, mut c
     }
 }
 
-/// `org.mpris.MediaPlayer2`: tunebox as an application. It lives in a terminal, which only
-/// Hyprland lets it bring to the front.
 struct Root;
 
 #[interface(name = "org.mpris.MediaPlayer2")]
@@ -138,7 +126,6 @@ impl Root {
         "tunebox"
     }
 
-    /// Lets clients find tunebox's name and icon in `tunebox.desktop`.
     #[zbus(property(emits_changed_signal = "const"))]
     fn desktop_entry(&self) -> &str {
         "tunebox"
@@ -155,8 +142,6 @@ impl Root {
     }
 }
 
-/// `org.mpris.MediaPlayer2.Player`: what plays, and the requests for it. Without a track every
-/// request is ignored, as MPRIS has it for players that can't play.
 struct Player {
     on_command: Callback,
     shown: Shown,
@@ -188,7 +173,6 @@ impl Player {
         self.request(Some(Command::Toggle));
     }
 
-    /// tunebox can't stop, only pause, which keeps the track.
     fn stop(&self) {
         self.request(Some(Command::Pause));
     }
@@ -209,7 +193,6 @@ impl Player {
         Err(fdo::Error::NotSupported("tunebox opens no URIs".into()))
     }
 
-    /// Tells clients that the position jumped, since it changes without PropertiesChanged.
     #[zbus(signal)]
     async fn seeked(emitter: &SignalEmitter<'_>, position: i64) -> zbus::Result<()>;
 
@@ -240,7 +223,6 @@ impl Player {
 
     #[zbus(property)]
     fn set_volume(&mut self, volume: f64) {
-        // MPRIS allows more than 1 to amplify, which tunebox doesn't.
         let volume = (volume.clamp(0.0, 1.0) * f64::from(u16::MAX)).round() as u16;
         self.request(Some(Command::Volume(volume)));
     }
@@ -286,23 +268,18 @@ impl Player {
     }
 }
 
-/// The player properties that follow whether there is a track.
 const CAPABILITIES: [&str; 5] = ["CanGoNext", "CanGoPrevious", "CanPlay", "CanPause", "CanSeek"];
 
-/// What the controls show, the way MPRIS describes it.
 #[derive(Debug)]
 struct Shown {
     track: Option<Current>,
     playing: bool,
-    /// Where playback was at `at`.
     position: Duration,
     at: Instant,
     volume: u16,
-    /// Tracks shown so far, which numbers their IDs.
     tracks: u64,
 }
 
-/// The track shown, with what MPRIS adds to it.
 #[derive(Debug)]
 struct Current {
     track: Track,
@@ -310,11 +287,9 @@ struct Current {
     art_url: Option<String>,
 }
 
-/// What an update changed, for the signals that tell clients.
 #[derive(Debug, Default, PartialEq)]
 struct Changes {
     properties: HashMap<&'static str, Variant<'static>>,
-    /// The new position, when it jumped.
     seeked: Option<Duration>,
 }
 
@@ -337,7 +312,6 @@ impl Shown {
             ("mpris:trackid", Variant::from(id.clone())),
             ("mpris:length", Variant::from(micros(track.duration))),
             ("xesam:title", Variant::from(track.title.clone())),
-            // One entry: the names come joined, and some contain commas themselves.
             ("xesam:artist", Variant::from(vec![track.artist.clone()])),
         ]);
         if !track.album.is_empty() {
@@ -352,14 +326,12 @@ impl Shown {
         metadata
     }
 
-    /// Where playback is by now; it moves on while playing, up to the end of the track.
     fn position(&self, now: Instant) -> Duration {
         let Some(current) = &self.track else { return Duration::ZERO };
         let moved = if self.playing { now.saturating_duration_since(self.at) } else { Duration::ZERO };
         (self.position + moved).min(current.track.duration)
     }
 
-    /// Shows `state`, and returns what clients need to hear about it.
     fn show(&mut self, state: State, art_url: Option<String>, now: Instant) -> Changes {
         let (status, metadata, volume) = (self.status(), self.metadata(), self.volume);
         let had_track = self.track.is_some();
@@ -399,8 +371,6 @@ impl Shown {
         changes
     }
 
-    /// The request for `Seek`, which moves by `offset` microseconds. Past the end it skips, as
-    /// MPRIS asks.
     fn seek(&self, offset: i64, now: Instant) -> Option<Command> {
         let current = self.track.as_ref()?;
         let target = micros(self.position(now)).saturating_add(offset).max(0);
@@ -410,7 +380,6 @@ impl Shown {
         Some(Command::Seek(Duration::from_micros(target.unsigned_abs())))
     }
 
-    /// The request for `SetPosition`, which only applies to the track it names.
     fn set_position(&self, track_id: &ObjectPath<'_>, position: i64) -> Option<Command> {
         let current = self.track.as_ref().filter(|current| current.id.as_str() == track_id.as_str())?;
         let position = u64::try_from(position).ok().map(Duration::from_micros)?;
@@ -431,7 +400,6 @@ impl Changes {
     }
 }
 
-/// Whether two updates show the same track; the cover may arrive later.
 fn same_track(a: &Track, b: &Track) -> bool {
     a.title == b.title && a.artist == b.artist && a.album == b.album && a.duration == b.duration
 }
@@ -440,21 +408,15 @@ fn track_id(number: u64) -> OwnedObjectPath {
     OwnedObjectPath::from(ObjectPath::from_string_unchecked(format!("/tunebox/track/{number}")))
 }
 
-/// Whether tunebox can bring its window to the front: on Hyprland.
 pub(super) fn can_raise() -> bool {
     env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
 }
 
-/// Brings tunebox's window to the front, in the background: hyprctl takes a moment, which the
-/// bus shouldn't wait for.
 pub(super) fn raise() {
     let _ = thread::Builder::new().name("tunebox-raise".into()).spawn(raise_window);
 }
 
-/// Focuses tunebox's window on Hyprland: the one Omarchy started it in, or else the terminal it
-/// runs in, found by walking up from tunebox's process.
 fn raise_window() {
-    // A pattern without backslashes, which would need escaping twice on the way to Hyprland.
     let omarchy = String::from("class:^(org.omarchy.tunebox)$");
     let terminal = ancestors().map(|pid| format!("pid:{pid}"));
     for window in std::iter::once(omarchy).chain(terminal) {
@@ -464,8 +426,6 @@ fn raise_window() {
     }
 }
 
-/// Asks Hyprland to focus `window`, the way its Lua configuration takes dispatches and then the
-/// way older versions do. It answers "ok" only when it found the window.
 fn focus(window: &str) -> bool {
     let lua = format!("hl.dsp.focus({{ window = \"{window}\" }})");
     [vec![lua.as_str()], vec!["focuswindow", window]].into_iter().any(|args| {
@@ -477,37 +437,28 @@ fn focus(window: &str) -> bool {
     })
 }
 
-/// The processes tunebox runs under, nearest first: its shell, then the terminal.
 fn ancestors() -> impl Iterator<Item = u32> {
     std::iter::successors(parent(process::id()), |&pid| parent(pid)).take(8)
 }
 
 fn parent(pid: u32) -> Option<u32> {
     let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    // The process name before it sits in parentheses and may hold spaces; the parent is the
-    // second field after them.
     let ppid = stat.rsplit_once(')')?.1.split_whitespace().nth(1)?.parse().ok()?;
     (ppid > 1).then_some(ppid)
 }
 
-/// A volume as MPRIS has it, from 0 to 1.
 fn fraction(volume: u16) -> f64 {
     f64::from(volume) / f64::from(u16::MAX)
 }
 
-/// Durations as MPRIS has them.
 fn micros(duration: Duration) -> i64 {
     duration.as_micros().try_into().unwrap_or(i64::MAX)
 }
 
-/// The cover as a file: MPRIS clients take a URL rather than the image.
 struct CoverFile {
-    /// Shared with [`Controls`], which removes the last file on its way out.
     path: Arc<Mutex<Option<PathBuf>>>,
     dir: PathBuf,
     shown: Option<(Arc<[u8]>, String)>,
-    /// Covers written so far. Each gets a name of its own, since clients keep what they loaded
-    /// from a URL.
     written: u64,
 }
 
@@ -516,7 +467,6 @@ impl CoverFile {
         Self { path, dir, shown: None, written: 0 }
     }
 
-    /// The URL of `cover`, written to a file first when it's new. The previous one goes.
     fn url(&mut self, cover: Option<&Arc<[u8]>>) -> Option<String> {
         match (cover, &self.shown) {
             (Some(cover), Some((shown, url))) if Arc::ptr_eq(cover, shown) || cover == shown => {
@@ -534,8 +484,6 @@ impl CoverFile {
         self.written += 1;
         let name = format!("tunebox-{}-cover-{}.{}", process::id(), self.written, extension(cover));
         let path = self.dir.join(name);
-        // A new file only: the temporary directory is shared, and a link planted under this name
-        // must not get followed.
         let written = OpenOptions::new().write(true).create_new(true).open(&path).and_then(|mut f| f.write_all(cover));
         if let Err(err) = written {
             tracing::warn!("cover for the media controls: {}: {err}", path.display());
@@ -549,7 +497,6 @@ impl CoverFile {
     }
 }
 
-/// The user's runtime directory, which lives in memory and goes at logout.
 pub(super) fn cover_dir() -> PathBuf {
     env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|dir| dir.is_absolute()).unwrap_or_else(env::temp_dir)
 }
@@ -583,7 +530,6 @@ mod tests {
         State { track: Some(track(title)), playing: true, position: Duration::from_secs(position), volume: 32768 }
     }
 
-    /// A player that showed `state` at `start`.
     fn showing(state: State, start: Instant) -> Shown {
         let mut shown = Shown::new(start);
         shown.show(state, None, start);
@@ -604,7 +550,6 @@ mod tests {
         assert_eq!(metadata["mpris:artUrl"], Variant::from("file:///run/cover.jpg"));
         assert_eq!(metadata["xesam:url"], Variant::from("https://open.spotify.com/track/0DiWol3AO6WpXZgp0goxAV"));
         assert_eq!(shown.status(), "Playing");
-        // The cover came later: the same track, with new metadata.
         assert_eq!(changes.properties.keys().collect::<Vec<_>>(), [&"Metadata"]);
         assert_eq!(changes.seeked, None);
     }
@@ -681,7 +626,6 @@ mod tests {
         let changes = shown.show(playing("One More Time", 60), None, later);
         assert_eq!(changes.seeked, Some(Duration::from_secs(60)));
         assert!(changes.properties.is_empty());
-        // Played again from the start.
         assert_eq!(shown.show(playing("One More Time", 0), None, later).seeked, Some(Duration::ZERO));
     }
 

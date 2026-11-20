@@ -1,4 +1,3 @@
-//! `tunebox doctor`: what each music service in use can reach, and through which path.
 
 use anyhow::{Result, bail};
 use tunebox_core::{
@@ -32,7 +31,6 @@ pub async fn run(paths: &Paths, services: &[Service]) -> Result<()> {
     }
     print_section(&doctor::external().await, &mut tally);
 
-    // Only Spotify removes what used to be there.
     let removed =
         (tally.removed > 0).then(|| format!(" · {} removed as expected", style::dim(&tally.removed.to_string())));
     println!(

@@ -1,4 +1,3 @@
-//! Asks for a star on GitHub, once tunebox is clearly in use: a short note and two buttons.
 
 use ratatui::{
     buffer::Buffer,
@@ -17,11 +16,9 @@ use crate::{
 
 const WIDTH: u16 = 54;
 const HEIGHT: u16 = 10;
-/// A star that every terminal font has.
 const STAR_ICON: &str = "★";
 const NOTE: &str = "tunebox is free and made in spare time. If you like it, a star on GitHub helps \
                     other people find it.";
-/// The two buttons, in the order the cursor goes through them.
 pub const STAR: &str = "Star on GitHub";
 pub const NO_THANKS: &str = "No thanks";
 
@@ -38,7 +35,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         .render(popup, buf);
     app.hits.push((popup, Hit::OverlayArea));
 
-    // Inside the border, and on a short terminal only what fits there.
     let inside = popup.inner(Margin::new(3, 1));
     let note = Rect { y: popup.y + 2, height: 3, ..inside }.intersection(inside);
     Paragraph::new(NOTE).wrap(Wrap { trim: true }).style(Style::new().fg(p.muted)).render(note, buf);

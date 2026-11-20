@@ -1,4 +1,3 @@
-//! Artist pages: popular tracks, then discography and related artists as shelves.
 
 use serde::{Deserialize, Serialize};
 
@@ -11,10 +10,8 @@ pub struct ArtistPage {
     pub image_url: Option<String>,
     pub monthly_listeners: Option<u64>,
     pub followers: Option<u64>,
-    /// Whether the user follows the artist.
     pub saved: bool,
     pub top_tracks: Vec<TopTrack>,
-    /// Discography, related artists and appearances, shown like Home shelves.
     pub shelves: Vec<Shelf>,
 }
 

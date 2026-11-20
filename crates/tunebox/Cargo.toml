@@ -6,15 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "A terminal music player for Spotify, YouTube Music and SoundCloud"
-
-# The music services built in; a release ships one build per choice. Without any, only
-# `tunebox demo` runs.
 [features]
 default = ["spotify", "ytmusic", "soundcloud"]
 spotify = ["tunebox-tui/spotify", "dep:tunebox-spotify", "dep:tunebox-player", "dep:librespot"]
 ytmusic = ["tunebox-tui/ytmusic", "dep:tunebox-ytmusic", "dep:crossterm"]
 soundcloud = ["tunebox-tui/soundcloud", "dep:tunebox-soundcloud"]
-
 [dependencies]
 tunebox-core.workspace = true
 tunebox-spotify = { workspace = true, optional = true }
@@ -26,7 +22,6 @@ tunebox-os.workspace = true
 anyhow.workspace = true
 base64.workspace = true
 clap.workspace = true
-# Picking the browser to sign in to YouTube Music with, by its arrow keys.
 crossterm = { workspace = true, optional = true }
 libc.workspace = true
 librespot = { workspace = true, optional = true }
@@ -39,11 +34,9 @@ tokio-tungstenite = "0.28"
 futures-util = "0.3"
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
 [dev-dependencies]
 serde.workspace = true
 unicode-width.workspace = true
-
 # Looks up the sample's songs on Spotify.
 [[example]]
 name = "demo_fixture"

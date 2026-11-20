@@ -2,7 +2,6 @@ use std::{fs, io, path::Path};
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
-/// A value to [`store`] in the config file.
 pub use toml_edit::Value;
 
 use crate::{paths::Paths, service::Service};
@@ -10,39 +9,21 @@ use crate::{paths::Paths, service::Service};
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    /// Client ID of the user's own app from developer.spotify.com (kept for librespot streaming).
     pub client_id: Option<String>,
-    /// The `sp_dc` cookie of a browser signed in to Spotify's web player, used for Web API calls.
     pub sp_dc: Option<String>,
-    /// Seconds consecutive tracks overlap (0–12); off when missing.
     pub crossfade: Option<u64>,
-    /// `"nerd"` or `"text"`; detected from the terminal when missing.
     pub icons: Option<String>,
-    /// `"keychain"` keeps sign-ins in the system's keychain; files when missing.
     pub credentials: Option<String>,
-    /// Desktop notifications for new tracks while tunebox is in the background; on when missing.
     pub notifications: Option<bool>,
-    /// Looks for a new release at start and offers to update; on when missing.
     pub update_check: Option<bool>,
-    /// Cover art on every page and in the player; on when missing.
     pub covers: Option<bool>,
-    /// `"on"` or `"off"`: fewer redraws and no animations; follows the system when missing.
     pub power_saving: Option<String>,
-    /// A color name such as `"violet"`; follows the playing cover when missing.
     pub accent: Option<String>,
-    /// `"tunebox"` or `"terminal"`: tunebox's own colors, or the terminal's background and text.
-    /// Omarchy's theme where there is one, tunebox's own elsewhere, when missing.
     pub colors: Option<String>,
-    /// How covers reach the terminal: `"kitty"`, `"sixel"`, `"iterm2"` or `"blocks"`; detected
-    /// from the terminal when missing.
     pub images: Option<String>,
-    /// The music services to use, by key: `["spotify", "ytmusic"]`. The installer writes it;
-    /// every service built in when missing.
     pub services: Option<Vec<String>>,
 }
 
-/// Accepts a bare cookie value and the common forms copied out of a browser: `sp_dc=…`,
-/// `sp_dc: "…"`, `Cookie: sp_dc=…;` and values quoted more than once.
 fn normalize_cookie(raw: &str) -> String {
     let mut value = raw.trim().to_owned();
     for _ in 0..4 {
@@ -70,7 +51,6 @@ fn normalize_cookie(raw: &str) -> String {
 }
 
 impl Config {
-    /// Reads `config.toml`; `TUNEBOX_CLIENT_ID` overrides the file.
     pub fn load(paths: &Paths) -> Result<Self> {
         let path = paths.config_file();
         let mut config = match fs::read_to_string(&path) {
@@ -87,7 +67,6 @@ impl Config {
         Ok(config)
     }
 
-    /// Whether sign-ins go to the system's keychain rather than files.
     pub fn keychain(&self) -> Result<bool> {
         match self.credentials.as_deref() {
             None | Some("files") => Ok(false),
@@ -97,9 +76,6 @@ impl Config {
         }
     }
 
-    /// The services to use, of those `compiled` in: the ones `services` lists, in its order, or
-    /// all of them when it is missing. The config file is shared by every build, so it may name
-    /// a service this one lacks; that one is left out.
     pub fn enabled_services(&self, compiled: &[Service]) -> Vec<Service> {
         let Some(keys) = &self.services else { return compiled.to_vec() };
         let mut enabled = Vec::new();
@@ -116,8 +92,6 @@ impl Config {
         enabled
     }
 
-    /// The Spotify app's client ID, from the config or from `TUNEBOX_SPOTIFY_CLIENT_ID`, which
-    /// helps where the config is managed elsewhere.
     pub fn client_id(&self, paths: &Paths) -> Result<String> {
         if let Some(id) = self.client_id.as_deref().map(str::trim).filter(|id| !id.is_empty()) {
             return Ok(id.to_owned());
@@ -135,9 +109,6 @@ impl Config {
         )
     }
 
-    /// The `sp_dc` cookie of Spotify's web player, from the config or `TUNEBOX_SPOTIFY_SP_DC`.
-    /// Values copied from a browser's developer tools often carry the cookie's name, quotes or a
-    /// trailing semicolon; accept those and keep only the token itself.
     pub fn sp_dc(&self, paths: &Paths) -> Result<String> {
         if let Some(cookie) = self.sp_dc.as_deref().map(normalize_cookie).filter(|c| !c.is_empty()) {
             return Ok(cookie);
@@ -156,8 +127,6 @@ impl Config {
     }
 }
 
-/// Sets `key` in the config file, or removes it with `None` so the default applies. The rest
-/// of the file stays as it was, comments included.
 pub fn store(paths: &Paths, key: &str, value: Option<Value>) -> Result<()> {
     let path = paths.config_file();
     store_at(&path, key, value).with_context(|| format!("Couldn't save the setting to {}", path.display()))
@@ -179,10 +148,7 @@ fn store_at(path: &Path, key: &str, value: Option<Value>) -> Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    // A config linked from elsewhere, such as a dotfiles repository, stays linked: the file it
-    // points to gets the change.
     let target = fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
-    // Write and rename, so a crash mid-write never leaves a broken file behind.
     let temp = target.with_extension("toml.tmp");
     fs::write(&temp, document.to_string())?;
     fs::rename(temp, target)?;

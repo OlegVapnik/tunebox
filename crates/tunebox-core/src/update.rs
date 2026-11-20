@@ -1,5 +1,3 @@
-//! Updates from tunebox's releases on GitHub: a look for a new one now and then, and putting the
-//! build for this machine in place of the running binary.
 
 use std::{
     fs,
@@ -15,37 +13,25 @@ use sha2::{Digest, Sha256};
 use crate::paths::Paths;
 
 const REPO: &str = "OlegVapnik/tunebox";
-/// tunebox's page on GitHub.
 pub const REPO_URL: &str = "https://github.com/OlegVapnik/tunebox";
 const USER_AGENT: &str = concat!("tunebox/", env!("CARGO_PKG_VERSION"));
-/// GitHub answers 60 requests an hour without an account; a look every few hours is plenty.
 const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
-/// Bounds the whole download, which the usual request timeout would cut short.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-/// What to run where tunebox can't replace itself.
 pub const INSTALLER: &str = "curl -fsSL https://raw.githubusercontent.com/OlegVapnik/tunebox/main/install.sh | bash";
 
-/// A package manager that installed tunebox. It owns the binary and updates it, so tunebox only
-/// says how.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageManager {
     Homebrew,
-    /// The system's, such as pacman with tunebox-bin from the AUR.
     System,
     Nix,
-    /// mise, with `github:OlegVapnik/tunebox[matching=…]`; it keeps each version in a folder of its
-    /// own.
     Mise,
 }
 
 impl PackageManager {
-    /// The one that installed the running tunebox, if any.
     pub fn of_running() -> Option<Self> {
-        // The real file, where a symlink such as Homebrew's in `bin` points to it.
         Self::of(&std::env::current_exe().ok()?.canonicalize().ok()?)
     }
 
-    /// The one that owns the binary at `path`, by where each puts its files.
     fn of(path: &Path) -> Option<Self> {
         if path.starts_with("/nix/store") {
             Some(Self::Nix)
@@ -66,7 +52,6 @@ impl PackageManager {
         }
     }
 
-    /// How to update the `variant` build of tunebox, as a sentence.
     pub fn how_to_update(self, variant: &str) -> String {
         match self {
             Self::Homebrew => format!("Update with brew upgrade {}", homebrew_formula(variant)),
@@ -77,8 +62,6 @@ impl PackageManager {
     }
 }
 
-/// Homebrew's formula for the `variant` build: `tunebox` is Spotify's, the others are named
-/// after theirs.
 fn homebrew_formula(variant: &str) -> String {
     match variant {
         "ytmusic" | "full" => format!("tunebox-{variant}"),
@@ -86,27 +69,21 @@ fn homebrew_formula(variant: &str) -> String {
     }
 }
 
-/// A published release.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
-    /// The tag, such as `v0.3.0`.
     pub tag: String,
 }
 
 impl Release {
-    /// The version without the tag's `v`, such as `0.3.0`.
     pub fn version(&self) -> &str {
         self.tag.trim_start_matches('v')
     }
 }
 
-/// The version running. `TUNEBOX_PRETEND_VERSION` stands in for it, to try updating.
 pub fn current_version() -> String {
     std::env::var("TUNEBOX_PRETEND_VERSION").unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_owned())
 }
 
-/// The latest release if it is newer than this tunebox. Asks GitHub at most every few hours and
-/// remembers the answer in between; `now` asks regardless.
 pub async fn check(paths: &Paths, now: bool) -> Result<Option<Release>> {
     let file = paths.update_check();
     let remembered = fs::read(&file)
@@ -134,7 +111,6 @@ fn remember(paths: &Paths, checked: &Checked) -> io::Result<()> {
 
 #[derive(Serialize, Deserialize)]
 struct Checked {
-    /// Seconds since the epoch.
     at: u64,
     latest: Release,
 }
@@ -143,7 +119,6 @@ fn seconds_since_epoch() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-/// The latest release, asked of GitHub.
 pub async fn latest() -> Result<Release> {
     #[derive(Deserialize)]
     struct Latest {
@@ -161,7 +136,6 @@ pub async fn latest() -> Result<Release> {
     Ok(Release { tag: latest.tag_name })
 }
 
-/// Whether `version` comes after `current`, by major, minor and patch.
 pub fn newer(version: &str, current: &str) -> bool {
     fn parts(version: &str) -> Option<(u64, u64, u64)> {
         let core = version.trim_start_matches('v').split(['-', '+']).next()?;
@@ -171,7 +145,6 @@ pub fn newer(version: &str, current: &str) -> bool {
     matches!((parts(version), parts(current)), (Some(version), Some(current)) if version > current)
 }
 
-/// The release workflow's name for a build that runs on this machine.
 fn target() -> Option<&'static str> {
     Some(match (std::env::consts::ARCH, std::env::consts::OS) {
         ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
@@ -182,17 +155,10 @@ fn target() -> Option<&'static str> {
     })
 }
 
-/// The release archive of the `variant` build for `target`. Each variant has the services it is
-/// named after: `spotify`, `ytmusic`, or both in `full`.
 fn archive_name(variant: &str, target: &str) -> String {
     format!("tunebox-{variant}-{target}.tar.gz")
 }
 
-/// Downloads the `variant` build of `release` for this machine, checks it against its published
-/// checksum and puts it in place of the running binary, which carries on until restarted. The
-/// running binary names its own variant, so an update keeps the services it has. `progress`
-/// hears the bytes that arrived so far and the total, when known. Returns where the new binary
-/// is.
 pub async fn install(release: &Release, variant: &str, mut progress: impl FnMut(u64, Option<u64>)) -> Result<PathBuf> {
     if let Some(manager) = PackageManager::of_running() {
         bail!("A package manager installed tunebox, so it doesn't replace itself. {}", manager.how_to_update(variant))
@@ -200,10 +166,8 @@ pub async fn install(release: &Release, variant: &str, mut progress: impl FnMut(
     let Some(target) = target() else {
         bail!("There is no prebuilt tunebox for this system; update with `cargo install` instead")
     };
-    // The real file, where a symlink points to it.
     let binary = std::env::current_exe()?.canonicalize()?;
     let dir = binary.parent().context("The tunebox binary has no folder")?;
-    // Before downloading anything, make sure the binary can be replaced at all.
     let mut staged = Staged::create(dir)?;
 
     let archive_name = archive_name(variant, target);
@@ -227,7 +191,6 @@ pub async fn install(release: &Release, variant: &str, mut progress: impl FnMut(
     }
 
     staged.write(&unpack(&archive)?, &binary)?;
-    // A build that can't start here, say for want of a system library, must not replace one that can.
     if !reports_version(&staged.path, release.version()).await {
         bail!("tunebox {} doesn't start on this system, so nothing was changed", release.version());
     }
@@ -235,13 +198,11 @@ pub async fn install(release: &Release, variant: &str, mut progress: impl FnMut(
     Ok(binary)
 }
 
-/// Whether `binary` starts and says it is `version`.
 async fn reports_version(binary: &Path, version: &str) -> bool {
     let output = tokio::process::Command::new(binary).arg("--version").output().await;
     output.is_ok_and(|output| output.status.success() && String::from_utf8_lossy(&output.stdout).contains(version))
 }
 
-/// The `tunebox` binary from a release archive.
 fn unpack(archive: &[u8]) -> Result<Vec<u8>> {
     let mut entries = tar::Archive::new(flate2::read::GzDecoder::new(archive));
     for entry in entries.entries()? {
@@ -259,8 +220,6 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// The new binary, next to the old one so it can take its place in one step. Removed again
-/// unless it does.
 struct Staged {
     path: PathBuf,
     file: Option<fs::File>,
@@ -279,8 +238,6 @@ impl Staged {
         }
     }
 
-    /// Writes `binary` with the permissions of the one it replaces, and closes the file: Linux
-    /// doesn't start a program that is still open for writing.
     fn write(&mut self, binary: &[u8], replaces: &Path) -> Result<()> {
         let mut file = self.file.take().context("Already written")?;
         file.write_all(binary)?;
@@ -290,7 +247,6 @@ impl Staged {
         Ok(())
     }
 
-    /// Takes the place of `binary`. Running processes keep the old file until they exit.
     fn replace(self, binary: &Path) -> Result<()> {
         fs::rename(&self.path, binary).with_context(|| format!("Couldn't replace {}", binary.display()))
     }
@@ -313,7 +269,6 @@ mod tests {
         assert!(newer("1.0.0", "0.99.0"));
         assert!(!newer("v0.2.0", "0.2.0"));
         assert!(!newer("0.1.9", "0.2.0"));
-        // A prerelease counts as its version; a tag that isn't one never wins.
         assert!(!newer("0.2.0-beta", "0.2.0"));
         assert!(!newer("nightly", "0.2.0"));
     }
@@ -334,7 +289,6 @@ mod tests {
             of("/nix/store/0ac6p7kvsyhwlnh7z7mfqmzjy3zcvqqg-tunebox-0.3.0/bin/tunebox"),
             Some(PackageManager::Nix)
         );
-        // Where the installer, cargo or a checkout put it, tunebox replaces itself.
         assert_eq!(of("/home/me/.local/bin/tunebox"), None);
         assert_eq!(of("/usr/local/bin/tunebox"), None);
         assert_eq!(of("/home/me/.cargo/bin/tunebox"), None);

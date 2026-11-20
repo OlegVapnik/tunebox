@@ -1,6 +1,3 @@
-//! Song notifications on a real session bus, as the desktop's notification server gets them. CI
-//! runs this under `dbus-run-session` with `TUNEBOX_REQUIRE_DBUS=1`; elsewhere it passes without
-//! looking, also on a desktop whose own server holds the name.
 #![cfg(target_os = "linux")]
 
 use std::{
@@ -16,10 +13,8 @@ use zbus::{Connection, OwnedVariant, fdo, interface, names::WellKnownName};
 const SERVER: &str = "org.freedesktop.Notifications";
 const PATH: &str = "/org/freedesktop/Notifications";
 
-/// What a notification server got: title, body and the cover's path.
 type Shown = Arc<Mutex<Vec<(String, String, Option<String>)>>>;
 
-/// A notification server, with markup in the body or without.
 struct Server {
     markup: bool,
     shown: Shown,
@@ -95,7 +90,6 @@ async fn shows_songs_on_the_desktop_s_server_with_the_cover() {
     assert_eq!(image, None::<String>);
 }
 
-/// A notification server on the session bus, until the connection goes.
 async fn serve(markup: bool, shown: Shown) -> Connection {
     zbus::connection::Builder::session()
         .serve_at(PATH, Server { markup, shown })
@@ -105,7 +99,6 @@ async fn serve(markup: bool, shown: Shown) -> Connection {
         .expect("the notification server's name")
 }
 
-/// Asks until `check` has an answer, for at most five seconds.
 async fn eventually<T, F: Future<Output = Option<T>>>(what: &str, mut check: impl FnMut() -> F) -> T {
     let started = Instant::now();
     loop {

@@ -1,6 +1,3 @@
-//! SoundCloud: its public API for the catalog, the `oauth_token` cookie for the library, mpv
-//! for playback. Signed out, it browses and plays; the library and likes need
-//! `tunebox login soundcloud`.
 
 use std::sync::{Arc, OnceLock};
 
@@ -23,25 +20,19 @@ use tunebox_soundcloud::{SoundCloud, Source};
 use super::{Found, Launch};
 use crate::{app::AppEvent, backend::Player, playback::Repeat, views::TrackSource};
 
-/// Where the volume starts without a last session's: half, as for Spotify.
 const DEFAULT_VOLUME: u16 = u16::MAX / 2;
-/// Songs asked about at once: whether they are liked, or their details for the queue.
 const BATCH: usize = 30;
-/// Batches of library checks running at the same time.
 const SAVED_CONCURRENCY: usize = 2;
 
-/// SoundCloud, signed in or not.
 pub struct Account {
     client: SoundCloud,
 }
 
 impl Account {
-    /// Reads the sign-in, if there is one; signed out is fine.
     pub fn open(paths: &Paths) -> Result<Self> {
         Ok(Self { client: SoundCloud::new(paths)? })
     }
 
-    /// Starts mpv in the background; the catalog works without it.
     pub fn start(self, launch: Launch) -> Catalog {
         let player = Arc::new(OnceLock::new());
         let catalog = Catalog { client: self.client.clone(), player: player.clone() };
@@ -71,7 +62,6 @@ impl Account {
     }
 }
 
-/// tunebox's own SoundCloud player: mpv, and the queue it plays from.
 pub struct Controller(tunebox_soundcloud::Player);
 
 impl Controller {
@@ -131,7 +121,6 @@ impl Controller {
         self.0.prefetch(uri)
     }
 
-    /// The queue is tunebox's own, so the player jumps there itself.
     pub fn skip_to(&self, uri: &str) -> Result<bool> {
         self.0.skip_to(uri).map(|()| true)
     }
@@ -144,7 +133,6 @@ impl Controller {
 #[derive(Clone)]
 pub struct Catalog {
     client: SoundCloud,
-    /// The player once mpv is up, which songs added to the queue go to.
     player: Arc<OnceLock<tunebox_soundcloud::Player>>,
 }
 
@@ -192,7 +180,6 @@ impl Catalog {
         self.client.liked_count().await
     }
 
-    /// SoundCloud has no saved albums to list apart from playlists.
     pub async fn saved_albums(&self) -> Result<Vec<AlbumInfo>> {
         Ok(Vec::new())
     }
@@ -201,17 +188,14 @@ impl Catalog {
         self.client.followed_artists().await
     }
 
-    /// tunebox plays no podcasts from SoundCloud.
     pub async fn saved_shows(&self) -> Result<Vec<ShowInfo>> {
         Ok(Vec::new())
     }
 
-    /// SoundCloud has no lyrics; LRCLIB's are found by title and artist.
     pub async fn lyrics(&self, query: LyricsQuery<'_>) -> Result<Option<Lyrics>> {
         self.client.lyrics(&query).await
     }
 
-    /// A batch at a time, so the first rows of a long list get their hearts early.
     pub fn check_saved(&self, uris: Vec<String>) -> BoxStream<'static, Result<Vec<(String, bool)>>> {
         let client = self.client.clone();
         let batches: Vec<Vec<String>> = uris.chunks(BATCH).map(<[_]>::to_vec).collect();
@@ -232,7 +216,6 @@ impl Catalog {
         self.client.add_to_playlist(playlist_id, uris).await
     }
 
-    /// tunebox's player keeps the queue, so the song goes there.
     pub async fn add_to_queue(&self, uri: &str) -> Result<()> {
         let player = self.player.get().context("SoundCloud's player isn't running")?;
         player.add_to_queue(uri)
@@ -257,7 +240,6 @@ impl Catalog {
             .boxed()
     }
 
-    /// The player always says what plays next itself.
     pub async fn upcoming(&self) -> Result<Vec<Track>> {
         bail!("SoundCloud's player says what plays next itself")
     }

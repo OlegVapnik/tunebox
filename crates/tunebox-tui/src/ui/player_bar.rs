@@ -18,7 +18,6 @@ use crate::{
 };
 
 const VOLUME_CELLS: u16 = 10;
-/// Blank cells between the queue button and the volume.
 const QUEUE_GAP: u16 = 3;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -27,7 +26,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     if area.height < 4 || area.width < 40 {
         return compact(frame.buffer_mut(), app, area);
     }
-    // A hairline above the bar: the player is its own panel, not more of the page.
     let buf = frame.buffer_mut();
     buf.set_string(area.x, area.y, "─".repeat(area.width as usize), Style::new().fg(p.raised).bg(p.player));
     let cover = Rect::new(area.x + 2, area.y + 1, COVER_SIZE.width, COVER_SIZE.height);
@@ -50,21 +48,15 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             let accent = app.accent.color();
             let (controls, targets) = controls(app, accent);
             let controls_width = controls.width() as u16;
-            // The transport sits in the middle of the bar, as in the official client: the track
-            // on the left, the volume on the right. A bar too narrow for a name beside it keeps
-            // the transport on the right, as before.
             let centred = area.x + area.width.saturating_sub(controls_width) / 2;
             let controls_x = if centred > info.x + 23 { centred } else { info.right().saturating_sub(controls_width) };
             let volume_width = VOLUME_CELLS + 7;
             let volume_x = info.right().saturating_sub(volume_width);
-            // The queue button sits before the volume, as in Spotify's desktop app, and lights
-            // up while the queue is open.
             let queue_icon = icons().queue;
             let queue_width = queue_icon.width() as u16;
             let queue_x = volume_x.saturating_sub(queue_width + QUEUE_GAP);
             let queue_open = matches!(app.view, View::Queue(_));
 
-            // The name stops short of the transport, and the heart sits between the two.
             let title_width = controls_x.saturating_sub(info.x + 7) as usize;
             let title = text::truncate(&track.name, title_width);
             buf.set_string(info.x, info.y, &title, Style::new().fg(p.text).bold());
@@ -75,8 +67,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 (icons().save, Style::new().fg(p.faint))
             };
             buf.set_string(heart_x, info.y, heart, heart_style);
-            // What plays from, and the hint for a track that was left, go after the transport
-            // while it stands in the middle, else after the heart, before it.
             let (note_x, note_end) = if controls_x + controls_width + 4 < info.right() {
                 (controls_x + controls_width + 4, info.right())
             } else {
@@ -91,13 +81,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             } else if let Some(label) = app.playing_context().and_then(|uri| app.context_label(uri))
                 && room > 12
             {
-                // Where the music comes from, like the official client's "Playing from".
                 let label = text::truncate(&label, room - 3);
                 buf.set_string(note_x, info.y, format!("{}  {label}", icons().playlist), Style::new().fg(p.faint));
                 let width = label.width() as u16 + 3;
                 hits.push((Rect::new(note_x, info.y, width, 1), Hit::Link(Link::PlayingContext)));
             }
-            // The blank cells either side widen the heart into an easier target.
             hits.push((Rect::new(heart_x.saturating_sub(1), info.y, 3, 1), Hit::LikePlaying));
             buf.set_line(controls_x, info.y, &controls, controls_width);
             hits.extend(targets.into_iter().map(|(offset, width, command)| {
@@ -161,7 +149,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     app.hits.extend(hits);
 }
 
-/// Small windows: title, heart and controls in one row, the progress bar below if there is room.
 fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     let p = theme::palette();
     let Some(track) = &app.now.track else {
@@ -179,11 +166,9 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     let (controls, targets) = controls(app, accent);
     let controls_width = controls.width() as u16;
     let show_controls = area.width >= controls_width + 24;
-    // Room for the title, then two blank cells, the heart and one more blank cell.
     let text_width = area.width.saturating_sub(if show_controls { controls_width + 10 } else { 8 }) as usize;
     let title = text::truncate(&format!("{} · {}", track.name, track.artists.join(", ")), text_width);
     buf.set_string(area.x + 2, area.y, &title, Style::new().fg(p.text).bold());
-    // Like the cover in the full bar, the title opens Now Playing.
     let mut hits = vec![(Rect::new(area.x + 2, area.y, title.width() as u16, 1), Hit::Cover)];
     let heart_x = area.x + 2 + title.width() as u16 + 2;
     if heart_x + 1 < area.right() {
@@ -211,15 +196,12 @@ fn compact(buf: &mut Buffer, app: &mut App, area: Rect) {
     app.hits.extend(hits);
 }
 
-/// Transport controls plus the click targets within the line (offset, width, command).
 pub(super) fn controls(app: &App, accent: Color) -> (Line<'static>, Vec<(u16, u16, Command)>) {
     let p = theme::palette();
     const GAP: u16 = 3;
     let icons = icons();
     let toggle = |on: bool| if on { Style::new().fg(accent) } else { Style::new().fg(p.faint) };
     let repeat = if app.now.repeat == Repeat::Track { icons.repeat_one } else { icons.repeat };
-    // A track on its way spins in place of play/pause; otherwise the button is the one filled
-    // control of the bar, so the eye finds it first.
     let (play, play_style) = match (&app.now.pending, app.now.playing) {
         (Some(_), _) => (text::spinner(app.frame()).to_owned(), Style::new().fg(p.muted)),
         (None, true) => (format!(" {} ", icons.pause), Style::new().fg(p.bg).bg(accent).bold()),
@@ -232,7 +214,6 @@ pub(super) fn controls(app: &App, accent: Color) -> (Line<'static>, Vec<(u16, u1
         (icons.next.to_owned(), Style::new().fg(p.muted), Command::Next),
         (repeat.to_owned(), toggle(app.now.repeat != Repeat::Off), Command::Repeat),
     ];
-    // While DJ plays, its button moves it on to different picks, as in Spotify's apps.
     if app.dj_playing() {
         parts.push((icons.dj.to_owned(), Style::new().fg(accent), Command::Dj));
     }
@@ -246,7 +227,6 @@ pub(super) fn controls(app: &App, accent: Color) -> (Line<'static>, Vec<(u16, u1
         }
         let width = glyph.width() as u16;
         spans.push(Span::styled(glyph, style));
-        // A little slack around each glyph makes them easier to hit.
         targets.push((x.saturating_sub(1), width + 2, command));
         x += width;
     }
@@ -264,7 +244,6 @@ fn volume(volume: u16, accent: Color) -> Line<'static> {
     ])
 }
 
-/// Draws `1:42 ━━━●──── 3:58` and returns the seek target of the bar.
 pub(super) fn progress(
     buf: &mut Buffer,
     area: Rect,

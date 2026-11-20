@@ -1,5 +1,3 @@
-//! Checks what YouTube Music needs: the programs playback runs on, InnerTube, the sign-in, and
-//! a stream URL actually resolving, as `tunebox doctor` sections.
 
 use std::{
     path::Path,
@@ -13,16 +11,13 @@ use tunebox_core::doctor::{Check, Expect, Outcome, Section, outcome};
 
 use crate::YtMusic;
 
-/// Starboy, which has lyrics and a radio.
 const TRACK: &str = "ytmusic:track:plnfIj7dkJE";
 const TIMEOUT: Duration = Duration::from_secs(45);
 
-/// Every check, in the order `tunebox doctor` shows them.
 pub async fn all(client: &YtMusic) -> Vec<Section> {
     vec![programs().await, innertube(client).await, playback().await]
 }
 
-/// mpv plays, yt-dlp finds the streams, and yt-dlp needs deno for YouTube's challenges.
 pub async fn programs() -> Section {
     let checks = vec![
         version("mpv", "mpv", &["--version"], Expect::Available).await,
@@ -74,7 +69,6 @@ pub async fn innertube(client: &YtMusic) -> Section {
     ];
     let account = if client.signed_in() {
         timed("Signed in", Expect::Available, async {
-            // The address tells a work and a private account of the same name apart.
             let user = match client.account().await? {
                 Some(account) => account.label(),
                 None => client.me().await?.map(|u| u.name).unwrap_or_default(),
@@ -91,12 +85,10 @@ pub async fn innertube(client: &YtMusic) -> Section {
     Section { title: "INNERTUBE · music.youtube.com", checks }
 }
 
-/// A stream URL resolves, which needs yt-dlp, deno and YouTube to agree.
 pub async fn playback() -> Section {
     playback_with(None).await
 }
 
-/// As `playback`, with the saved sign-in so YouTube's bot check doesn't refuse the stream.
 pub async fn playback_with(cookies: Option<&Path>) -> Section {
     let check = timed("Stream URL (yt-dlp)", Expect::Available, async {
         let started = std::time::Instant::now();
@@ -128,7 +120,6 @@ async fn version(name: &str, program: &str, args: &[&str], expect: Expect) -> Ch
     Check { name: name.into(), expect, outcome }
 }
 
-/// Like [`tunebox_core::doctor::timed`], with time for yt-dlp, and how long the probe took.
 async fn timed(name: &str, expect: Expect, probe: impl Future<Output = Result<String>>) -> Check {
     let started = std::time::Instant::now();
     let outcome = match outcome(TIMEOUT, probe).await {

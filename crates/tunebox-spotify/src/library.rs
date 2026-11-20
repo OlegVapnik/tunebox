@@ -1,4 +1,3 @@
-//! The user's playlists as Spotify's apps list them, mixes included.
 
 use std::collections::HashMap;
 
@@ -13,7 +12,6 @@ const PAGE: u32 = 500;
 
 pub async fn playlists(pathfinder: &Pathfinder) -> Result<Vec<PlaylistInfo>> {
     let first = page(pathfinder, 0).await?;
-    // Spotify may send fewer than asked for.
     let offsets: Vec<u32> = match first.entries {
         0 => Vec::new(),
         step => (step..first.total).step_by(step as usize).collect(),
@@ -26,8 +24,6 @@ pub async fn playlists(pathfinder: &Pathfinder) -> Result<Vec<PlaylistInfo>> {
     Ok(std::iter::once(first).chain(rest).flat_map(|page| page.playlists).collect())
 }
 
-/// Adds the Web API's details, like song counts, to `found`. Also returns the Web API's
-/// playlists that `found` lacks.
 pub fn with_web_details(found: Vec<PlaylistInfo>, web: Vec<PlaylistInfo>) -> (Vec<PlaylistInfo>, Vec<PlaylistInfo>) {
     let positions: HashMap<String, usize> = web.iter().enumerate().map(|(at, p)| (p.uri.clone(), at)).collect();
     let mut web: Vec<Option<PlaylistInfo>> = web.into_iter().map(Some).collect();
@@ -42,7 +38,6 @@ pub fn with_web_details(found: Vec<PlaylistInfo>, web: Vec<PlaylistInfo>) -> (Ve
 }
 
 struct Page {
-    /// Folders and unavailable playlists included.
     total: u32,
     entries: u32,
     playlists: Vec<PlaylistInfo>,
@@ -53,7 +48,6 @@ async fn page(pathfinder: &Pathfinder, offset: u32) -> Result<Page> {
         "filters": ["Playlists"],
         "order": null,
         "textFilter": null,
-        // Leaves out Liked Songs and Your Episodes.
         "features": [],
         "limit": PAGE,
         "offset": offset,

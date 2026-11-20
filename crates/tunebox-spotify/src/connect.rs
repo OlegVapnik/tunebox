@@ -1,6 +1,3 @@
-//! Spotify Connect through the Web API: list devices, see what plays where, and control
-//! playback on other devices (phone, speakers, web player). What the Web API can't do with
-//! the queue goes to the device through Spotify Connect itself, sent as tunebox's own device.
 
 use anyhow::Result;
 use librespot::{core::session::Session, protocol::player::ProvidedTrack};
@@ -21,9 +18,7 @@ pub enum Command {
     Seek(u32),
     Volume(u8),
     Shuffle(bool),
-    /// "off", "context" or "track".
     Repeat(&'static str),
-    /// Starts a context on the active device, optionally at a given track or shuffled.
     PlayContext {
         context: String,
         track: Option<String>,
@@ -36,7 +31,6 @@ pub async fn devices(api: &WebApi) -> Result<Vec<Device>> {
     Ok(raw.devices.into_iter().map(Device::from).collect())
 }
 
-/// What plays where; `None` when no device is active.
 pub async fn playback(api: &WebApi) -> Result<Option<Playback>> {
     let response = api.get("/me/player").await?;
     if response.body.is_null() {
@@ -57,7 +51,6 @@ pub async fn playback(api: &WebApi) -> Result<Option<Playback>> {
     }))
 }
 
-/// Moves playback to `device_id` and keeps it playing.
 pub async fn transfer(api: &WebApi, device_id: &str) -> Result<()> {
     let body = json!({ "device_ids": [device_id], "play": true });
     api.call(Method::PUT, "/me/player", Some(&body)).await
@@ -87,15 +80,11 @@ pub async fn send(api: &WebApi, command: Command) -> Result<()> {
     api.call(method, &path, body.as_ref()).await
 }
 
-/// Skips ahead to a track that plays later on `device`, as a click in Spotify's queue does.
-/// `uid` tells apart entries of the same track; empty where unknown.
 pub async fn skip_to(session: &Session, device: &str, uri: &str, uid: &str, provider: &str) -> Result<()> {
     let track = json!({ "uri": uri, "uid": uid, "provider": provider });
     command(session, device, json!({ "endpoint": "skip_next", "track": track, "logging_params": {} })).await
 }
 
-/// Replaces what plays next on `device`, as removing a track from Spotify's queue does. The
-/// tracks go back as the device listed them, under the revision it listed them in.
 pub async fn set_queue(
     session: &Session,
     device: &str,
@@ -121,7 +110,6 @@ async fn command(session: &Session, device: &str, command: Value) -> Result<()> 
     Ok(())
 }
 
-/// A track in Spotify's own JSON form, field names as in its protocol.
 fn provided_track_json(track: &ProvidedTrack) -> Result<Value> {
     let options = PrintOptions { proto_field_name: true, ..PrintOptions::default() };
     Ok(serde_json::from_str(&protobuf_json_mapping::print_to_string_with_options(track, &options)?)?)

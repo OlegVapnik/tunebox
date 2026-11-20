@@ -1,4 +1,3 @@
-//! `tunebox play` and `tunebox connect`: Spotify without the interface.
 
 use std::time::Duration;
 
@@ -21,8 +20,6 @@ use crate::{
 
 const DEVICE_NAME: &str = "tunebox";
 
-/// Plays standalone: tunebox activates itself as the playing device and loads the context.
-/// Without Premium, the songs come from YouTube and play through mpv.
 pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     if !session::is_logged_in(paths)? {
         return play_free(paths, input, shuffle).await;
@@ -41,7 +38,6 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
         context_options: Some(LoadContextOptions::Options(Options { shuffle, ..Options::default() })),
         ..LoadRequestOptions::default()
     };
-    // Like Spotify itself: a single track plays within its album, so next/previous work.
     let context = match &uri {
         SpotifyUri::Track { .. } => {
             let track = Track::get(&session, &uri).await?;
@@ -94,7 +90,6 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     Ok(())
 }
 
-/// Plays through mpv, the songs found on YouTube: no librespot and no Premium.
 async fn play_free(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     let config = tunebox_core::config::Config::load(paths)?;
     let api =
@@ -158,7 +153,6 @@ async fn play_free(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     result
 }
 
-/// Remote mode: waits until a Spotify app picks tunebox as its playback device.
 pub async fn connect(paths: &Paths, name: String) -> Result<()> {
     let pending = session::prepare(paths)?;
     let session = pending.session.clone();
@@ -213,7 +207,6 @@ pub async fn connect(paths: &Paths, name: String) -> Result<()> {
     Ok(())
 }
 
-/// Hands a request from the system's media controls to Spirc.
 fn control(spirc: &Spirc, command: Command) -> Result<()> {
     match command {
         Command::Play => spirc.play()?,
@@ -227,7 +220,6 @@ fn control(spirc: &Spirc, command: Command) -> Result<()> {
     Ok(())
 }
 
-/// Hands a request from the system's media controls to the mpv player.
 fn control_free(player: &tunebox_spotify::Player, command: Command, paused: bool) -> Result<()> {
     match command {
         Command::Play if paused => player.toggle(true),
@@ -241,7 +233,6 @@ fn control_free(player: &tunebox_spotify::Player, command: Command, paused: bool
     }
 }
 
-/// Accepts `spotify:…` URIs as well as `https://open.spotify.com/…` links.
 fn parse_uri(input: &str) -> Result<SpotifyUri> {
     let uri = match input.strip_prefix("https://open.spotify.com/") {
         Some(path) => {
@@ -256,7 +247,6 @@ fn parse_uri(input: &str) -> Result<SpotifyUri> {
     SpotifyUri::from_uri(&uri).with_context(|| format!("“{input}” is not a valid Spotify URI"))
 }
 
-/// What `tunebox play` and `connect` print for a track that couldn't load.
 fn unavailable(refused: bool) -> String {
     if refused {
         style::red(

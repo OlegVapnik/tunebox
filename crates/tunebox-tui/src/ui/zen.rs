@@ -1,4 +1,3 @@
-//! Now Playing: big cover, track info and lyrics that follow the song.
 
 use ratatui::{
     Frame,
@@ -16,10 +15,8 @@ use crate::{
     theme::{self, Rgb},
 };
 
-/// Below this size the cover is left out and the lyrics get the whole screen.
 const WIDE_MIN_WIDTH: u16 = 100;
 const WIDE_MIN_HEIGHT: u16 = 20;
-/// Rows below the cover: gap, title, artist, gap, progress, gap, controls.
 const INFO_ROWS: u16 = 7;
 const LYRIC_SPACING: f32 = 2.0;
 
@@ -45,10 +42,8 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let duration_ms = track.duration_ms;
     let accent_color: Color = accent.into();
 
-    // Without cover art, the lyrics get the whole screen, as in small windows.
     let wide = app.prefs.covers && area.width >= WIDE_MIN_WIDTH && area.height >= WIDE_MIN_HEIGHT;
     let (info, lyrics_area) = if wide {
-        // Cells are about twice as tall as wide, so a square cover is twice as many columns.
         let cover_height = (area.height - INFO_ROWS - 4).min(area.width / 5);
         let cover = Rect::new(
             area.x + 6,
@@ -70,10 +65,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let buf = frame.buffer_mut();
-    // Windows shorter than the info leave out its lower rows.
     let fits = |row: u16| info.y + row < area.bottom();
-    // A quiet label names the page, and where the music comes from ends the same line, as in
-    // the official app.
     if fits(1) {
         buf.set_string(info.x, info.y, "NOW PLAYING", Style::new().fg(p.faint).bold());
         let room = info.width.saturating_sub("NOW PLAYING".width() as u16 + 3) as usize;
@@ -120,8 +112,6 @@ fn draw_cover(frame: &mut Frame, app: &mut App, area: Rect) {
     match placed {
         Some(placement) => app.placements.extend(placement),
         None => {
-            // A designed placeholder instead of a stray note icon, consistent with every
-            // other cover slot in the app.
             super::placeholder(frame, app, area, &name, false);
         }
     }
@@ -150,10 +140,8 @@ fn draw_lyrics(buf: &mut Buffer, app: &App, area: Rect, accent: Color) {
 
     let width = area.width as usize;
     let current = lyrics.current_line(app.now.position_ms());
-    // The label and the provider keep rows of their own, so no line runs into them.
     let top = area.y + if area.height >= 6 { 2 } else { 0 };
     let bottom = area.bottom().saturating_sub(1);
-    // Synced lyrics keep the current line in the middle; unsynced ones read from the top.
     let (anchor, scroll) = if lyrics.synced { (center as f32, app.lyrics_scroll) } else { (top as f32, 0.0) };
     for (index, line) in lyrics.lines.iter().enumerate() {
         let y = (anchor + (index as f32 - scroll) * LYRIC_SPACING).round();

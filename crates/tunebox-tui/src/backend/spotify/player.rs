@@ -1,5 +1,3 @@
-//! tunebox's own Spotify Connect device: librespot's player, connected in the background and
-//! connected again whenever the connection drops.
 
 use std::{
     sync::{
@@ -33,31 +31,22 @@ use crate::{
 };
 
 const DEVICE_NAME: &str = "tunebox";
-/// A connection that lasted this long was fine: the next one is tried right away.
 const STABLE: Duration = Duration::from_secs(30);
-/// Waits between attempts while Spotify can't be reached or keeps dropping the connection,
-/// doubling up to the longest.
 const RETRY_FIRST: Duration = Duration::from_secs(1);
 const RETRY_LONGEST: Duration = Duration::from_secs(60);
 
-/// The librespot session as the catalog sees it.
 #[derive(Clone)]
 pub enum SessionState {
     Connecting,
     Ready(Session),
-    /// Connecting failed; requests that need the session fail too instead of waiting forever.
     Failed(String),
 }
 
-/// tunebox's own Spotify Connect device. Commands only take effect while it is the active device.
 pub struct Connect {
     spirc: Spirc,
     session: Session,
     engine: Arc<Engine>,
-    /// Set when the connection ends on purpose, so it isn't restored.
     stopping: Arc<AtomicBool>,
-    /// Set when tunebox drops the connection to make a new one, as after sleep, so connecting
-    /// again doesn't wait.
     forced: Arc<AtomicBool>,
 }
 
@@ -73,7 +62,6 @@ impl Connect {
         Ok(())
     }
 
-    /// Continues a track from the last session at `position_ms`, in its context if known.
     pub fn resume(&self, context: Option<String>, track: String, position_ms: u32) -> Result<()> {
         let options = LoadRequestOptions { start_playing: true, seek_to: position_ms, ..LoadRequestOptions::default() };
         let request = match context {
@@ -99,7 +87,6 @@ impl Connect {
         Ok(())
     }
 
-    /// Plays or pauses; with nothing loaded, takes over playback from the active device.
     pub fn toggle(&self, has_track: bool) -> Result<()> {
         if has_track {
             self.spirc.play_pause()?;
@@ -139,23 +126,18 @@ impl Connect {
         Ok(())
     }
 
-    /// Empties the queue; the rest of the context stays.
     pub fn clear_queue(&self) -> Result<()> {
         Ok(self.spirc.clear_queue()?)
     }
 
-    /// Adds a track after the ones queued before.
     pub fn add_to_queue(&self, uri: &str) -> Result<()> {
         Ok(self.spirc.add_to_queue(SpotifyUri::from_uri(uri)?)?)
     }
 
-    /// Jumps DJ to its next segment of picks, as the DJ button does in Spotify's apps.
     pub fn next_segment(&self) -> Result<()> {
         Ok(self.spirc.next_segment()?)
     }
 
-    /// Asks DJ for something. The future resolves once DJ took the request; its answer
-    /// plays seconds later.
     pub fn ask_dj(&self, prompt: String, suggested: bool) -> Result<BoxFuture<'static, Result<()>>> {
         let answer = self.spirc.ask_dj(prompt, suggested)?;
         Ok(async move { Ok(answer.await?) }.boxed())
@@ -165,17 +147,14 @@ impl Connect {
         self.engine.player.set_crossfade(crossfade);
     }
 
-    /// tunebox's Spotify Connect device ID.
     pub fn device_id(&self) -> String {
         self.session.device_id().to_owned()
     }
 
-    /// The username the session is logged in with.
     pub fn user(&self) -> String {
         self.session.username()
     }
 
-    /// Drops the connection; the background task connects again.
     pub fn reconnect(&self) {
         self.forced.store(true, Ordering::Relaxed);
         self.session.shutdown();
@@ -188,11 +167,6 @@ impl Connect {
     }
 }
 
-/// Connects the player in the background so the UI shows up instantly, and connects again
-/// whenever the connection drops: after the computer slept, or while the network was gone.
-/// Playback starts at `volume`, and keeps its volume when connecting again. `retry_now` cuts a
-/// wait between attempts short, for when the computer wakes up. `state` follows the session,
-/// for the catalog's requests that go through it.
 pub fn spawn(
     paths: Paths,
     crossfade: Duration,
@@ -231,7 +205,6 @@ pub fn spawn(
                     if let Err(err) = session::remember(&paths, &connection) {
                         tracing::warn!("saving streaming credentials: {err:#}");
                     }
-                    // Before the task starts the dealer: while it starts, it takes no subscriptions.
                     forward_pushes(&connection, tx.clone());
                     let stopping = Arc::new(AtomicBool::new(false));
                     let forced = Arc::new(AtomicBool::new(false));
@@ -254,8 +227,6 @@ pub fn spawn(
                     if stopping.load(Ordering::Relaxed) {
                         return;
                     }
-                    // Nothing controls the old track any more, and the app offers to resume it.
-                    // A track that was already downloaded would otherwise play on.
                     engine.player.stop();
                     if !connection.is_invalid() {
                         connection.shutdown();
@@ -265,8 +236,6 @@ pub fn spawn(
                     if tx.send(AppEvent::PlayerLost(Service::Spotify)).is_err() {
                         return;
                     }
-                    // One tunebox dropped itself, after sleep, goes ahead at once; one that dropped
-                    // soon after it started waits like a failed attempt.
                     if forced.load(Ordering::Relaxed) || connected.elapsed() >= STABLE {
                         retry = RETRY_FIRST;
                         false
@@ -302,7 +271,6 @@ pub fn spawn(
     });
 }
 
-/// Passes the player's events, as tunebox's own, and lost outputs on to the app.
 fn forward_events(
     engine: &Engine,
     mut lost_outputs: UnboundedReceiver<String>,
@@ -335,9 +303,6 @@ fn forward_events(
     });
 }
 
-/// Spotify pushes every change of what plays where to all of the user's devices, tunebox
-/// included. The details still come from a poll; the push says when one is worth it. What
-/// plays next comes straight from the push.
 fn forward_pushes(session: &Session, tx: UnboundedSender<AppEvent>) {
     let pushes = session.dealer().listen_for("hm://connect-state/v1/cluster", Message::from_raw::<ClusterUpdate>);
     let mut pushes = match pushes {

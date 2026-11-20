@@ -1,5 +1,3 @@
-//! Playing, on fake services (see [`crate::backend::fake`]): what the player bar, the queue and
-//! the notices show as the player reports, and the commands the player gets.
 
 use std::time::Duration;
 
@@ -11,7 +9,6 @@ use crate::{backend::fake::SONG, harness::Harness, views::View};
 const SPOTIFY: Service = Service::Spotify;
 const YOUTUBE: Service = Service::YouTubeMusic;
 
-/// Opens the album of the service shown and plays its first song.
 async fn play_album(h: &mut Harness, service: Service) {
     h.click_on(&format!("{} Album", service.name())).await.press(Enter).await;
 }
@@ -48,8 +45,6 @@ async fn seeking_moves_the_position() {
     assert_eq!(h.fake(SPOTIFY).commands().last().unwrap(), "seek 10000 ms");
 }
 
-/// Each service keeps its own list of what plays next; switching back and forth shows the one of
-/// the service that plays. (8b495bf's own tests are in `app::browsing` and `tunebox-ytmusic`.)
 #[tokio::test]
 async fn the_queue_page_shows_the_service_that_plays() {
     let mut h = Harness::fakes(&[YOUTUBE, SPOTIFY]).await;
@@ -64,7 +59,6 @@ async fn the_queue_page_shows_the_service_that_plays() {
     assert!(h.shows("YouTube Music Song 2") && !h.shows("Spotify Song"), "{}", h.screen());
 }
 
-/// From 3729e30: a song Spotify refused the key to was skipped without a word.
 #[tokio::test]
 async fn a_skipped_song_says_why() {
     let mut h = Harness::fakes(&[SPOTIFY]).await;
@@ -79,8 +73,6 @@ async fn a_skipped_song_says_why() {
     assert!(h.shows("A song couldn't load, so it was skipped"), "{}", h.screen());
 }
 
-/// From 7211331, as far as the interface goes: Home, the library and search don't wait for
-/// the player, and playing says it is still connecting.
 #[tokio::test]
 async fn browsing_works_while_the_player_connects() {
     let mut h = Harness::fakes_connecting(&[SPOTIFY]).await;
@@ -92,7 +84,6 @@ async fn browsing_works_while_the_player_connects() {
     h.fake(SPOTIFY).connect();
     h.settle().await;
     h.press(Enter).await;
-    // A song from search plays on with the rest of its album.
     assert_eq!(h.fake(SPOTIFY).commands(), ["play spotify:album:a1 at spotify:track:a1-3"]);
 }
 
@@ -142,16 +133,12 @@ async fn liking_a_song_saves_it() {
     );
 }
 
-/// YouTube Music's Home as in its own apps: chips above, Quick picks as songs in columns that
-/// play at once, and a Play all that plays them in order.
 #[tokio::test]
 async fn youtube_music_home_has_chips_and_quick_picks() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
     assert!(h.shows(" Relax ") && h.shows("Quick picks") && h.shows("MADE FOR YOU"), "{}", h.screen());
     h.assert_screen("ytmusic_home");
 
-    // Down the first column, then to the next one: its stream is resolved while the cursor
-    // rests there, so Enter has a head start over yt-dlp.
     h.press(Down).await.press(Char('l')).await;
     assert!(h.fake(YOUTUBE).prefetches().iter().any(|uri| uri == "ytmusic:track:p1-1"));
     h.press(Enter).await;
@@ -169,13 +156,10 @@ async fn a_chip_narrows_youtube_music_home_down_and_back() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
     h.click_on("Workout").await;
     assert!(h.shows("Workout mixes"), "{}", h.screen());
-    // Up from the first shelf to the chips; Enter on the picked one shows the whole Home again.
     h.press(Char('k')).await.press(Enter).await;
     assert!(!h.shows("Workout mixes") && h.shows("Quick picks"), "{}", h.screen());
 }
 
-/// A chip whose Home doesn't load left the old Home with the chip picked, and nothing said.
-/// The Home shown stays, its chip too, and the bottom says why.
 #[tokio::test]
 async fn a_chip_that_fails_to_load_says_so() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
@@ -186,7 +170,6 @@ async fn a_chip_that_fails_to_load_says_so() {
     assert!(v.filter.is_none() && !v.loading && v.chips().iter().all(|c| !c.selected));
 }
 
-/// On the second day of use tunebox asks for a star on GitHub, once, a few seconds in.
 #[tokio::test]
 async fn the_star_on_github_is_asked_for_once() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
@@ -213,8 +196,6 @@ async fn no_thanks_closes_the_star_for_good() {
     assert!(h.app.usage.star_asked);
 }
 
-/// On a short terminal the star's popup leaves out what doesn't fit inside its border, instead
-/// of drawing over the border and the page under it.
 #[tokio::test]
 async fn the_star_keeps_inside_its_border_on_a_short_terminal() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
@@ -229,8 +210,6 @@ async fn the_star_keeps_inside_its_border_on_a_short_terminal() {
     }
 }
 
-/// Issue #27: the expired sign-in went away after a few seconds, before anyone read it or
-/// could copy the command. It stays now, under other messages, until closed.
 #[tokio::test]
 async fn an_expired_sign_in_stays_until_closed() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;
@@ -239,12 +218,10 @@ async fn an_expired_sign_in_stays_until_closed() {
     h.wait(Duration::from_secs(60)).await;
     assert!(h.shows("run `tunebox login ytmusic` again") && h.shows("click to copy"), "{}", h.screen());
 
-    // A message in between, and the sign-in is back after it.
     play_album(&mut h, YOUTUBE).await;
     h.fake(YOUTUBE).send(PlayerEvent::Unavailable { uri: "ytmusic:track:a1-2".into(), refused: false });
     h.settle().await;
     assert!(h.shows("A song couldn't load"), "{}", h.screen());
-    // The short-lived notice yields to the pinned problem after its 8s TTL.
     h.wait(Duration::from_secs(9)).await;
     assert!(h.shows("tunebox login ytmusic"), "{}", h.screen());
 
@@ -254,7 +231,6 @@ async fn an_expired_sign_in_stays_until_closed() {
     assert!(!h.shows("tunebox login ytmusic"), "{}", h.screen());
 }
 
-/// YouTube's bot check stopped every song without a word: it says so now, until music plays.
 #[tokio::test]
 async fn the_bot_check_says_why_nothing_plays() {
     let mut h = Harness::fakes(&[YOUTUBE]).await;

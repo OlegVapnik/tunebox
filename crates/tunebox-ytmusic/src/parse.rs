@@ -1,6 +1,3 @@
-//! Reading InnerTube's renderers. YouTube reshuffles them now and then, so everything here is
-//! lenient: a field that isn't where it should be leaves its value empty, and an item that
-//! can't be made sense of is skipped rather than failing the whole page.
 
 use serde_json::Value;
 use tunebox_core::{
@@ -8,20 +5,15 @@ use tunebox_core::{
     home::{HomeItem, ItemKind},
 };
 
-/// Cover size for lists and cards, in pixels.
 pub(crate) const IMAGE_SIZE: u32 = 300;
-/// Cover size for the Now Playing screen.
 pub(crate) const LARGE_IMAGE_SIZE: u32 = 800;
 
 pub(crate) const TRACK: &str = "ytmusic:track:";
 pub(crate) const ALBUM: &str = "ytmusic:album:";
 pub(crate) const PLAYLIST: &str = "ytmusic:playlist:";
 pub(crate) const ARTIST: &str = "ytmusic:artist:";
-/// Songs played in a row, by video ID: `ytmusic:songs:<id>,<id>,…`. Home's Quick picks play as
-/// this, since YouTube Music makes their list up rather than keeping it as a playlist.
 pub(crate) const SONGS: &str = "ytmusic:songs:";
 
-/// The text of a `runs` or `simpleText` object.
 pub(crate) fn text(value: &Value) -> String {
     if let Some(simple) = value["simpleText"].as_str() {
         return simple.to_owned();
@@ -37,7 +29,6 @@ pub(crate) fn list(value: &Value) -> &[Value] {
     value.as_array().map_or(&[], Vec::as_slice)
 }
 
-/// The first value under `key`, searched depth first.
 pub(crate) fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
     match value {
         Value::Object(map) => map.get(key).or_else(|| map.values().find_map(|v| find(v, key))),
@@ -46,7 +37,6 @@ pub(crate) fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
     }
 }
 
-/// Every value under `key`, outermost first; matches aren't searched further.
 pub(crate) fn find_all<'a>(value: &'a Value, key: &str, found: &mut Vec<&'a Value>) {
     match value {
         Value::Object(map) => {
@@ -67,13 +57,11 @@ pub(crate) fn str_at<'a>(value: &'a Value, pointer: &str) -> Option<&'a str> {
     value.pointer(pointer).and_then(Value::as_str).filter(|s| !s.is_empty())
 }
 
-/// Where a link goes: a page (browse ID and page type) or a song.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Link {
     Album(String),
     Artist(String),
     Playlist(String),
-    /// A song or video, maybe within a playlist.
     Watch {
         video: String,
         playlist: Option<String>,
@@ -107,26 +95,19 @@ impl Link {
         })
     }
 
-    /// The link of a run of text.
     pub fn of_run(run: &Value) -> Option<Link> {
         Link::of(run.get("navigationEndpoint")?)
     }
 }
 
-/// A line of text such as `Song • Daft Punk & Pharrell • Random Access Memories • 4:08`,
-/// sorted into what each part says.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Byline {
-    /// Song, Video, Album, Single, EP, Playlist, Artist…
     pub label: Option<String>,
-    /// Names, and the channel ID of those that link to one.
     pub artists: Vec<(String, Option<String>)>,
     pub album: Option<(String, String)>,
     pub duration_ms: Option<u32>,
     pub year: Option<String>,
-    /// "1.2B plays", "7.2M subscribers", "50 songs"…
     pub counts: Vec<String>,
-    /// Parts that are none of the above, such as a playlist's owner without a link.
     pub other: Vec<String>,
 }
 
@@ -148,7 +129,6 @@ const LABELS: [&str; 13] = [
 const SEPARATORS: [&str; 6] = [", ", " & ", " and ", " x ", " + ", ","];
 
 impl Byline {
-    /// Sorts the runs of one or more columns. Parts are separated by ` • ` runs.
     pub fn parse<'a>(columns: impl IntoIterator<Item = &'a [Value]>) -> Byline {
         let mut byline = Byline::default();
         for runs in columns {
@@ -199,7 +179,6 @@ impl Byline {
         }
     }
 
-    /// The artists, or else the first unlinked part, which is where the artist stands.
     pub fn artist_names(&self) -> Vec<String> {
         if !self.artists.is_empty() {
             return self.artists.iter().map(|(name, _)| name.clone()).collect();
@@ -207,14 +186,11 @@ impl Byline {
         self.other.first().map(|name| vec![name.clone()]).unwrap_or_default()
     }
 
-    /// Artist URIs for the leading artists that link to a channel; tunebox pairs them with the
-    /// names from the front.
     pub fn artist_uris(&self) -> Vec<String> {
         self.artists.iter().map_while(|(_, id)| id.as_ref().map(|id| format!("{ARTIST}{id}"))).collect()
     }
 }
 
-/// `3:45` or `1:02:03` in milliseconds.
 pub(crate) fn parse_duration(text: &str) -> Option<u32> {
     let parts: Vec<&str> = text.trim().split(':').collect();
     if !(2..=3).contains(&parts.len()) || parts.iter().any(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit())) {
@@ -224,7 +200,6 @@ pub(crate) fn parse_duration(text: &str) -> Option<u32> {
     Some(seconds * 1000)
 }
 
-/// `1.2B plays`, `68.3M monthly audience`, `7,215 subscribers` as a number.
 pub(crate) fn parse_count(text: &str) -> Option<u64> {
     let number = text.split_whitespace().next()?;
     let (digits, factor) = match number.chars().last()? {
@@ -237,7 +212,6 @@ pub(crate) fn parse_count(text: &str) -> Option<u64> {
     Some((value * factor).round() as u64)
 }
 
-/// The first number in a text like `1,234 songs` or `496 tracks`.
 pub(crate) fn leading_number(text: &str) -> Option<u32> {
     let digits: String =
         text.chars().skip_while(|c| !c.is_ascii_digit()).take_while(|c| c.is_ascii_digit() || *c == ',').collect();
@@ -251,7 +225,6 @@ pub(crate) struct Thumbnail {
     pub height: u32,
 }
 
-/// The thumbnails anywhere within `value`, smallest first as YouTube lists them.
 pub(crate) fn thumbnails(value: &Value) -> Vec<Thumbnail> {
     let list = find(value, "thumbnails").or_else(|| find(value, "sources"));
     list.and_then(Value::as_array)
@@ -267,8 +240,6 @@ pub(crate) fn thumbnails(value: &Value) -> Vec<Thumbnail> {
         .collect()
 }
 
-/// A cover of about `size` pixels. Square covers on Google's image servers are made in that
-/// size; others (video stills) are picked from what YouTube offers.
 pub(crate) fn image(value: &Value, size: u32) -> Option<String> {
     pick(&thumbnails(value), size)
 }
@@ -283,8 +254,6 @@ pub(crate) fn pick(thumbnails: &[Thumbnail], size: u32) -> Option<String> {
     thumbnails.iter().filter(|t| t.width >= size).min_by_key(|t| t.width).or(Some(largest)).map(|t| t.url.clone())
 }
 
-/// The URL of the same image in another size, where the server makes any size
-/// (`…=w120-h120-l90-rj` → `…=w300-h300-l90-rj`).
 pub(crate) fn resize(url: &str, size: u32) -> Option<String> {
     let host = url.strip_prefix("https://")?.split('/').next()?;
     if !(host.ends_with(".googleusercontent.com") || host.ends_with(".ggpht.com")) {
@@ -304,12 +273,10 @@ pub(crate) fn resize(url: &str, size: u32) -> Option<String> {
     Some(format!("{base}=w{size}-h{size}{rest}"))
 }
 
-/// The large version of a cover picked for lists.
 pub(crate) fn large(url: &str) -> String {
     resize(url, LARGE_IMAGE_SIZE).unwrap_or_else(|| url.to_owned())
 }
 
-/// The ID in a URI of the given prefix, e.g. the video ID in `ytmusic:track:…`.
 pub(crate) fn id<'a>(uri: &'a str, prefix: &str) -> anyhow::Result<&'a str> {
     uri.strip_prefix(prefix).filter(|id| !id.is_empty()).ok_or_else(|| anyhow::anyhow!("Not a {prefix}… URI: {uri}"))
 }
@@ -322,8 +289,6 @@ fn fixed_columns(item: &Value) -> Vec<&[Value]> {
     list(&item["fixedColumns"]).iter().map(|c| runs(&c["musicResponsiveListItemFixedColumnRenderer"]["text"])).collect()
 }
 
-/// The song in a row of a list (`musicResponsiveListItemRenderer`): search results,
-/// playlists, albums, an artist's top songs. Rows that can't play are left out.
 pub(crate) fn list_item_track(item: &Value) -> Option<Track> {
     if item["musicItemRendererDisplayPolicy"] == "MUSIC_ITEM_RENDERER_DISPLAY_POLICY_GREY_OUT" {
         return None;
@@ -348,8 +313,6 @@ pub(crate) fn list_item_track(item: &Value) -> Option<Track> {
     })
 }
 
-/// A song of a queue or radio (`playlistPanelVideoRenderer`, maybe in a wrapper that pairs
-/// the song with its music video).
 pub(crate) fn panel_track(item: &Value) -> Option<Track> {
     let item = item
         .get("playlistPanelVideoRenderer")
@@ -376,9 +339,6 @@ pub(crate) fn panel_track(item: &Value) -> Option<Track> {
     })
 }
 
-/// A card of a shelf (`musicTwoRowItemRenderer`) or a row standing for an album, playlist or
-/// artist. Songs become their radio: opening one lists the song and what YouTube Music would
-/// play after it, playing one plays the song and then the radio.
 pub(crate) fn home_item(item: &Value) -> Option<HomeItem> {
     if let Some(card) = item.get("musicTwoRowItemRenderer") {
         let title_run = runs(&card["title"]).first();
@@ -390,7 +350,6 @@ pub(crate) fn home_item(item: &Value) -> Option<HomeItem> {
     if let Some(track) = list_item_track(row)
         && row.get("navigationEndpoint").is_none()
     {
-        // A row of songs only: what the row says under the title, e.g. "Artist • Album".
         let mut item = song_item(&track);
         let below = below_title(row, &item.title);
         if !below.is_empty() {
@@ -406,8 +365,6 @@ pub(crate) fn home_item(item: &Value) -> Option<HomeItem> {
     make_item(link, title, &byline, subtitle, &row["thumbnail"])
 }
 
-/// The columns of a list row after its title, as one line: "Artist • Album". A column that
-/// repeats the title adds nothing, so it is left out.
 fn below_title(row: &Value, title: &str) -> String {
     let title = normalized(title);
     let columns = flex_columns(row);
@@ -418,7 +375,6 @@ fn below_title(row: &Value, title: &str) -> String {
         .join(" • ")
 }
 
-/// A name compared without case or stray spaces; the service spells the same album both ways.
 fn normalized(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
 }
@@ -447,7 +403,6 @@ fn make_item(link: Link, title: String, byline: &Byline, subtitle: String, thumb
         }
         Link::Other => return None,
     };
-    // Only "Playlist • <owner> • …" names the owner; other subtitles list the artists in it.
     let labeled = kind == ItemKind::Playlist && byline.label.as_deref() == Some("Playlist");
     let (owner_id, owner_name) = match byline.artists.first() {
         Some((name, id)) if labeled => (id.clone().unwrap_or_default(), name.clone()),
@@ -466,7 +421,6 @@ fn make_item(link: Link, title: String, byline: &Byline, subtitle: String, thumb
     })
 }
 
-/// A song as a card: its radio to open, the song itself to play.
 pub(crate) fn song_item(track: &Track) -> HomeItem {
     let video = track.uri.strip_prefix(TRACK).unwrap_or_default();
     let mut subtitle = vec!["Song".to_owned()];
@@ -483,12 +437,10 @@ pub(crate) fn song_item(track: &Track) -> HomeItem {
     }
 }
 
-/// The ID of a song's radio, which `next` understands as a playlist.
 pub(crate) fn radio_playlist(video: &str) -> String {
     format!("RDAMVM{video}")
 }
 
-/// The token of the next page, in either of the shapes YouTube uses.
 pub(crate) fn continuation(value: &Value) -> Option<String> {
     if let Some(token) = value
         .pointer("/continuations/0/nextContinuationData/continuation")
@@ -501,7 +453,6 @@ pub(crate) fn continuation(value: &Value) -> Option<String> {
     continuation_in(list(items.unwrap_or(value)))
 }
 
-/// The token in the item that ends a list, in the newer shape.
 pub(crate) fn continuation_in(items: &[Value]) -> Option<String> {
     items.iter().rev().find_map(|item| {
         str_at(item, "/continuationItemRenderer/continuationEndpoint/continuationCommand/token").map(str::to_owned)

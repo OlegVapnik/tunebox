@@ -1,5 +1,3 @@
-//! The catalog as tunebox shows it: tracks, playlists, albums, artists and podcasts, whichever
-//! service they come from.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,12 +14,10 @@ pub struct Track {
     pub uri: String,
     pub name: String,
     pub artists: Vec<String>,
-    /// Same order as `artists`; empty where the service doesn't say.
     pub artist_uris: Vec<String>,
     pub album: String,
     pub album_uri: String,
     pub duration_ms: u32,
-    /// The album cover, where the service sends one along.
     pub image_url: Option<String>,
 }
 
@@ -33,7 +29,6 @@ pub struct PlaylistInfo {
     pub owner_id: String,
     pub owner_name: String,
     pub collaborative: bool,
-    /// Unknown for some, like Spotify's mixes.
     pub total: Option<u32>,
     pub image_url: Option<String>,
 }
@@ -56,7 +51,6 @@ pub struct ArtistInfo {
     pub image_url: Option<String>,
 }
 
-/// A podcast in the user's library.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowInfo {
     pub uri: String,
@@ -72,7 +66,6 @@ pub struct SearchResults {
     pub playlists: Vec<PlaylistInfo>,
 }
 
-/// One page of a long list, and where the next one starts.
 #[derive(Debug, Clone)]
 pub struct Page<T> {
     pub items: Vec<T>,

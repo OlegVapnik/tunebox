@@ -1,5 +1,3 @@
-//! Remembering the session: each service's open page and selections, the service shown and
-//! the last track survive a restart.
 
 use std::{collections::HashMap, io, time::Duration};
 
@@ -17,12 +15,9 @@ use crate::{
     views::{HomeView, ListCursor, TrackSource, TrackView, View},
 };
 
-/// A cached greeting older than this ("Good morning" in the evening) is left out.
 const GREETING_FRESH: Duration = Duration::from_secs(60 * 60);
 
 impl App {
-    /// Shows the library, Home and open list the last run left for the service shown, until
-    /// fresh ones arrive.
     pub(super) fn load_cache(&mut self) {
         let (cache, Some(service)) = (&self.paths.cache, self.loader.service()) else { return };
         self.cached_tracks = datacache::load(&datacache::tracks_path(cache, service)).map(|(tracks, _)| tracks);
@@ -30,7 +25,6 @@ impl App {
         else {
             return;
         };
-        // Signed out since, the library is gone; Home is the same for everyone.
         if !self.signed_out {
             let uris = library.playlists.iter().map(|p| &p.uri);
             let uris = uris.chain(library.albums.iter().map(|a| &a.uri)).chain(library.artists.iter().map(|a| &a.uri));
@@ -47,7 +41,6 @@ impl App {
                 home.greeting.clear();
             }
             if service == Service::SoundCloud {
-                // SoundCloud Home no longer has these shelves; don't show them from an old cache.
                 home.shelves.retain(|shelf| !shelf.uri.starts_with("soundcloud:search:"));
             }
             if let View::Home(v) = &mut self.view {
@@ -57,7 +50,6 @@ impl App {
         }
     }
 
-    /// The list the last run left open, to show at once while it loads again.
     pub(super) fn cached_copy(&mut self, source: &TrackSource) -> Option<TrackView> {
         let cached = self.cached_tracks.take().filter(|cached| cached.key == source.key())?;
         if matches!(source, TrackSource::Liked) {
@@ -66,7 +58,6 @@ impl App {
         Some(TrackView { tracks: cached.tracks, total: Some(cached.total), ..TrackView::new(source.clone()) })
     }
 
-    /// Drops cached data of the account logged in last time and loads this one's.
     pub(super) fn forget_library(&mut self) {
         self.edit_library(|app| {
             app.playlists.clear();
@@ -85,8 +76,6 @@ impl App {
         self.loader.library();
     }
 
-    /// Writes the library and Home of the service shown for the next start; in the background
-    /// unless quitting.
     pub(super) fn save_library(&mut self, background: bool) {
         self.data_dirty = false;
         if self.demo {
@@ -107,7 +96,6 @@ impl App {
         write_cache(background, move || datacache::save(&path, &library));
     }
 
-    /// Writes the open track list for the next start, once it is complete and if it changed.
     pub(super) fn save_open_tracks(&mut self, background: bool) {
         let Some(service) = self.loader.service().filter(|_| !self.demo) else { return };
         let View::Tracks(v) = &self.view else { return };
@@ -125,10 +113,7 @@ impl App {
         write_cache(background, move || datacache::save(&path, &tracks));
     }
 
-    /// Reopens what was open last time: the service shown then, as far as it started, with
-    /// its page, and the track to resume. Called once, right after startup.
     pub(super) fn restore(&mut self, state: State) {
-        // Crossfade used to be kept here; the last one chosen moves to the config file.
         if let Some(crossfade) = state.crossfade.filter(|c| *c != self.prefs.crossfade) {
             self.prefs.crossfade = crossfade.min(12);
             self.save_setting(Setting::Crossfade);
@@ -139,13 +124,10 @@ impl App {
             self.ask_for_star_after(STAR_DELAY);
         }
         self.restored_volume = state.volume;
-        // The player starts at this volume too, so the slider can show it right away.
         if let Some(volume) = state.volume {
             self.now.volume = volume;
         }
 
-        // Files from before YouTube Music hold Spotify's page only; without a file, the first
-        // service in use shows.
         let saved = match state.service.as_deref() {
             Some(key) => Service::from_key(key),
             None if state.page == Page::default() && state.last_track.is_none() => None,
@@ -166,7 +148,6 @@ impl App {
         self.park_others();
         self.open_browsing();
 
-        // Only a track that can play again is offered.
         let last =
             state.last_track.filter(|last| Service::of(&last.uri).is_some_and(|service| working.contains(&service)));
         if let Some(last) = last {
@@ -175,36 +156,28 @@ impl App {
                 self.load_cover(url.clone());
             }
             self.last_context = last.context.clone();
-            // Its player is the one that plays, once it is up.
             self.active = Service::of(&last.uri);
             self.notice(format!("Resume “{}” · press space", last.name));
             self.resume = Some(last);
             self.after_track_change(None);
         }
-        // A service that can't start, while another one shows: say how to set it up.
         let down = services.iter().find(|service| Some(**service) != shown && !working.contains(service));
         if let Some(down) = down.filter(|_| shown.is_some_and(|shown| working.contains(&shown))) {
             self.notice(format!("{} isn't set up yet · run `tunebox login {}` in a terminal", down.name(), down.key()));
         }
-        // Coming back should look like you never left: no entrance animations.
         self.effects = Effects::default();
     }
 
-    /// Why `service` couldn't start, said with its name.
     pub(super) fn problem_of(&self, service: Service) -> Option<String> {
         self.loader.problem(service).map(|problem| format!("{}: {problem}", service.name()))
     }
 
-    /// Reopens a service's page from the last run.
     pub(super) fn restore_page(&mut self, page: Page) {
         self.library_filter = page.library_filter;
         self.nav.selected = page.sidebar_selected;
         let selection = page.selection;
         match page.view {
             SavedView::Home => {
-                // Start at the first card of the first shelf, not at the index left by the last
-                // run: feeds change while tunebox is closed, so an old index can name a different
-                // card – often one in the bottom row – or fall out of range.
                 if let View::Home(v) = &mut self.view {
                     v.shelf = 0;
                     v.item = 0;
@@ -282,10 +255,8 @@ impl App {
                 .map(|upcoming| upcoming.uri.clone())
                 .collect(),
         });
-        // While another device plays, the shown volume is that device's, not tunebox's.
         let volume = if self.now.device.is_none() { Some(self.now.volume) } else { self.restored_volume };
         let shown = self.loader.service();
-        // A service that couldn't start keeps the page it had.
         let page = match shown.filter(|_| self.problem.is_some()).and_then(|s| self.saved_pages.get(&s)) {
             Some(page) => page.clone(),
             None => page(&self.view, &self.history, self.focus, &self.nav, self.library_filter),
@@ -318,7 +289,6 @@ fn write_cache(background: bool, save: impl FnOnce() -> io::Result<()> + Send + 
             tracing::warn!("saving the data cache: {err}");
         }
     };
-    // Tests write at once, so nothing writes into a test's directory after it is gone.
     if background && !cfg!(test) {
         tokio::task::spawn_blocking(save);
     } else {
@@ -326,8 +296,6 @@ fn write_cache(background: bool, save: impl FnOnce() -> io::Result<()> + Send + 
     }
 }
 
-/// Where a service's pages are: the page open, or the one the queue or Settings were opened
-/// from, which are detours, and the sidebar.
 pub(super) fn page(view: &View, history: &[View], focus: Focus, nav: &ListCursor, filter: LibraryFilter) -> Page {
     let page = match view {
         View::Queue(_) | View::Settings(_) => {

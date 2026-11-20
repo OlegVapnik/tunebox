@@ -1,4 +1,3 @@
-//! Short transitions, drawn over each finished frame.
 
 use std::time::Duration;
 
@@ -12,9 +11,7 @@ use crate::theme::Rgb;
 
 #[derive(Clone, Copy)]
 enum Kind {
-    /// Text fades in out of `from`.
     FadeIn { from: Color },
-    /// Cells appear top down out of `from`, over a gradient `rows` high.
     SweepDown { from: Color, rows: u16 },
 }
 
@@ -48,7 +45,6 @@ impl Effect {
         let area = self.area.intersection(buffer.area);
         match self.kind {
             Kind::FadeIn { from } => {
-                // Eases out: most of the way there early on.
                 let left = (1.0 - t) * (1.0 - t);
                 for pos in area.positions() {
                     let cell = &mut buffer[pos];
@@ -82,7 +78,6 @@ impl Effect {
     }
 }
 
-/// Running effects, at most one per slot.
 pub struct Effects<K> {
     running: Vec<(K, Effect)>,
 }
@@ -94,7 +89,6 @@ impl<K> Default for Effects<K> {
 }
 
 impl<K: PartialEq> Effects<K> {
-    /// Starts `effect`, in place of the one in `slot`.
     pub fn start(&mut self, slot: K, effect: Effect) {
         self.cancel(&slot);
         self.running.push((slot, effect));
@@ -108,7 +102,6 @@ impl<K: PartialEq> Effects<K> {
         !self.running.is_empty()
     }
 
-    /// Moves each effect on by `elapsed` and draws it, leaving out cells `skip` picks.
     pub fn process(&mut self, elapsed: Duration, buffer: &mut Buffer, skip: fn(&Cell) -> bool) {
         for (_, effect) in &mut self.running {
             effect.elapsed += elapsed;

@@ -10,45 +10,27 @@ use crate::clock::Instant;
 
 const ACCENT_FADE: Duration = Duration::from_millis(600);
 
-/// The colors the interface is drawn with. They can change while tunebox runs, so drawing code
-/// reads them with [`palette`] as it draws rather than keeping them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Palette {
-    /// Behind everything.
     pub bg: Color,
-    /// The sidebar.
     pub surface: Color,
-    /// The player bar.
     pub player: Color,
-    /// Cards, menus and anything else that sits on top.
     pub raised: Color,
     pub text: Color,
-    /// Secondary text, such as artists and counts.
     pub muted: Color,
-    /// Hints and separators.
     pub faint: Color,
-    /// Errors.
     pub danger: Color,
-    /// The selected row of a list that doesn't have focus; with focus it takes the accent.
     pub unfocused: Color,
-    /// Buttons that do nothing right now.
     pub disabled: Color,
-    /// Where a cover is still loading, on something raised.
     pub placeholder: Color,
-    /// The part of a scrollbar that shows where the view is.
     pub thumb: Color,
-    /// Lyrics next to the line being sung, which fade toward `lyric_far` with distance.
     pub lyric_near: Color,
     pub lyric_far: Color,
-    /// What hovered and highlighted things move toward: white on a dark background.
     pub highlight: Rgb,
-    /// The accent while no cover or setting picks another.
     pub accent: Rgb,
 }
 
 impl Palette {
-    /// Catppuccin Mocha: graphite-blue panels, one mauve accent. Levels from `text` down to
-    /// `faint` carry the hierarchy, so the accent is left for what is playing and what has focus.
     pub const DEFAULT: Palette = Palette {
         bg: Color::Rgb(17, 17, 27),
         surface: Color::Rgb(24, 24, 37),
@@ -68,23 +50,17 @@ impl Palette {
         accent: Rgb(203, 166, 247),
     };
 
-    /// Whether this is a light theme, with dark text on a light background.
     pub fn is_light(&self) -> bool {
         Rgb::of(self.bg).is_light()
     }
 }
 
-/// A lock rather than constants, so the colors can follow the system's theme or the terminal's. Drawing only
-/// reads it, which costs next to nothing while nobody writes.
 static PALETTE: RwLock<Palette> = RwLock::new(Palette::DEFAULT);
 
-/// The colors to draw with now.
 pub fn palette() -> Palette {
-    // A palette is plain data, so one left by a panicking writer is still whole.
     *PALETTE.read().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Draws with `palette` from the next frame on.
 pub fn set_palette(palette: Palette) {
     *PALETTE.write().unwrap_or_else(PoisonError::into_inner) = palette;
 }
@@ -98,13 +74,10 @@ impl Rgb {
         Rgb(lerp(self.0, other.0), lerp(self.1, other.1), lerp(self.2, other.2))
     }
 
-    /// Whether dark text reads better on it than light text.
     pub fn is_light(self) -> bool {
-        // The way Omarchy tells, by the sum of the channels.
         u16::from(self.0) + u16::from(self.1) + u16::from(self.2) > 382
     }
 
-    /// The parts of a palette color, which is always RGB; anything else counts as black.
     pub fn of(color: Color) -> Rgb {
         match color {
             Color::Rgb(r, g, b) => Rgb(r, g, b),
@@ -119,7 +92,6 @@ impl From<Rgb> for Color {
     }
 }
 
-/// The app's accent color. It follows the cover art and fades between covers.
 pub struct Accent {
     from: Rgb,
     to: Rgb,
@@ -138,7 +110,6 @@ impl Accent {
         self.since = Instant::now();
     }
 
-    /// Switches without fading.
     pub fn jump(&mut self, target: Rgb) {
         self.from = target;
         self.to = target;
@@ -155,8 +126,6 @@ impl Accent {
         self.rgb().into()
     }
 
-    /// The selection background: a muted step between the pane and raised surfaces, so the
-    /// accent bar and the bold name carry the focus rather than a wash of color.
     pub fn selection(&self) -> Color {
         Rgb::of(palette().bg).mix(Rgb::of(palette().raised), 0.25).into()
     }
@@ -166,18 +135,13 @@ impl Accent {
     }
 }
 
-/// The two ends of the gradient that stands in for a cover nobody has: fixed to the name, so the
-/// same playlist keeps the same one across runs.
 pub fn placeholder_colors(name: &str) -> (Rgb, Rgb) {
-    // FNV-1a, which spreads short names well.
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in name.as_bytes() {
         hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    // Mix in the high bits so names that share a prefix still land on different hues.
     let hue = ((hash ^ (hash >> 32)) % 360) as f32;
-    // Muted tones, so a shelf of placeholders stays behind the titles.
     let (r, g, b) = hsl_to_rgb(hue, 0.38, 0.34);
     let (r2, g2, b2) = hsl_to_rgb((hue + 24.0) % 360.0, 0.42, 0.20);
     (
@@ -186,8 +150,6 @@ pub fn placeholder_colors(name: &str) -> (Rgb, Rgb) {
     )
 }
 
-/// The dominant vivid color of a cover, if it has one. [`cover_accent`] tunes it to the
-/// background when it is shown, so it follows a change of colors.
 pub fn dominant_color(image: &DynamicImage) -> Option<Rgb> {
     const BUCKETS: usize = 24;
     let mut buckets = [[0f32; 4]; BUCKETS];
@@ -215,7 +177,6 @@ pub fn dominant_color(image: &DynamicImage) -> Option<Rgb> {
     Some(Rgb(channel(r), channel(g), channel(b)))
 }
 
-/// A cover's dominant color, tuned to read well on the background.
 pub fn cover_accent(color: Rgb) -> Rgb {
     tune(color, palette().is_light())
 }
@@ -228,12 +189,9 @@ fn tune(color: Rgb, light_background: bool) -> Rgb {
     Rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
 }
 
-/// How light an accent may be to read well on a dark background, and on a light one.
 const DARK_LIGHTNESS: (f32, f32) = (0.58, 0.70);
 const LIGHT_LIGHTNESS: (f32, f32) = (0.30, 0.42);
 
-/// `color` darkened enough to read on a light background, and as it is on a dark one, which
-/// tunebox's own colors are made for.
 pub fn readable(color: Rgb) -> Rgb {
     if !palette().is_light() {
         return color;

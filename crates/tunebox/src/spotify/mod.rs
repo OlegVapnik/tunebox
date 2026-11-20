@@ -1,5 +1,3 @@
-//! The commands for Spotify: signing in, its checks for `tunebox doctor`, playing without the
-//! interface, and a few for development.
 
 mod cdp;
 mod playback;
@@ -16,18 +14,14 @@ use tunebox_spotify::{doctor, session, webapi::WebApi};
 pub use self::playback::{connect, play};
 use crate::{prompt, style};
 
-/// Spotify's web player, where the `sp_dc` cookie lives.
 const WEB_PLAYER: &str = "https://open.spotify.com";
 
-/// Keeps the cookie in the config, where the Web API finds it on every start.
 fn save_sp_dc(paths: &Paths, cookie: String) -> Result<String> {
     config::store(paths, "sp_dc", Some(config::Value::from(cookie.clone())))?;
     println!("  {} saved to {}\n", style::green("✓"), paths.config_file().display());
     Ok(cookie)
 }
 
-/// Walks the user through getting the `sp_dc` cookie: first by reading a browser's cookie store,
-/// then, when that isn't possible, by pasting the value from Developer Tools.
 async fn setup_sp_dc(paths: &Paths) -> Result<String> {
     if !prompt::interactive() {
         bail!(
@@ -69,7 +63,6 @@ async fn setup_sp_dc(paths: &Paths) -> Result<String> {
             continue;
         }
 
-        // Manual fallback: a portable browser or one whose cookies can't be read.
         println!();
         println!("  In a browser signed in to open.spotify.com, open Developer Tools (F12), then");
         println!("  Application → Cookies → open.spotify.com, and copy the value of the {} cookie.", style::bold("sp_dc"));
@@ -86,7 +79,6 @@ async fn setup_sp_dc(paths: &Paths) -> Result<String> {
     }
 }
 
-/// Signs in to the Web API with a web-player cookie, then to librespot for streaming.
 pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
     let sp_dc = match config.sp_dc(paths) {
         Ok(cookie) => cookie,
@@ -123,8 +115,6 @@ pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
                 session.shutdown();
             }
             Ok(session) => {
-                // Spotify lets free accounts sign in here but refuses to play their songs,
-                // so the credentials are no use; tunebox plays those through YouTube.
                 session.shutdown();
                 paths.streaming_credentials().delete()?;
                 println!("  {} a free account: Spotify songs play through YouTube\n", style::cyan("•"));
@@ -141,20 +131,16 @@ pub async fn login(paths: &Paths, config: &Config, force: bool) -> Result<()> {
     Ok(())
 }
 
-/// An error's first line, for a message inside a sentence.
 fn one_line(err: &anyhow::Error) -> String {
     err.to_string().lines().next().unwrap_or_default().to_owned()
 }
 
-/// Whether both sign-ins are saved, the Web API's with the user's app and librespot's.
 pub async fn signed_in(paths: &Paths, config: &Config) -> Result<bool> {
     let Ok(sp_dc) = config.sp_dc(paths) else { return Ok(false) };
     let api = WebApi::new(sp_dc, paths.webapi_token())?;
     Ok(api.is_logged_in().await)
 }
 
-/// What `tunebox doctor` finds through the Web API and through librespot, each section handed
-/// to `report` as soon as it is done.
 pub async fn doctor(paths: &Paths, config: &Config, mut report: impl FnMut(Section)) -> Result<()> {
     match config.sp_dc(paths) {
         Ok(sp_dc) => {
@@ -197,7 +183,6 @@ fn failed_section(title: &'static str, name: &str, reason: String) -> Section {
     }
 }
 
-/// Fetches the DJ's lines for the first tracks of a fresh DJ session, without playing anything.
 pub async fn dj_sample(paths: &Paths, dir: &std::path::Path) -> Result<()> {
     use anyhow::Context as _;
     let session = session::prepare(paths)?.connect().await?;
@@ -240,7 +225,6 @@ pub async fn dj_sample(paths: &Paths, dir: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-/// Runs a pathfinder query and prints the JSON.
 pub async fn query(paths: &Paths, operation: &str, variables: &str) -> Result<()> {
     let session = session::prepare(paths)?.connect().await?;
     let pathfinder = tunebox_spotify::pathfinder::Pathfinder::new(session.clone(), paths.pathfinder_hashes());

@@ -1,7 +1,3 @@
-//! YouTube Music for tunebox: the catalog through InnerTube (the API music.youtube.com itself
-//! uses), playback through mpv with stream URLs from yt-dlp. Signed out is a first-class mode:
-//! browsing and playing work without an account; liking and the library need the cookies of
-//! a browser that is signed in.
 
 mod account;
 pub mod auth;
@@ -45,18 +41,13 @@ pub use crate::{
 };
 use crate::{innertube::InnerTube, library::Library};
 
-/// What `tracks` lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
-    /// The user's liked songs (`ytmusic:playlist:LM`).
     Liked,
-    /// A playlist by URI.
     Playlist(String),
-    /// An album by URI.
     Album(String),
 }
 
-/// The YouTube Music client. Cheap to clone; clones share the connection and the sign-in.
 #[derive(Clone)]
 pub struct YtMusic {
     inner: Arc<Inner>,
@@ -66,18 +57,12 @@ struct Inner {
     api: InnerTube,
     http: reqwest::Client,
     library: Library,
-    /// Where the sign-in is kept, to read it from the browser again; `None` for one that isn't.
     paths: Option<Paths>,
-    /// When the sign-in was last read from the browser again, so a failed try can be retried.
     last_refresh: Mutex<Option<Instant>>,
-    /// Whether the last refresh was refused or couldn't be read: the message says so.
     refresh_failed: AtomicBool,
-    /// The account the sign-in acted as, to tell another one's cookies apart.
     last_user: Mutex<Option<User>>,
 }
 
-/// A call that needs the sign-in, made once more when YouTube has stopped taking the cookies
-/// and the browser gave fresh ones for the same account.
 macro_rules! signed_in {
     ($self:expr, $call:expr) => {
         match $call.await {
@@ -87,16 +72,12 @@ macro_rules! signed_in {
     };
 }
 
-/// How soon a failed refresh may be tried again: a browser's cookie store can be locked for a
-/// moment, and a sign-in that comes back later shouldn't need a restart.
 const REFRESH_COOLDOWN: Duration = Duration::from_secs(30);
 
-/// Whether enough time has passed since the last try to read the browser again.
 fn refresh_due(last: Option<Instant>, now: Instant) -> bool {
     last.is_none_or(|at| now.duration_since(at) >= REFRESH_COOLDOWN)
 }
 
-/// Whether YouTube has stopped taking the saved sign-in, rather than anything else going wrong.
 fn refused(err: &anyhow::Error) -> bool {
     let message = err.to_string();
     matches!(innertube::status(err), Some(reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN))
@@ -105,13 +86,10 @@ fn refused(err: &anyhow::Error) -> bool {
 }
 
 impl YtMusic {
-    /// Signs in with the cookies saved by `tunebox login ytmusic`, if any; signed out otherwise.
     pub fn new(paths: &Paths) -> Result<Self> {
         Self::with_api(InnerTube::new(paths.ytmusic_cookies())?, Some(paths.clone()))
     }
 
-    /// Signed in with cookies that aren't kept, to try a sign-in before it replaces the one
-    /// before.
     pub(crate) fn unsaved(jar: cookies::Jar) -> Result<Self> {
         Self::with_api(InnerTube::unsaved(jar)?, None)
     }
@@ -135,11 +113,11 @@ impl YtMusic {
         self.inner.api.signed_in()
     }
 
-    /// The signed-in account; `None` when signed out.
     pub async fn me(&self) -> Result<Option<User>> {
         if !self.signed_in() {
             return Ok(None);
         }
+        self.refresh_now().await;
         match library::me(&self.inner.api).await {
             Ok(user) => {
                 *self.inner.last_user.lock().unwrap() = Some(user.clone());
@@ -150,16 +128,15 @@ impl YtMusic {
         }
     }
 
-    /// Where a refusal can't be mended by reading the browser again, says what to do: the
-    /// sign-in was pasted, saved by 0.5.2 or older, or the browser's cookies no longer work.
     fn sign_in_hint(&self, err: anyhow::Error) -> anyhow::Error {
         if !refused(&err) {
             return err;
         }
         match self.inner.api.browser() {
             None => err.context(
-                "This sign-in doesn't say which browser it came from, so it can't be read again: \
-                 run `tunebox login ytmusic --force` once",
+                "This sign-in doesn't record its browser, so it can't be read again: run \
+                 `tunebox login ytmusic` and it will re-read the cookies from the browser that \
+                 opens links",
             ),
             Some(_) if self.inner.refresh_failed.load(Ordering::Relaxed) => err.context(
                 "Couldn't refresh the YouTube Music sign-in from the browser: \
@@ -169,16 +146,26 @@ impl YtMusic {
         }
     }
 
-    /// Reads the sign-in from the browser it came from again, with a short cooldown, when
-    /// YouTube has stopped taking the cookies that were copied: a browser that goes on using its
-    /// sign-in gets new cookies for it. They are kept only when they are still the same account's,
-    /// told by its channel or handle; otherwise the sign-in before stays. A failed try is retried
-    /// later, so a locked cookie store or a browser that was shut for a moment doesn't need a
-    /// restart. Whether the call that failed is worth repeating.
     async fn refresh_sign_in(&self, err: &anyhow::Error) -> bool {
-        let (Some(paths), Some(spec)) = (&self.inner.paths, self.inner.api.browser()) else { return false };
-        if !refused(err) {
-            return false;
+        self.refresh_sign_in_inner(Some(err), false).await
+    }
+
+    pub async fn refresh_now(&self) -> bool {
+        self.refresh_sign_in_inner(None, true).await
+    }
+
+    async fn refresh_sign_in_inner(&self, err: Option<&anyhow::Error>, force: bool) -> bool {
+        let Some(paths) = &self.inner.paths else { return false };
+        let browser = match self.inner.api.browser() {
+            Some(spec) => Some(auth::Browser { name: spec.clone(), spec }),
+            None => auth::default_browser(),
+        };
+        let Some(mut browser) = browser else { return false };
+        let _ = force;
+        if let Some(err) = err {
+            if !refused(err) {
+                return false;
+            }
         }
         let allowed = {
             let mut last = self.inner.last_refresh.lock().unwrap();
@@ -192,12 +179,8 @@ impl YtMusic {
         if !allowed {
             return false;
         }
-        let Some(identity) = self.inner.api.identity() else {
-            self.inner.refresh_failed.store(true, Ordering::Relaxed);
-            return false;
-        };
+        let identity = self.inner.api.identity().unwrap_or_default();
         let was = self.inner.last_user.lock().unwrap().clone();
-        let mut browser = auth::Browser { name: spec.clone(), spec };
         let outcome = match auth::SignIn::refresh(paths, &mut browser, was.as_ref(), identity).await {
             Ok(Some(found)) => match found.save(paths) {
                 Ok(()) => match paths.ytmusic_cookies().read() {
@@ -227,26 +210,18 @@ impl YtMusic {
         outcome.unwrap_or(false)
     }
 
-    /// Which of the browser's accounts the sign-in acts as, with its address; `None` when
-    /// signed out, or when YouTube no longer lists it.
     pub async fn account(&self) -> Result<Option<Account>> {
         signed_in!(self, account::current(&self.inner.api))
     }
 
-    /// The Home feed's shelves, as music.youtube.com shows them. Home items have no kind for
-    /// songs, so a song is its radio: a playlist (`ytmusic:playlist:RDAMVM<id>`) to open, whose
-    /// `context_uri` is the song itself (`ytmusic:track:<id>`) to play. With a chip's ID, the
-    /// Home of that chip.
     pub async fn home(&self, chip: Option<&str>) -> Result<Home> {
         signed_in!(self, home::home(&self.inner.api, chip))
     }
 
-    /// Songs, albums, artists and playlists for `query`.
     pub async fn search(&self, query: &str) -> Result<SearchResults> {
         signed_in!(self, search::search(&self.inner.api, query))
     }
 
-    /// Completions for a query being typed.
     pub async fn suggestions(&self, query: &str) -> Result<Vec<String>> {
         search::suggestions(&self.inner.api, query).await
     }
@@ -265,14 +240,10 @@ impl YtMusic {
         Ok(album)
     }
 
-    /// The songs of a playlist, an album or the liked songs, a page at a time as YouTube sends
-    /// them (100 per page for playlists). Every page but the last has `next_offset` set to the
-    /// number of songs so far; `total` is the best count known by then.
     pub fn tracks(&self, source: Source) -> impl Stream<Item = Result<Page<Track>>> + Send + 'static {
         pages::tracks(self.clone(), source)
     }
 
-    /// The playlists in the library, without Liked Music.
     pub async fn library_playlists(&self) -> Result<Vec<PlaylistInfo>> {
         signed_in!(self, library::playlists(&self.inner.api, &self.inner.library))
     }
@@ -281,7 +252,6 @@ impl YtMusic {
         signed_in!(self, library::albums(&self.inner.api, &self.inner.library))
     }
 
-    /// The artists the user subscribed to.
     pub async fn followed_artists(&self) -> Result<Vec<ArtistInfo>> {
         signed_in!(self, library::artists(&self.inner.api, &self.inner.library))
     }
@@ -290,29 +260,22 @@ impl YtMusic {
         signed_in!(self, library::liked_count(&self.inner.api))
     }
 
-    /// Songs by URI, with their details, in the given order; unknown ones are left out.
     pub async fn tracks_by_uri(&self, uris: &[String]) -> Result<Vec<Track>> {
         signed_in!(self, watch::tracks_by_uri(&self.inner.api, uris))
     }
 
-    /// A song's radio: the song, then what YouTube Music would play after it.
     pub async fn radio(&self, track_uri: &str) -> Result<Vec<Track>> {
         signed_in!(self, watch::radio(&self.inner.api, track_uri))
     }
 
-    /// Time-synced lyrics where YouTube Music has them, else its plain ones, else LRCLIB's.
     pub async fn lyrics(&self, query: &LyricsQuery<'_>) -> Result<Option<Lyrics>> {
         lyrics::lyrics(&self.inner.api, &self.inner.http, query).await
     }
 
-    /// Whether each URI is in the library: liked songs, saved albums and playlists, subscribed
-    /// artists. Signed out, nothing is.
     pub async fn check_saved(&self, uris: &[String]) -> Result<Vec<(String, bool)>> {
         signed_in!(self, library::check_saved(&self.inner.api, &self.inner.library, uris))
     }
 
-    /// Likes or unlikes a song, saves or removes an album or playlist, subscribes to or
-    /// unsubscribes from an artist.
     pub async fn set_saved(&self, uri: &str, saved: bool) -> Result<()> {
         signed_in!(self, library::set_saved(&self.inner.api, &self.inner.library, uri, saved))
     }
@@ -321,13 +284,11 @@ impl YtMusic {
         signed_in!(self, library::add_to_playlist(&self.inner.api, playlist_uri, uris))
     }
 
-    /// A raw InnerTube call, for diagnostics and the `ytm` example.
     #[doc(hidden)]
     pub async fn raw(&self, endpoint: &str, body: Value) -> Result<Value> {
         self.inner.api.call(endpoint, body).await
     }
 
-    /// [`YtMusic::raw`] as the Android app, which gets time-synced lyrics.
     #[doc(hidden)]
     pub async fn raw_android(&self, endpoint: &str, body: Value) -> Result<Value> {
         self.inner.api.call_as(innertube::ClientKind::Android, endpoint, body).await

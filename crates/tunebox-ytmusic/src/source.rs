@@ -1,4 +1,3 @@
-//! YouTube Music as a playback source: URIs to songs, context pages and stream URLs.
 
 use std::path::PathBuf;
 
@@ -13,13 +12,10 @@ use crate::{
     parse::{self, ALBUM, ARTIST, PLAYLIST, SONGS, TRACK},
 };
 
-/// YouTube Music playback: InnerTube for the catalog, yt-dlp for the streams.
 #[derive(Clone)]
 pub struct YtMusicSource {
     client: YtMusic,
     cache_dir: Option<PathBuf>,
-    /// YouTube asks unsigned yt-dlp requests to prove they aren't a bot; the saved sign-in
-    /// answers that check.
     cookies: Option<PathBuf>,
 }
 

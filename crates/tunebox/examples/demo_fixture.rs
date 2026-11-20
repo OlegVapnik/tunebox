@@ -1,10 +1,3 @@
-//! Builds the sample that `tunebox demo` shows, from public Spotify content:
-//!
-//!     cargo run --example demo_fixture
-//!
-//! It reads `crates/tunebox-tui/demo/plan.json` and writes `crates/tunebox-tui/demo/sample.json`.
-//! Albums, artists and songs are looked up with the signed-in account, but nothing of the
-//! account itself ends up in the sample: the user, the playlists and the library are the plan's.
 
 use std::{collections::HashMap, path::Path};
 
@@ -21,9 +14,7 @@ use tunebox_core::{
 use tunebox_spotify::{artist, catalog, lyrics, pathfinder::Pathfinder, session, webapi::WebApi};
 use tunebox_tui::demo::{Demo, Playing};
 
-/// Spotify's own Liked Songs artwork.
 const LIKED_IMAGE: &str = "https://misc.scdn.co/liked-songs/liked-songs-300.png";
-/// Cover art file names start with their size: 300 px, and 640 px for Now Playing.
 const SMALL: &str = "ab67616d00001e02";
 const LARGE: &str = "ab67616d0000b273";
 
@@ -42,7 +33,6 @@ struct Plan {
 #[derive(Deserialize)]
 struct PlanPlaylist {
     name: String,
-    /// In the user's library, or only on Home like Spotify's mixes.
     #[serde(default = "yes")]
     library: bool,
     owner: Option<String>,
@@ -58,7 +48,6 @@ struct PlanPlaying {
     track: String,
     context: String,
     position_ms: u32,
-    /// Songs in the queue, before the rest of the context.
     queued: Vec<String>,
 }
 
@@ -81,7 +70,6 @@ struct Builder {
 }
 
 impl Builder {
-    /// The first song Spotify finds for `query`, like "Daft Punk Around the World".
     async fn track(&mut self, query: &str) -> Result<Track> {
         if let Some(track) = self.found.get(query) {
             return Ok(track.clone());
@@ -124,7 +112,6 @@ impl Builder {
     }
 }
 
-/// Spotify's cover for a playlist of others' songs: the covers of its first four albums.
 fn mosaic(tracks: &[Track]) -> Option<String> {
     let mut ids: Vec<&str> = Vec::new();
     for url in tracks.iter().filter_map(|t| t.image_url.as_deref()) {
@@ -143,7 +130,6 @@ fn slug(name: &str) -> String {
     name.to_lowercase().chars().filter(char::is_ascii_alphanumeric).collect()
 }
 
-/// "Artist, Artist and more" from the first songs of a mix.
 fn artists_of(tracks: &[Track]) -> String {
     let mut names: Vec<&str> = Vec::new();
     for name in tracks.iter().filter_map(|t| t.artists.first()) {
@@ -231,7 +217,6 @@ async fn main() -> Result<()> {
     let mut searches = HashMap::new();
     for query in &plan.searches {
         let mut results = catalog::search(&builder.api, query).await?;
-        // Playlists of other users would show their names; keep the artists' own.
         results.playlists.retain(|p| artists.iter().any(|a| a.name == p.owner_name));
         searches.insert(query.to_lowercase(), results);
     }
@@ -291,7 +276,6 @@ async fn main() -> Result<()> {
                 }
             }
             "album" => {
-                // Spotify names some editions longer, like "Since I Left You (Deluxe Edition)".
                 let album = albums
                     .iter()
                     .find(|a| a.name == name || a.name.starts_with(name))

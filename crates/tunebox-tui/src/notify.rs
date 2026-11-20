@@ -1,8 +1,3 @@
-//! Desktop notifications for new tracks while tunebox's window is in the background. They go
-//! through the terminal's own escape sequence, so they need no permission of their own and a
-//! click leads back to the terminal. On Linux they go to the desktop directly in terminals
-//! without notifications of their own, and on Hyprland in all of them: the desktop shows the
-//! cover with them, and there a click brings tunebox's window to the front.
 
 use std::{sync::Arc, time::Duration};
 
@@ -11,48 +6,33 @@ use tunebox_core::player::CurrentTrack;
 
 use crate::clock::Instant;
 
-/// How long a track has to play before it gets announced, so skipping through doesn't flood.
 const SETTLE: Duration = Duration::from_millis(1500);
 
-/// The escape sequence a terminal understands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Protocol {
-    /// kitty's OSC 99: title and body, and a new one replaces the last.
     Kitty,
-    /// rxvt's OSC 777, also spoken by Ghostty and WezTerm: title and body.
     Rxvt,
-    /// iTerm2's OSC 9: a single line.
     ITerm,
 }
 
 pub struct Notifier {
     channel: Channel,
-    /// The track playing, and since when.
     pending: Option<(String, Instant)>,
-    /// The track last announced, or that played while tunebox was in front.
     announced: Option<String>,
 }
 
 enum Channel {
     Terminal {
         protocol: Protocol,
-        /// Inside tmux, which passes the sequence on only when wrapped.
         tmux: bool,
     },
-    /// The desktop's notification server: its notifications show the cover, and on Hyprland a
-    /// click on one brings tunebox's window to the front.
     #[cfg(target_os = "linux")]
     Desktop(tunebox_os::notifications::Notifications),
 }
 
 impl Notifier {
-    /// The terminal's notifications, or the desktop's on Linux where they do better. `None`
-    /// without either.
     pub fn detect() -> Option<Self> {
         let terminal = Protocol::detect().map(|protocol| Channel::Terminal { protocol, tmux: set("TMUX") });
-        // A click on the terminal's notification brings its window to the front, which only
-        // Hyprland lets tunebox do for the desktop's. Over SSH the desktop's session bus belongs
-        // to another computer, whose screen nobody is looking at.
         #[cfg(target_os = "linux")]
         if (terminal.is_none() || tunebox_os::notifications::click_raises())
             && !set("SSH_CONNECTION")
@@ -67,9 +47,6 @@ impl Notifier {
         Self { channel, pending: None, announced: None }
     }
 
-    /// Announces a track that has been playing for a moment while tunebox is in the background,
-    /// with its cover where the desktop shows one. Returns the escape sequence to write, when
-    /// the terminal is the one to tell. `track` is tunebox's own playback only.
     pub fn update(
         &mut self,
         track: Option<&CurrentTrack>,
@@ -117,7 +94,6 @@ impl Notifier {
 }
 
 impl Protocol {
-    /// The terminal's, from what it sets in the environment.
     fn detect() -> Option<Self> {
         let var = |name| std::env::var(name).unwrap_or_default();
         if set("KITTY_WINDOW_ID") || var("TERM").contains("kitty") {
@@ -157,7 +133,6 @@ fn sequence(protocol: Protocol, tmux: bool, title: &str, body: &str) -> String {
     if tmux { passthrough(&sequence) } else { sequence }
 }
 
-/// Artists and album, leaving out what is missing: episodes have no album.
 fn byline(track: &CurrentTrack) -> String {
     [track.artists.join(", "), track.album.clone()]
         .into_iter()
@@ -166,14 +141,10 @@ fn byline(track: &CurrentTrack) -> String {
         .join(" · ")
 }
 
-/// Without control characters, which would end the sequence, or semicolons, which separate its
-/// fields (and turn OSC 9 into other commands in some terminals).
 fn clean(text: &str) -> String {
     text.chars().filter(|c| !c.is_control()).map(|c| if c == ';' { ',' } else { c }).collect()
 }
 
-/// tmux passes a sequence on to the terminal when wrapped like this. It needs
-/// `allow-passthrough all`: with `on`, tmux drops it for panes out of view, the usual case.
 fn passthrough(sequence: &str) -> String {
     format!("\x1bPtmux;{}\x1b\\", sequence.replace('\x1b', "\x1b\x1b"))
 }
@@ -200,7 +171,6 @@ mod tests {
         }
     }
 
-    /// Plays `track` until it settles.
     fn settle(notifier: &mut Notifier, track: &CurrentTrack, focused: bool) -> Option<String> {
         assert_eq!(notifier.update(Some(track), true, focused, None), None, "not before it settled");
         notifier.pending.as_mut().unwrap().1 -= SETTLE;

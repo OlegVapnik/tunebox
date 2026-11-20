@@ -1,5 +1,3 @@
-//! What plays, as the interface shows it: tunebox's own player as its events report it, or
-//! another of the account's devices as polls and pushes report it.
 
 use std::time::Duration;
 
@@ -11,19 +9,12 @@ use tunebox_core::{
 use crate::clock::Instant;
 use crate::queue::Queue;
 
-/// How long a change made in tunebox wins over reports the player sent before it got there.
 const ECHO_WINDOW: Duration = Duration::from_millis(1500);
-/// A reported position this close to a seek target confirms the seek.
 const SEEK_TOLERANCE_MS: u32 = 1000;
-/// Spirc reports nothing for a volume it already has, so a change counts as done after this.
 const VOLUME_TIMEOUT: Duration = Duration::from_secs(1);
-/// How long after Spotify accepted a remote command its state may still show the old values.
 const REMOTE_GRACE: Duration = Duration::from_secs(2);
-/// Both ends extrapolate remote positions, so they agree less closely than local ones.
 const REMOTE_SEEK_TOLERANCE_MS: u32 = 2000;
-/// Devices round volumes to their own steps.
 const REMOTE_VOLUME_TOLERANCE: u32 = 3;
-/// A track start that hasn't begun loading after this long has failed.
 pub const START_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -35,7 +26,6 @@ pub enum Repeat {
 }
 
 impl Repeat {
-    /// The Web API's "off", "context" or "track".
     pub fn from_remote(mode: &str) -> Self {
         match mode {
             "track" => Repeat::Track,
@@ -50,18 +40,12 @@ pub struct Cover {
     pub picture: crate::loader::Picture,
 }
 
-/// A track start that was asked for, or that the player announced, and hasn't begun playing.
 pub struct Pending {
-    /// The track that will play, once known.
     pub uri: Option<String>,
-    /// The track shown when the start was asked for; a skip is through once another one shows.
     from: Option<String>,
-    /// Next or previous rather than a new track or context.
     pub skip: bool,
     pub since: Instant,
-    /// The local player is loading it.
     loading: bool,
-    /// What was shown before the track was switched early, to put back if the start fails.
     previous: Option<Shown>,
 }
 
@@ -73,7 +57,6 @@ struct Shown {
     position_at: Instant,
 }
 
-/// What the local player is doing, as reported by its events.
 pub struct NowPlaying {
     pub track: Option<CurrentTrack>,
     pub playing: bool,
@@ -83,11 +66,8 @@ pub struct NowPlaying {
     pub repeat: Repeat,
     pub volume: u16,
     pub cover: Option<Cover>,
-    /// The other Spotify Connect device that is playing, if not tunebox itself.
     pub device: Option<String>,
-    /// A seek sent to the local player that it hasn't confirmed yet: target and when.
     seeking: Option<(u32, Instant)>,
-    /// A track on its way; the play button spins meanwhile.
     pub pending: Option<Pending>,
 }
 
@@ -108,10 +88,7 @@ impl NowPlaying {
         }
     }
 
-    /// Notes a track start sent to a player, until it plays. `uri` is the track that will
-    /// play, if known.
     pub fn start(&mut self, uri: Option<String>) {
-        // A start right after another one still waits to replace what played before both.
         let (from, previous) = match self.pending.take() {
             Some(pending) if !pending.loading => (pending.from, pending.previous),
             _ => (self.track.as_ref().map(|t| t.uri.clone()), None),
@@ -119,7 +96,6 @@ impl NowPlaying {
         self.pending = Some(Pending { uri, from, skip: false, since: Instant::now(), loading: false, previous });
     }
 
-    /// Notes a skip to the next or previous track sent to a player, until it plays.
     pub fn skip(&mut self) {
         self.start(None);
         if let Some(pending) = &mut self.pending {
@@ -127,8 +103,6 @@ impl NowPlaying {
         }
     }
 
-    /// Shows the track just asked for at once, before its audio has loaded. The one shown
-    /// before comes back if the start fails.
     pub fn show_early(&mut self, track: CurrentTrack) {
         let Some(pending) = &mut self.pending else { return };
         if pending.uri.as_deref() != Some(track.uri.as_str()) || self.track.as_ref().is_some_and(|t| t.uri == track.uri)
@@ -146,7 +120,6 @@ impl NowPlaying {
                 position_at: self.position_at,
             });
         }
-        // The old cover would sit next to the new title; the placeholder shows until the new one loads.
         self.cover = None;
         self.track = Some(track);
         self.seeking = None;
@@ -154,12 +127,10 @@ impl NowPlaying {
         self.set_position(0);
     }
 
-    /// Whether a start went nowhere: the local player never began loading it.
     pub fn start_failed(&self) -> bool {
         self.pending.as_ref().is_some_and(|p| !p.loading && p.since.elapsed() >= START_TIMEOUT)
     }
 
-    /// Gives up on a start, putting back what was shown before it.
     pub fn cancel_start(&mut self) {
         let Some(shown) = self.pending.take().and_then(|p| p.previous) else { return };
         self.track = Some(shown.track);
@@ -169,16 +140,10 @@ impl NowPlaying {
         self.position_at = shown.position_at;
     }
 
-    /// Whether a poll of another device predates the pending start, still showing the track
-    /// from before it. `waiting` says Spotify may still lag behind the commands sent. Ends the
-    /// start once a poll shows it through.
     pub fn awaits_remote(&mut self, playback: &Playback, waiting: bool) -> bool {
         let Some(pending) = &self.pending else { return false };
         let shown = playback.track.as_ref().map(|t| t.uri.as_str());
         let through = shown != pending.from.as_deref() || (pending.uri.is_some() && shown == pending.uri.as_deref());
-        // A device may take a while to load a picked track. Skips and contexts may not change
-        // the track at all (the end of a playlist, a context starting with the track already
-        // playing), so they wait only as long as Spotify may lag behind.
         let gave_up = if pending.uri.is_some() { pending.since.elapsed() >= START_TIMEOUT } else { !waiting };
         if through || gave_up {
             self.pending = None;
@@ -198,23 +163,17 @@ impl NowPlaying {
         self.position_at = Instant::now();
     }
 
-    /// Starts or stops the clock where it stands, so pausing doesn't jump.
     pub fn set_playing(&mut self, playing: bool) {
         self.set_position(self.position_ms());
         self.playing = playing;
     }
 
-    /// Moves to `position_ms` at once for a seek sent to the local player. The player confirms
-    /// only after decoding there, which can wait for a download.
     pub fn seek(&mut self, position_ms: u32) {
         self.set_position(position_ms);
         self.seeking = Some((position_ms, Instant::now()));
     }
 
-    /// Takes a position the local player reported, unless it predates the last seek: the
-    /// player reports positions it had before the seek, which would make the bar jump back.
     fn report_position(&mut self, position_ms: u32) {
-        // Until the player loads a track shown early, its reports are about the old one.
         if self.pending.as_ref().is_some_and(|p| p.previous.is_some() && !p.loading) {
             return;
         }
@@ -227,7 +186,6 @@ impl NowPlaying {
         self.set_position(position_ms);
     }
 
-    /// Shows the track from the last session, paused where it was left.
     pub fn restore(&mut self, last: &crate::state::LastTrack) {
         self.track = Some(CurrentTrack {
             uri: last.uri.clone(),
@@ -244,9 +202,6 @@ impl NowPlaying {
         self.set_position(last.position_ms);
     }
 
-    /// Mirrors playback on another device, keeping the changes in `intent` that the poll
-    /// doesn't show yet. Returns a cover URL when the track changed, and whether some change
-    /// is still unconfirmed.
     pub fn apply_remote(&mut self, playback: &Playback, intent: &mut RemoteIntent) -> (Option<String>, bool) {
         let same_track = self.track.as_ref().map(|t| t.uri.as_str()) == playback.track.as_ref().map(|t| t.uri.as_str());
         let shown_ms = self.position_ms();
@@ -268,7 +223,6 @@ impl NowPlaying {
             self.track = None;
             return None;
         };
-        // A track shown early lacks the details only the device's state has, like its cover.
         if self.track.as_ref().is_some_and(|t| t.uri == remote.uri && t.cover_url == remote.cover_url) {
             return None;
         }
@@ -287,11 +241,9 @@ impl NowPlaying {
         changed.then(|| remote.cover_url.clone()).flatten()
     }
 
-    /// Applies a player event. Returns a cover URL when the new track needs its art loaded.
     pub fn apply(&mut self, event: PlayerEvent) -> Option<String> {
         match event {
             PlayerEvent::Loading { uri, position_ms } => {
-                // Also covers skips from the phone and next tracks that weren't preloaded.
                 if self.pending.is_none() {
                     self.start(None);
                 }
@@ -299,7 +251,6 @@ impl NowPlaying {
                     pending.uri = Some(uri.clone());
                     pending.loading = true;
                 }
-                // The old track's audio has stopped, so its clock does too.
                 self.set_playing(false);
                 if self.track.as_ref().is_some_and(|t| t.uri == uri) {
                     self.report_position(position_ms);
@@ -317,7 +268,6 @@ impl NowPlaying {
             }
             PlayerEvent::Playing { position_ms } => {
                 self.pending = None;
-                // Freeze first, so a report from before a seek leaves the shown position put.
                 self.set_playing(false);
                 self.report_position(position_ms);
                 self.playing = true;
@@ -332,7 +282,6 @@ impl NowPlaying {
                 self.playing = false;
             }
             PlayerEvent::Seeked { position_ms } => {
-                // "Previous" restarts the track instead when it has played for a while.
                 if self.pending.as_ref().is_some_and(|p| p.skip && !p.loading) {
                     self.pending = None;
                 }
@@ -356,31 +305,22 @@ impl NowPlaying {
     }
 }
 
-/// Volume changes for tunebox's own device. Spirc follows every command with a network round
-/// trip, so a drag or a held key would queue dozens of changes and report each one back
-/// afterwards, dragging the slider through old values. Only one change is on its way at a
-/// time, newer ones replace the waiting one, and reports of values in between are hidden.
 #[derive(Default)]
 pub struct VolumeSync {
-    /// The volume asked for last, until the player reports it.
     target: Option<u16>,
-    /// The volume sent to the player and not reported back yet, and when it was sent.
     sent: Option<(u16, Instant)>,
 }
 
 impl VolumeSync {
-    /// Asks for `volume`. Returns it when it should be sent to the player now.
     pub fn request(&mut self, volume: u16) -> Option<u16> {
         self.target = Some(volume);
         self.next()
     }
 
-    /// Keeps `volume` for when tunebox's device becomes active; Spirc ignores it until then.
     pub fn defer(&mut self, volume: u16) {
         self.target = Some(volume);
     }
 
-    /// The volume to send now: the wanted one, unless another one is still on its way.
     pub fn next(&mut self) -> Option<u16> {
         if self.sent.is_some() {
             return None;
@@ -390,14 +330,11 @@ impl VolumeSync {
         Some(target)
     }
 
-    /// Handles the player reporting `volume`. Returns whether the slider should show it, and
-    /// a volume to send next.
     pub fn reported(&mut self, volume: u16) -> (bool, Option<u16>) {
         if self.sent.is_some_and(|(sent, at)| sent == volume || at.elapsed() >= VOLUME_TIMEOUT) {
             self.sent = None;
         }
         match self.target {
-            // Changed elsewhere, e.g. from the phone.
             None => (true, None),
             Some(target) if target == volume && self.sent.is_none() => {
                 self.target = None;
@@ -407,7 +344,6 @@ impl VolumeSync {
         }
     }
 
-    /// Gives up waiting for a report that doesn't come. Returns a volume to send next.
     pub fn expire(&mut self) -> Option<u16> {
         let (sent, at) = self.sent?;
         if at.elapsed() < VOLUME_TIMEOUT {
@@ -421,18 +357,13 @@ impl VolumeSync {
     }
 }
 
-/// Controls changed in tunebox for another device. Spotify's state lags behind the commands it
-/// accepts, so until a poll shows a new value, polls that still show the old one don't undo
-/// it on screen.
 #[derive(Default)]
 pub struct RemoteIntent {
     pub playing: Option<bool>,
     pub shuffle: Option<bool>,
     pub repeat: Option<Repeat>,
     pub volume: Option<u16>,
-    /// Seek target and when it was asked for.
     pub seek: Option<(u32, Instant)>,
-    /// Commands sent and not answered yet.
     in_flight: usize,
     answered_at: Option<Instant>,
 }
@@ -442,7 +373,6 @@ impl RemoteIntent {
         self.in_flight += 1;
     }
 
-    /// Spotify answered `commands` commands. After a failure the next poll shows the truth.
     pub fn answered(&mut self, commands: usize, ok: bool) {
         self.in_flight = self.in_flight.saturating_sub(commands);
         self.answered_at = Some(Instant::now());
@@ -451,7 +381,6 @@ impl RemoteIntent {
         }
     }
 
-    /// Whether Spotify's state may still lag behind the commands sent.
     pub fn is_waiting(&self) -> bool {
         self.in_flight > 0 || self.answered_at.is_some_and(|at| at.elapsed() < REMOTE_GRACE)
     }
@@ -460,9 +389,6 @@ impl RemoteIntent {
         *self = Self { in_flight: self.in_flight, answered_at: self.answered_at, ..Self::default() };
     }
 
-    /// Puts back what was asked for where a poll, already applied to `now`, doesn't show it
-    /// yet, and forgets what the poll confirms. `shown_ms` is the position shown before the
-    /// poll, if it is still the same track. Returns whether something is still unconfirmed.
     fn reconcile(&mut self, now: &mut NowPlaying, playback: &Playback, shown_ms: Option<u32>) -> bool {
         if !self.is_waiting() {
             self.forget();
@@ -485,7 +411,6 @@ impl RemoteIntent {
                 keep_position = true;
             }
         }
-        // A new track brings its own position.
         if let Some(position_ms) = shown_ms.filter(|_| keep_position) {
             now.set_position(position_ms);
         }
@@ -507,7 +432,6 @@ impl RemoteIntent {
             let wanted = volume as u32 * 100 / u16::MAX as u32;
             match playback.device.volume_percent {
                 Some(percent) if percent.abs_diff(wanted) > REMOTE_VOLUME_TOLERANCE => now.volume = volume,
-                // Confirmed, or a device without volume control.
                 _ => self.volume = None,
             }
         }
@@ -519,23 +443,16 @@ impl RemoteIntent {
     }
 }
 
-/// What Spotify pushed about the device that plays.
 #[derive(Debug, Clone)]
 pub struct ConnectPush {
-    /// Empty when no device is active.
     pub active_device: String,
     pub track: String,
-    /// The playlist, album or artist it plays from, or empty.
     pub context: String,
     pub playing: bool,
-    /// What plays next there.
     pub queue: Queue,
 }
 
 impl ConnectPush {
-    /// Whether a poll would learn something new. tunebox's own player reports its changes
-    /// itself, except for what it plays from when another app started it; with nothing
-    /// playing anywhere, there is only news if another device was playing.
     pub fn worth_polling(&self, own_device: Option<&str>, remote_active: bool, context: Option<&str>) -> bool {
         let here = own_device == Some(self.active_device.as_str());
         let elsewhere = !here && !self.active_device.is_empty();
@@ -543,7 +460,6 @@ impl ConnectPush {
         elsewhere || new_context || remote_active
     }
 
-    /// Whether a poll of the same device still shows the state from before this push.
     pub fn is_ahead_of(&self, playback: &Playback) -> bool {
         let other_track = !self.track.is_empty() && playback.track.as_ref().is_some_and(|t| t.uri != self.track);
         self.active_device == playback.device.id && (self.playing != playback.playing || other_track)
@@ -570,7 +486,6 @@ mod tests {
         }
     }
 
-    /// A paused track, so positions don't move while a test runs.
     fn paused_track() -> NowPlaying {
         let mut now = NowPlaying::new();
         now.track = Some(track(URI));
@@ -585,7 +500,6 @@ mod tests {
         PlayerEvent::PositionChanged { position_ms }
     }
 
-    /// A poll of another device playing `uri`.
     fn poll(uri: &str, playing: bool, progress_ms: u32) -> Playback {
         use tunebox_core::connect::{Device, PlayingTrack};
         Playback {
@@ -615,7 +529,6 @@ mod tests {
         }
     }
 
-    /// Shows another device paused at `progress_ms`.
     fn remote_track(progress_ms: u32) -> (NowPlaying, RemoteIntent) {
         let (mut now, mut intent) = (NowPlaying::new(), RemoteIntent::default());
         now.apply_remote(&poll(URI, false, progress_ms), &mut intent);
@@ -631,7 +544,6 @@ mod tests {
         assert_eq!(now.position_ms(), 60_000);
         now.apply(seeked(60_200));
         assert_eq!(now.position_ms(), 60_200);
-        // Confirmed: the player's reports count again.
         now.apply(position_changed(10_000));
         assert_eq!(now.position_ms(), 10_000);
     }
@@ -672,10 +584,8 @@ mod tests {
         assert_eq!(sync.request(100), Some(100));
         assert_eq!(sync.request(200), None);
         assert_eq!(sync.request(300), None);
-        // The first one arrives: hide it and send the newest wish.
         assert_eq!(sync.reported(100), (false, Some(300)));
         assert_eq!(sync.reported(300), (true, None));
-        // Nothing pending: changes from elsewhere show.
         assert_eq!(sync.reported(5_000), (true, None));
     }
 
@@ -705,7 +615,6 @@ mod tests {
         let mut sync = VolumeSync::default();
         sync.defer(900);
         assert_eq!(sync.next(), Some(900));
-        // Activation reports the old volume first.
         assert_eq!(sync.reported(500), (false, None));
         assert_eq!(sync.reported(900), (true, None));
     }
@@ -716,7 +625,6 @@ mod tests {
         now.set_playing(true);
         intent.playing = Some(true);
         intent.sent();
-        // Spotify still shows the device paused, a little further along.
         assert!(now.apply_remote(&poll(URI, false, 12_000), &mut intent).1);
         assert!(now.playing);
         assert!((10_000..10_500).contains(&now.position_ms()));
@@ -865,7 +773,6 @@ mod tests {
         assert!(now.awaits_remote(&poll(URI, true, 12_000), false));
         assert!(!now.awaits_remote(&poll(OTHER, true, 300), false));
         assert!(now.pending.is_none());
-        // The device's state fills in what the early track lacked.
         let mut full = poll(OTHER, true, 300);
         full.track.as_mut().unwrap().cover_url = Some("https://i.scdn.co/image/cover".into());
         let (cover, _) = now.apply_remote(&full, &mut RemoteIntent::default());
@@ -880,9 +787,7 @@ mod tests {
         let third = "spotify:track:1111111111111111111111";
         now.start(Some(third.into()));
         now.show_early(track(third));
-        // The device still plays the first track: not through yet.
         assert!(now.awaits_remote(&poll(URI, true, 11_000), true));
-        // If it fails, the track from before both comes back.
         now.cancel_start();
         assert_eq!(now.track.as_ref().unwrap().uri, URI);
     }
@@ -911,11 +816,8 @@ mod tests {
         let own = Some("tunebox");
         let context = Some("spotify:playlist:abc");
         assert!(push("phone", URI, true).worth_polling(own, false, context));
-        // tunebox's own player reports its own changes…
         assert!(!push("tunebox", URI, true).worth_polling(own, false, context));
-        // …but not what another app started it on.
         assert!(push("tunebox", URI, true).worth_polling(own, false, Some("spotify:album:xyz")));
-        // Nothing plays anywhere: news only if another device was playing.
         assert!(!push("", "", false).worth_polling(own, false, context));
         assert!(push("", "", false).worth_polling(own, true, context));
     }
@@ -927,7 +829,6 @@ mod tests {
         assert!(!push("phone", URI, true).is_ahead_of(&remote));
         assert!(push("phone", URI, false).is_ahead_of(&remote));
         assert!(push("phone", OTHER, true).is_ahead_of(&remote));
-        // About another device, or without a track: nothing to compare.
         assert!(!push("speaker", OTHER, false).is_ahead_of(&remote));
         assert!(!push("phone", "", true).is_ahead_of(&remote));
     }

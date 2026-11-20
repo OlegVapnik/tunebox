@@ -1,16 +1,12 @@
-//! Cookies in the Netscape `cookies.txt` format, as yt-dlp exports them from a browser. The
-//! sign-in is kept in that format too, so an export can be used as it is.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cookie {
-    /// With a leading dot when it also applies to subdomains, as browsers write it.
     pub domain: String,
     pub path: String,
     pub secure: bool,
     pub http_only: bool,
-    /// Seconds since the epoch; 0 for a cookie that only lasts the session.
     pub expires: u64,
     pub name: String,
     pub value: String,
@@ -33,7 +29,6 @@ pub struct Jar {
 }
 
 impl Jar {
-    /// Reads a `cookies.txt`. Lines it doesn't understand are skipped.
     pub fn parse(text: &str) -> Self {
         let cookies = text
             .lines()
@@ -59,7 +54,6 @@ impl Jar {
         Self { cookies }
     }
 
-    /// A `Cookie:` header as copied from the browser's developer tools, for youtube.com.
     pub fn from_header(header: &str) -> Self {
         let header = header.trim();
         let header = header.strip_prefix("Cookie:").or_else(|| header.strip_prefix("cookie:")).unwrap_or(header);
@@ -81,7 +75,6 @@ impl Jar {
         Self { cookies }
     }
 
-    /// The file as yt-dlp would write it.
     pub fn to_text(&self) -> String {
         let mut text = String::from("# Netscape HTTP Cookie File\n# Written by tunebox. Keep this file private.\n\n");
         for c in &self.cookies {
@@ -96,7 +89,6 @@ impl Jar {
         text
     }
 
-    /// Only the cookies youtube.com gets; an export from a browser has every site's.
     pub fn youtube_only(self) -> Self {
         Self { cookies: self.cookies.into_iter().filter(|c| c.matches("music.youtube.com")).collect() }
     }
@@ -105,7 +97,6 @@ impl Jar {
         self.cookies.is_empty()
     }
 
-    /// The value of a cookie that youtube.com gets.
     pub fn get(&self, name: &str) -> Option<&str> {
         let now = now();
         self.cookies
@@ -114,7 +105,6 @@ impl Jar {
             .map(|c| c.value.as_str())
     }
 
-    /// The `Cookie` header for requests to `host`.
     pub fn header(&self, host: &str) -> String {
         let now = now();
         self.cookies
@@ -125,7 +115,6 @@ impl Jar {
             .join("; ")
     }
 
-    /// Applies a `Set-Cookie` header that came from `host`. Returns whether anything changed.
     pub fn update(&mut self, host: &str, set_cookie: &str) -> bool {
         let mut parts = set_cookie.split(';');
         let Some((name, value)) = parts.next().and_then(|pair| pair.split_once('=')) else { return false };
@@ -179,7 +168,6 @@ fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-/// Parses dates like `Wed, 27-Oct-2027 19:00:00 GMT` or `Wed, 27 Oct 2027 19:00:00 GMT`.
 fn parse_http_date(text: &str) -> Option<u64> {
     const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
     let (mut day, mut month, mut year, mut time) = (None, None, None, None);
@@ -197,7 +185,6 @@ fn parse_http_date(text: &str) -> Option<u64> {
     Some(days_from_civil(year?, month?, day?) * 86_400 + h * 3600 + m * 60 + s)
 }
 
-/// Days since 1970-01-01 of a date in the Gregorian calendar (Howard Hinnant's algorithm).
 pub(crate) fn days_from_civil(year: u64, month: u64, day: u64) -> u64 {
     let year = if month <= 2 { year - 1 } else { year };
     let era = year / 400;
@@ -207,7 +194,6 @@ pub(crate) fn days_from_civil(year: u64, month: u64, day: u64) -> u64 {
     era * 146_097 + day_of_era - 719_468
 }
 
-/// The date `days` after 1970-01-01, as (year, month, day).
 pub(crate) fn civil_from_days(days: u64) -> (u64, u64, u64) {
     let z = days + 719_468;
     let era = z / 146_097;

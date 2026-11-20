@@ -1,8 +1,3 @@
-//! SoundCloud for tunebox: its public API for browsing and search, the `oauth_token` cookie
-//! for the library and likes, and mpv for playback.
-//!
-//! SoundCloud's API needs a `client_id`, which its web player embeds in its JavaScript. It is
-//! fetched from there, kept in the cache and refreshed when it stops working, as yt-dlp does.
 
 pub mod browser;
 pub mod doctor;
@@ -34,27 +29,18 @@ use tunebox_core::{
 pub use self::{player::Player, source::SoundCloudSource};
 
 const API: &str = "https://api-v2.soundcloud.com";
-/// The page and the API request at most this many songs at a time.
 const PAGE: u32 = 50;
-/// How long a `client_id` is used before the site is asked for a new one.
 const CLIENT_ID_AGE: Duration = Duration::from_secs(6 * 60 * 60);
-/// Enough for a long listening history, and then some.
 const MAX_LIKES: usize = 5_000;
-/// Browsing and playback ask for the same track minutes apart; keep its profile this long.
 const RESOLVED_TTL: Duration = Duration::from_secs(30);
 
-/// What `tracks` lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
-    /// The tracks the user liked.
     Liked,
-    /// A playlist, by its `soundcloud:playlist:…` URI.
     Playlist(String),
-    /// A playlist SoundCloud calls an album.
     Album(String),
 }
 
-/// The SoundCloud client. Cheap to clone; clones share the client ID and the sign-in.
 #[derive(Clone)]
 pub struct SoundCloud {
     inner: Arc<Inner>,
@@ -66,15 +52,11 @@ struct Inner {
     client_id: Mutex<Option<String>>,
     client_id_file: PathBuf,
     liked: Mutex<Option<HashSet<String>>>,
-    /// Tracks resolved while browsing, reused by the stream and context lookups on play.
     resolved: Mutex<HashMap<String, (Value, Instant)>>,
-    /// Whether SoundCloud has refused the sign-in, so requests go out without it.
     expired: AtomicBool,
 }
 
 impl SoundCloud {
-    /// Reads the sign-in from `tunebox login soundcloud`, if there is one; browsing and
-    /// playing work signed out.
     pub fn new(paths: &Paths) -> Result<Self> {
         let token = match paths.soundcloud_token().read()? {
             Some(bytes) => Some(String::from_utf8(bytes).context("Stored SoundCloud sign-in corrupted")?),
@@ -102,8 +84,6 @@ impl SoundCloud {
         self.inner.token.is_some() && !self.expired()
     }
 
-    /// Whether a saved sign-in is there but SoundCloud won't take it any more, which asks for
-    /// `tunebox login soundcloud` again.
     pub fn sign_in_expired(&self) -> bool {
         self.inner.token.is_some() && self.expired()
     }
@@ -112,12 +92,10 @@ impl SoundCloud {
         self.inner.expired.load(Ordering::Relaxed)
     }
 
-    /// The sign-in to put on a request; nothing once SoundCloud has refused it.
     fn bearer(&self) -> Option<&str> {
         self.signed_in().then(|| self.inner.token.as_deref()).flatten()
     }
 
-    /// Checks an `oauth_token` cookie and saves it when SoundCloud accepts it.
     pub async fn login_with_token(paths: &Paths, token: String) -> Result<User> {
         let token = token.trim().to_owned();
         if token.is_empty() {
@@ -129,7 +107,6 @@ impl SoundCloud {
         Ok(me)
     }
 
-    /// The account, for a signed-in client.
     pub async fn me(&self) -> Result<Option<User>> {
         if !self.signed_in() {
             return Ok(None);
@@ -143,17 +120,12 @@ impl SoundCloud {
         Ok((me.id.clone(), me))
     }
 
-    /// What to try after SoundCloud refused a request, or nothing when it is no use asking
-    /// again: first a new client ID, then no sign-in at all.
     fn refused(&self, attempt: u32, status: u16) -> Option<u32> {
         if !matches!(status, 401 | 403) {
             return None;
         }
         match attempt {
-            // A client ID that has gone stale is the usual reason for a refusal.
             0 => Some(1),
-            // …and when a new one doesn't help, it is the sign-in SoundCloud won't take, so
-            // the public API is asked without it: browsing and playing keep working.
             1 if self.inner.token.is_some() && !self.expired() => {
                 self.inner.expired.store(true, Ordering::Relaxed);
                 Some(2)
@@ -164,8 +136,6 @@ impl SoundCloud {
 
     pub async fn home(&self, _chip: Option<&str>) -> Result<Home> {
         let mut shelves = Vec::new();
-        // The charts endpoint is the first thing SoundCloud breaks; a search for what is popular
-        // fills the same shelf when it does.
         let trending = match self.trending().await {
             Ok(tracks) if !tracks.is_empty() => Ok(tracks),
             _ => self.search_tracks("popular", 30).await,
@@ -227,7 +197,6 @@ impl SoundCloud {
         Ok(collection(&value).filter_map(|item| item.get("track").and_then(track).or_else(|| track(item))).collect())
     }
 
-    /// The user's own playlists. Signed out, none.
     pub async fn playlists(&self) -> Result<Vec<PlaylistInfo>> {
         if !self.signed_in() {
             return Ok(Vec::new());
@@ -310,8 +279,6 @@ impl SoundCloud {
         })
     }
 
-    /// What a page is: `track`, `playlist`, `user`; and whether a playlist SoundCloud calls
-    /// an album.
     pub async fn kind(&self, path: &str) -> Result<(String, bool)> {
         let value = self.resolve(&format!("https://soundcloud.com/{path}")).await?;
         Ok((value["kind"].as_str().unwrap_or_default().to_owned(), value["is_album"].as_bool().unwrap_or(false)))
@@ -325,14 +292,12 @@ impl SoundCloud {
         album(&self.resolve(uri).await?).ok_or_else(|| anyhow!("SoundCloud album not found"))
     }
 
-    /// Every song of a context, in order.
     pub async fn tracks(&self, source: Source) -> Result<Vec<Track>> {
         match source {
             Source::Liked => self.liked_tracks().await,
             Source::Playlist(uri) | Source::Album(uri) => {
                 let value = self.resolve(&uri).await?;
                 let mut tracks = self.playlist_tracks(&value).await?;
-                // A track's list is its radio, which playback asks for separately.
                 if tracks.is_empty() && value["kind"].as_str() == Some("track") {
                     tracks.extend(track(&value));
                 }
@@ -341,7 +306,6 @@ impl SoundCloud {
         }
     }
 
-    /// A context's songs in pages, for the interface.
     pub async fn pages(&self, source: Source) -> Result<Vec<Page<Track>>> {
         let tracks = self.tracks(source).await?;
         let total = tracks.len() as u32;
@@ -376,7 +340,6 @@ impl SoundCloud {
         Ok(tracks)
     }
 
-    /// Which of `uris` the user liked. Only tracks can be liked; signed out, nothing is.
     pub async fn check_saved(&self, uris: &[String]) -> Result<Vec<(String, bool)>> {
         if !self.signed_in() {
             return Ok(uris.iter().map(|uri| (uri.clone(), false)).collect());
@@ -398,7 +361,6 @@ impl SoundCloud {
         Ok(())
     }
 
-    /// SoundCloud can't add to someone else's playlist through the API tunebox uses.
     pub async fn add_to_playlist(&self, _playlist: &str, _uris: &[String]) -> Result<()> {
         bail!("SoundCloud doesn't let tunebox change its playlists")
     }
@@ -407,7 +369,6 @@ impl SoundCloud {
         tunebox_core::lyrics::lrclib(&self.inner.http, query).await
     }
 
-    /// A playable URL for a track page, trying the progressive stream first and HLS after.
     pub async fn stream_url(&self, path: &str) -> Result<String> {
         let value = self.resolve(&format!("https://soundcloud.com/{path}")).await?;
         if !value["streamable"].as_bool().unwrap_or(true) {
@@ -419,9 +380,6 @@ impl SoundCloud {
             .context("SoundCloud has no stream for this track")?;
         let authorization = value["track_authorization"].as_str().unwrap_or_default().to_owned();
         let client_id = self.client_id(false).await?;
-        // Progressive plays anywhere; HLS needs mpv's manifest support. Within each, best
-        // quality first. SoundCloud's abr_sq stream is sometimes refused, so each is tried
-        // in turn rather than only the preferred one.
         let mut chosen: Vec<&Value> =
             transcodings.iter().filter(|item| item["snipped"].as_bool() != Some(true)).collect();
         chosen.sort_by(|a, b| {
@@ -449,7 +407,6 @@ impl SoundCloud {
         Err(last_err.unwrap_or_else(|| anyhow!("SoundCloud has no stream for this track")))
     }
 
-    /// Songs SoundCloud plays after this one.
     pub async fn related(&self, path: &str) -> Result<Vec<Track>> {
         let value = self.resolve(&format!("https://soundcloud.com/{path}")).await?;
         let id = value["id"].as_u64().ok_or_else(|| anyhow!("SoundCloud track without an ID"))?;
@@ -519,7 +476,6 @@ impl SoundCloud {
         Ok(liked)
     }
 
-    /// The public API, with the client ID SoundCloud's site uses.
     async fn get(&self, path: &str, query: &[(&str, &str)]) -> Result<Value> {
         self.request(reqwest::Method::GET, path, query, None).await
     }
@@ -591,8 +547,6 @@ impl SoundCloud {
         } else {
             bail!("Not a SoundCloud link: {uri}");
         };
-        // The same track is resolved when it is shown, when it starts, and when its context is
-        // rebuilt. Browsing and playback share this client, so one answer serves all three.
         if let Some((value, at)) = self.inner.resolved.lock().await.get(&page)
             && at.elapsed() < RESOLVED_TTL
         {
@@ -603,7 +557,6 @@ impl SoundCloud {
         Ok(value)
     }
 
-    /// A `client_id` from the cache, the environment, or the site's JavaScript.
     async fn client_id(&self, refresh: bool) -> Result<String> {
         if !refresh {
             if let Some(id) = self.inner.client_id.lock().await.clone() {
@@ -700,7 +653,6 @@ fn first_line(text: &str) -> String {
     text.lines().find(|line| !line.trim().is_empty()).unwrap_or_default().trim().to_owned()
 }
 
-/// The path of a SoundCloud URI or page: `artist/song`, `artist/sets/playlist`, `artist`.
 pub fn uri_path(uri: &str) -> Option<&str> {
     let path = if let Some(rest) = uri.strip_prefix("soundcloud:") {
         match rest.split_once(':') {
@@ -813,7 +765,6 @@ fn song_item(track: &Track) -> HomeItem {
         image_url: track.image_url.clone(),
         owner_id: String::new(),
         owner_name: String::new(),
-        // A song plays with its radio after it, as in SoundCloud's own app.
         context_uri: track.uri.clone(),
     }
 }
@@ -823,9 +774,6 @@ fn songs_context(tracks: &[Track]) -> String {
     format!("soundcloud:songs:{}", paths.join(","))
 }
 
-/// The artwork a track or playlist has. SoundCloud often leaves a playlist's own
-/// `artwork_url` empty and shows the first track's cover instead; if even that is
-/// missing, the uploader's avatar is the last resort.
 fn artwork_url(value: &serde_json::Value) -> Option<String> {
     value["artwork_url"]
         .as_str()
@@ -834,12 +782,10 @@ fn artwork_url(value: &serde_json::Value) -> Option<String> {
         .map(artwork)
 }
 
-/// Asks for a bigger cover than the one lists show.
 fn artwork(url: &str) -> String {
     url.replace("-large.", "-t500x500.").replace("-badge.", "-t500x500.")
 }
 
-/// The page's scripts, from its HTML.
 fn script_urls(page: &str) -> Vec<String> {
     let mut urls = Vec::new();
     let mut rest = page;
@@ -859,7 +805,6 @@ fn script_urls(page: &str) -> Vec<String> {
     urls
 }
 
-/// The `client_id` in a JavaScript asset, as in `client_id:"0123…"`.
 fn client_id_in(script: &str) -> Option<String> {
     let mut rest = script;
     while let Some(start) = rest.find("client_id") {

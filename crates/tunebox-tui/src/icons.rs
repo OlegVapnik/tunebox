@@ -1,12 +1,6 @@
-//! Icons: Nerd Font glyphs where the terminal ships them, plain symbols otherwise.
-//!
-//! Symbols missing from the user's font get pulled from fallback fonts and stretched to the
-//! cell, which looks off. Nerd Font glyphs are made for terminal cells, and Ghostty, kitty and
-//! WezTerm bundle them.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Not every glyph is used by every build, and some only by the plain-text set.
 #[allow(dead_code)]
 pub struct Icons {
     pub home: &'static str,
@@ -20,9 +14,7 @@ pub struct Icons {
     pub repeat: &'static str,
     pub repeat_one: &'static str,
     pub volume: &'static str,
-    /// In the library (Spotify's check circle).
     pub saved: &'static str,
-    /// Add to the library.
     pub save: &'static str,
     pub note: &'static str,
     pub playlist: &'static str,
@@ -31,14 +23,11 @@ pub struct Icons {
     pub podcast: &'static str,
     pub audiobook: &'static str,
     pub queue: &'static str,
-    /// Take out of the queue.
     pub remove: &'static str,
     pub open: &'static str,
     pub link: &'static str,
     pub more: &'static str,
-    /// Open the library as a full page.
     pub expand: &'static str,
-    /// Page a shelf sideways.
     pub chevron_left: &'static str,
     pub chevron_right: &'static str,
     pub speaker: &'static str,
@@ -47,17 +36,12 @@ pub struct Icons {
     pub tablet: &'static str,
     pub tv: &'static str,
     pub cast: &'static str,
-    /// Moves DJ on to different picks.
     pub dj: &'static str,
-    /// A newer tunebox to install.
     pub update: &'static str,
-    /// Start the installed update.
     pub restart: &'static str,
-    /// The music services, in the switch between them; none in plain text.
     pub spotify: &'static str,
     pub youtube: &'static str,
     pub soundcloud: &'static str,
-    /// The settings page.
     pub settings: &'static str,
 }
 
@@ -149,8 +133,6 @@ const TEXT: Icons = Icons {
 
 static NERD_ICONS: AtomicBool = AtomicBool::new(false);
 
-/// Picks the icon set: `"nerd"` or `"text"` from the settings, else by terminal. Called again
-/// when the setting changes; the next frame draws with the new set.
 pub fn init(setting: Option<&str>) {
     let nerd = match setting {
         Some("nerd") => true,
@@ -171,7 +153,6 @@ fn terminal_bundles_nerd_font() -> bool {
         || std::env::var_os("KITTY_WINDOW_ID").is_some()
 }
 
-/// The icon of a music service, empty without Nerd Font glyphs.
 pub fn service(service: tunebox_core::service::Service) -> &'static str {
     match service {
         tunebox_core::service::Service::Spotify => icons().spotify,
@@ -180,7 +161,6 @@ pub fn service(service: tunebox_core::service::Service) -> &'static str {
     }
 }
 
-/// The icon for a Spotify Connect device type.
 pub fn device(kind: &str) -> &'static str {
     let icons = icons();
     match kind {

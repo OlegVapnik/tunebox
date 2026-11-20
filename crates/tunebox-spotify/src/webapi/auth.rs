@@ -4,20 +4,13 @@ use anyhow::{Context, Result, bail};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-/// Spotify's web player hands out a Web API token for the account behind an `sp_dc` cookie.
-/// The token belongs to Spotify's own app, so it isn't subject to the "premium owner" rule
-/// that blocks tokens from a user-created developer app.
 const WEB_TOKEN_URL: &str = "https://open.spotify.com/get_access_token?reason=transport&productType=web-player";
-/// Spotify's web player identifies as a browser; a bare reqwest client gets turned away.
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
     pub access_token: String,
-    /// Unix seconds.
     pub expires_at: u64,
-    /// Hash of the cookie this token came from. A changed cookie (or an old OAuth token,
-    /// which has no hash) invalidates the cache.
     #[serde(default)]
     pub cookie_hash: u64,
 }
@@ -36,9 +29,6 @@ struct WebToken {
     expires_at_ms: u64,
 }
 
-/// Exchanges the `sp_dc` cookie for a short-lived Web API access token. Spotify's web player
-/// used to do this through `get_access_token`; when that endpoint refuses the request, try to
-/// read the session token from the rendered home page instead.
 pub(super) async fn access_token(http: &Client, sp_dc: &str) -> Result<Token> {
     check_cookie(sp_dc)?;
     let response = http
@@ -66,9 +56,6 @@ pub(super) async fn access_token(http: &Client, sp_dc: &str) -> Result<Token> {
     })
 }
 
-/// Looks for an access token in the session JSON the web page may embed. Older builds rendered
-/// `<script id="session" type="application/json">`; the current one fetches its token from
-/// JavaScript instead, so a missing token is reported as such rather than guessed.
 async fn ssr_token(http: &Client, sp_dc: &str) -> Result<Token> {
     let html = http
         .get("https://open.spotify.com/")
@@ -128,7 +115,6 @@ fn find_u64(value: &serde_json::Value, key: &str) -> Option<u64> {
     }
 }
 
-/// Stable hash used only to notice a changed cookie; not a security measure.
 pub(super) fn cookie_hash(sp_dc: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -177,7 +163,6 @@ mod tests {
 
     #[test]
     fn an_empty_cookie_is_reported_before_a_request() {
-        // The error is deterministic and doesn't touch the network.
         assert!(check_cookie("  ").is_err());
         assert!(check_cookie("real-cookie").is_ok());
     }

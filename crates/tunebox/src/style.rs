@@ -1,4 +1,3 @@
-//! Minimal ANSI styling for the CLI commands; plain text when piped or with `NO_COLOR`.
 
 use std::{io::IsTerminal, sync::LazyLock};
 

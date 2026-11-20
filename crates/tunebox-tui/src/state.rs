@@ -1,5 +1,3 @@
-//! What tunebox remembers between runs: each service's open page and selection, which service
-//! shows, and the last track.
 
 use std::{collections::BTreeMap, fs, io, path::Path};
 
@@ -10,37 +8,27 @@ use crate::app::LibraryFilter;
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct State {
-    /// The page of the service shown, where files from before YouTube Music kept Spotify's.
     #[serde(flatten)]
     pub page: Page,
-    /// The service shown, by key; missing in files from before YouTube Music.
     pub service: Option<String>,
-    /// The pages of the other services, by key.
     pub pages: BTreeMap<String, Page>,
     pub last_track: Option<LastTrack>,
     pub volume: Option<u16>,
-    /// Only in files from before settings moved to `config.toml`.
     pub crossfade: Option<u64>,
     pub usage: Usage,
 }
 
-/// Days of use after which tunebox asks for a star on GitHub, once.
 pub const STAR_AFTER_DAYS: u32 = 2;
 
-/// On how many days tunebox was used, to ask for a star on GitHub once it's clearly in use.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Usage {
-    /// Days tunebox was started on.
     pub days: u32,
-    /// The last of them, in days since 1970 (UTC).
     pub last_day: u64,
-    /// The star was asked for. Whatever the answer, it isn't asked again.
     pub star_asked: bool,
 }
 
 impl Usage {
-    /// Counts a start on `today`; several starts on one day are one day of use.
     pub fn start(&mut self, today: u64) {
         if today != self.last_day {
             self.days += 1;
@@ -48,18 +36,15 @@ impl Usage {
         }
     }
 
-    /// Whether to ask for a star now.
     pub fn wants_star(&self) -> bool {
         !self.star_asked && self.days >= STAR_AFTER_DAYS
     }
 }
 
-/// Today, in days since 1970 (UTC).
 pub fn today() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() / 86_400)
 }
 
-/// Where a service's pages were left: the open one, and the sidebar.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Page {
@@ -106,7 +91,6 @@ pub enum SavedView {
 }
 
 impl SavedView {
-    /// The playlist, album or artist it shows.
     pub fn uri(&self) -> Option<&str> {
         match self {
             SavedView::Playlist { uri, .. } | SavedView::Album { uri, .. } | SavedView::Artist { uri, .. } => Some(uri),
@@ -115,7 +99,6 @@ impl SavedView {
     }
 }
 
-/// Cursor position within a view: a list index, or a shelf and card.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Selection {
@@ -124,7 +107,6 @@ pub struct Selection {
     pub item: usize,
 }
 
-/// The track to resume, with where it was and what it played in.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LastTrack {
     pub uri: String,
@@ -138,15 +120,12 @@ pub struct LastTrack {
     pub duration_ms: u32,
     pub cover_url: Option<String>,
     pub cover_url_large: Option<String>,
-    /// Playlist, album or artist the track played in.
     pub context: Option<String>,
     pub position_ms: u32,
-    /// Songs the user queued themselves, after the ones from the context. Re-added on resume.
     #[serde(default)]
     pub queued: Vec<String>,
 }
 
-/// Missing or unreadable state just means a fresh start.
 pub fn load(path: &Path) -> State {
     fs::read(path).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default()
 }
@@ -155,7 +134,6 @@ pub fn save(path: &Path, state: &State) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    // Write and rename, so a crash mid-write never leaves a broken file behind.
     let temp = path.with_extension("json.tmp");
     fs::write(&temp, serde_json::to_vec_pretty(state)?)?;
     fs::rename(temp, path)
@@ -226,7 +204,6 @@ mod tests {
         assert_eq!(loaded.service.as_deref(), Some("ytmusic"));
         assert_eq!(loaded.page, search);
         assert_eq!(loaded.pages.get("spotify"), Some(&library));
-        // Older tuneboxs read the page at the top as theirs and skip the rest.
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains(r#""view""#) && text.contains("daft punk"), "{text}");
         fs::remove_dir_all(dir).unwrap();

@@ -1,9 +1,3 @@
-//! Omarchy's theme. tunebox takes its colors from the theme Omarchy has set and follows it when
-//! it changes, the way Omarchy's own apps do.
-//!
-//! A theme's colors come from `tunebox.toml` in the theme's directory, which Omarchy renders
-//! from the template `tunebox omarchy install` puts in place, and which a theme may also ship.
-//! Without one, tunebox renders the same template itself from the theme's `colors.toml`.
 
 use std::{
     collections::HashMap,
@@ -16,13 +10,9 @@ use ratatui::style::Color;
 
 use crate::theme::{Palette, Rgb};
 
-/// The template that turns an Omarchy theme into tunebox's colors.
 pub const TEMPLATE: &str = include_str!("../../../integrations/omarchy/tunebox.toml.tpl");
-/// How often to look for a new theme; switching takes Omarchy about as long.
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
-/// Omarchy's state, `~/.local/state/omarchy`; `TUNEBOX_OMARCHY_STATE` points elsewhere, for
-/// trying a theme without switching to it. `None` without Omarchy.
 pub fn state_dir() -> Option<PathBuf> {
     let dir = match env::var_os("TUNEBOX_OMARCHY_STATE") {
         Some(dir) => PathBuf::from(dir),
@@ -31,27 +21,20 @@ pub fn state_dir() -> Option<PathBuf> {
     dir.join("current/theme").is_dir().then_some(dir)
 }
 
-/// Follows the theme Omarchy has set.
 pub struct ThemeWatch {
     current: PathBuf,
     checked: Option<Instant>,
-    /// What the theme's files looked like when they were last read.
     seen: Option<Stamp>,
 }
 
-/// When the files that make up the theme last changed. A switch replaces the theme's
-/// directory, then rewrites `theme.name`.
 #[derive(Debug, PartialEq)]
 struct Stamp([Option<SystemTime>; 3]);
 
 impl ThemeWatch {
-    /// `None` without Omarchy.
     pub fn new() -> Option<Self> {
         Some(Self { current: state_dir()?.join("current"), checked: None, seen: None })
     }
 
-    /// The theme's palette the first time, then again whenever the theme changed. Looks at the
-    /// files at most every [`CHECK_INTERVAL`], so it may be called on every tick.
     pub fn poll(&mut self) -> Option<Palette> {
         if self.checked.is_some_and(|at| at.elapsed() < CHECK_INTERVAL) {
             return None;
@@ -67,8 +50,6 @@ impl ThemeWatch {
         if self.seen.as_ref() == Some(&stamp) {
             return None;
         }
-        // Read in the middle of a switch, the directory may be gone for a moment; the next
-        // look tries again.
         let colors = fs::read_to_string(theme.join("colors.toml")).ok()?;
         let tunebox = fs::read_to_string(theme.join("tunebox.toml")).ok();
         self.seen = Some(stamp);
@@ -76,8 +57,6 @@ impl ThemeWatch {
     }
 }
 
-/// The palette for a theme: what its `tunebox.toml` says, and for whatever that leaves out, the
-/// template rendered from its `colors.toml`.
 pub fn palette(tunebox: Option<&str>, colors: &str) -> Palette {
     let derived = read_palette(&render(TEMPLATE, &variables(colors)), Palette::DEFAULT);
     match tunebox {
@@ -86,8 +65,6 @@ pub fn palette(tunebox: Option<&str>, colors: &str) -> Palette {
     }
 }
 
-/// The palette for a terminal's own background and text: the shades mixed by the same template
-/// as a theme's, with tunebox's accent and red.
 pub fn terminal_palette(background: Rgb, foreground: Rgb) -> Palette {
     let variables = [
         ("background", background),
@@ -100,13 +77,10 @@ pub fn terminal_palette(background: Rgb, foreground: Rgb) -> Palette {
     read_palette(&render(TEMPLATE, &variables), Palette::DEFAULT)
 }
 
-/// `base` with the colors a `tunebox.toml`-style file such as `theme.toml` names.
 pub fn apply(text: &str, base: Palette) -> Palette {
     read_palette(text, base)
 }
 
-/// `colors.toml` as the variables templates use, with the fallbacks Omarchy applies for the
-/// ones templates here need, so older themes that name only ANSI colors work too.
 pub fn variables(colors: &str) -> HashMap<String, String> {
     let mut variables = entries(colors);
     let fallbacks = [
@@ -129,7 +103,6 @@ pub fn variables(colors: &str) -> HashMap<String, String> {
     variables
 }
 
-/// The `key = "value"` lines of a flat TOML file such as `colors.toml`.
 fn entries(text: &str) -> HashMap<String, String> {
     text.lines()
         .filter_map(|line| {
@@ -143,9 +116,6 @@ fn entries(text: &str) -> HashMap<String, String> {
         .collect()
 }
 
-/// Fills in a template the way Omarchy does: `{{ key }}`, `{{ key_strip }}` (without `#`),
-/// `{{ key_rgb }}` (`r,g,b`) and `{{ mix a b 30% }}`, which mixes 30 % of `b` into `a`.
-/// Anything it can't fill in stays as it was, like in Omarchy.
 pub fn render(template: &str, variables: &HashMap<String, String>) -> String {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
@@ -172,7 +142,6 @@ fn fill(token: &str, variables: &HashMap<String, String>) -> Option<String> {
             _ => None,
         };
     }
-    // Omarchy replaces these by exact text, with one space each side.
     let name = inner.strip_prefix(' ')?.strip_suffix(' ')?;
     if let Some(value) = variables.get(name) {
         return Some(value.clone());
@@ -183,7 +152,6 @@ fn fill(token: &str, variables: &HashMap<String, String>) -> Option<String> {
     name.strip_suffix("_rgb").and_then(|key| variables.get(key)).and_then(|value| hex(value)).map(|color| color.rgb())
 }
 
-/// An amount such as `30%`, `0.3` or `30`, as a fraction.
 fn percent(amount: &str) -> Option<f64> {
     let (number, percent) = match amount.strip_suffix('%') {
         Some(number) => (number, true),
@@ -196,8 +164,6 @@ fn percent(amount: &str) -> Option<f64> {
     Some(if percent || value > 1.0 { value / 100.0 } else { value }.clamp(0.0, 1.0))
 }
 
-/// Mixes like Omarchy's templates, rounding halves up, so tunebox's own rendering matches theirs
-/// to the last digit.
 fn mix(a: Rgb, b: Rgb, amount: f64) -> Rgb {
     let channel = |a: u8, b: u8| (f64::from(a) * (1.0 - amount) + f64::from(b) * amount + 0.5) as u8;
     Rgb(channel(a.0, b.0), channel(a.1, b.1), channel(a.2, b.2))
@@ -222,7 +188,6 @@ impl Rgb {
     }
 }
 
-/// `base` with the colors `text` names in `key = "#rrggbb"` lines.
 fn read_palette(text: &str, base: Palette) -> Palette {
     let entries = entries(text);
     let rgb = |key: &str| entries.get(key).and_then(|value| hex(value));
@@ -277,7 +242,6 @@ red = "#d20f39"
         assert_eq!(palette.accent, Rgb(0x7a, 0xa2, 0xf7));
         assert_eq!(palette.danger, Color::Rgb(0xf7, 0x76, 0x8e));
         assert_eq!(palette.highlight, Rgb(0xc0, 0xca, 0xf5));
-        // 7 % of the way from the background to the text.
         assert_eq!(palette.raised, Color::Rgb(36, 38, 50));
         assert!(!palette.is_light());
     }
@@ -345,7 +309,6 @@ red = "#d20f39"
         watch.checked = None;
         assert_eq!(watch.poll(), None, "nothing changed");
 
-        // A switch replaces the directory and then names the theme.
         fs::remove_dir_all(&theme).unwrap();
         fs::create_dir_all(&theme).unwrap();
         fs::write(theme.join("colors.toml"), CATPPUCCIN_LATTE).unwrap();

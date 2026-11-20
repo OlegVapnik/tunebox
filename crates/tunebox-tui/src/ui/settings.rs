@@ -1,5 +1,3 @@
-//! The Settings page: every setting with a line on what it does, and its value, changed in
-//! place with the arrow keys or a click.
 
 use std::borrow::Cow;
 
@@ -15,22 +13,17 @@ use crate::{
     views::View,
 };
 
-/// Room for the longest choice, so the arrows around it stay put while it changes.
 const CHOICE_WIDTH: usize = 10;
 
-/// What one screen row of the page shows.
 enum Row {
     Title,
     Section(&'static str),
-    /// The name and value of the `n`th setting.
     Name(usize, Setting),
-    /// The line under it that says what it does.
     About(Setting),
     Blank,
     Footer,
 }
 
-/// The page's rows, with the settings `shown`; a section without any is left out.
 fn rows(shown: &[Setting]) -> Vec<Row> {
     let mut rows = vec![Row::Title, Row::Blank];
     let mut index = 0;
@@ -67,7 +60,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let rows = rows(&view.settings);
     let height = inner.height as usize;
-    // Follow the selection, with its section title in view, unless the wheel moved the page.
     if !view.detached {
         let name = rows.iter().position(|row| matches!(row, Row::Name(i, _) if *i == view.selected)).unwrap_or(0);
         let first_shown = if view.selected == 0 { 0 } else { name.saturating_sub(3) };
@@ -95,7 +87,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 buf.set_string(inner.x, y, title, Style::new().fg(p.text).bold());
             }
             Row::Name(index, setting) => {
-                // The band covers the name and the line under it, like a two-row list entry.
                 let band = super::content::row_band(inner, y, 2).intersection(area);
                 if index == selected {
                     buf.set_style(band, Style::new().bg(selection));
@@ -128,7 +119,6 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-/// What the setting does, or why it can't do anything here.
 fn about(app: &App, setting: Setting) -> Cow<'static, str> {
     match setting {
         Setting::Notifications if !app.can_notify() && !app.is_demo() => {
@@ -144,14 +134,11 @@ fn about(app: &App, setting: Setting) -> Cow<'static, str> {
     }
 }
 
-/// Draws the value of `setting` ending at column `right`, with its click targets. Returns
-/// where it starts.
 fn value(buf: &mut Buffer, app: &mut App, index: usize, setting: Setting, right: u16, y: u16) -> u16 {
     let p = theme::palette();
     let accent = app.accent.color();
     let shown = app.prefs.value(setting);
     if let Some(on) = app.prefs.switch(setting) {
-        // A pill like the page buttons: filled with the accent while on.
         let label = format!(" {shown} ");
         let width = label.width() as u16;
         let x = right.saturating_sub(width);

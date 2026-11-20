@@ -1,5 +1,3 @@
-//! Checks what SoundCloud needs: the programs playback runs on, its public API, the sign-in,
-//! and a stream URL actually resolving, as `tunebox doctor` sections.
 
 use std::{
     process::Stdio,
@@ -14,12 +12,10 @@ use crate::{SoundCloud, uri_path};
 
 const TIMEOUT: Duration = Duration::from_secs(45);
 
-/// Every check, in the order `tunebox doctor` shows them.
 pub async fn all(client: &SoundCloud) -> Vec<Section> {
     vec![programs().await, soundcloud(client).await, playback(client).await]
 }
 
-/// mpv plays, yt-dlp finds SoundCloud streams when its own HLS path can't.
 pub async fn programs() -> Section {
     let checks = vec![
         version("mpv", "mpv", &["--version"], Expect::Available).await,
@@ -28,7 +24,6 @@ pub async fn programs() -> Section {
     Section { title: "PROGRAMS · playback", checks }
 }
 
-/// SoundCloud's public API reaches it; signing in only adds the library and likes.
 pub async fn soundcloud(client: &SoundCloud) -> Section {
     let mut checks = vec![
         timed("Search", Expect::Available, async {
@@ -59,8 +54,6 @@ pub async fn soundcloud(client: &SoundCloud) -> Section {
         })
         .await
     } else if client.sign_in_expired() {
-        // Browsing goes on without the sign-in, so this is not a broken install; it is the
-        // one thing the user has to fix by signing in again.
         let reason = "SoundCloud won't take the saved sign-in any more – run `tunebox login soundcloud` again";
         Check { name: "Signed in".into(), expect: Expect::Available, outcome: Outcome::Failed(reason.into()) }
     } else {
@@ -71,7 +64,6 @@ pub async fn soundcloud(client: &SoundCloud) -> Section {
     Section { title: "SOUNDCLOUD · api-v2", checks }
 }
 
-/// A stream URL resolves, for a track found by Search, which needs yt-dlp and SoundCloud to agree.
 pub async fn playback(client: &SoundCloud) -> Section {
     let check = timed("Stream URL", Expect::Available, async {
         let started = Instant::now();
@@ -108,7 +100,6 @@ async fn version(name: &str, program: &str, args: &[&str], expect: Expect) -> Ch
     Check { name: name.into(), expect, outcome }
 }
 
-/// Like [`tunebox_core::doctor::timed`], with time for SoundCloud, and how long the probe took.
 async fn timed(name: &str, expect: Expect, probe: impl Future<Output = Result<String>>) -> Check {
     let started = Instant::now();
     let outcome = match outcome(TIMEOUT, probe).await {

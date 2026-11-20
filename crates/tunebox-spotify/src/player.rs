@@ -1,5 +1,3 @@
-//! Playback through mpv without Premium. The queue and mpv control live in `tunebox-mpv`;
-//! this is the Spotify source it plays.
 
 use std::sync::Arc;
 
@@ -10,14 +8,12 @@ use tunebox_mpv::Player as Engine;
 
 use crate::{source::SpotifySource, webapi::WebApi};
 
-/// The Spotify player for accounts without Premium.
 #[derive(Clone)]
 pub struct Player {
     inner: Engine,
 }
 
 impl Player {
-    /// Starts mpv at `volume` (0 to 65535). Fails when mpv isn't installed.
     pub async fn spawn(
         api: Arc<WebApi>,
         paths: &Paths,
@@ -28,7 +24,6 @@ impl Player {
         Self::spawn_with_args(api, paths, volume, events, args.split_whitespace().map(str::to_owned).collect()).await
     }
 
-    /// [`Player::spawn`] with more arguments for mpv, such as `--ao=null` for tests.
     pub async fn spawn_with_args(
         api: Arc<WebApi>,
         paths: &Paths,

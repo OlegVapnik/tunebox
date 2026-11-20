@@ -1,4 +1,3 @@
-//! The personalized Home feed, as the official clients show it.
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};

@@ -1,6 +1,3 @@
-//! The commands for YouTube Music: signing in with a browser's sign-in, as one of the accounts
-//! signed in there, and out again, its checks for `tunebox doctor`, and playing without the
-//! interface.
 
 mod playback;
 
@@ -13,14 +10,9 @@ use tunebox_ytmusic::{Account, YtMusic, auth, doctor};
 pub use self::playback::play;
 use crate::{prompt, style};
 
-/// How long `tunebox login ytmusic` waits for a sign-in, or another account, in the browser.
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-/// How often it looks whether the browser is signed in by now.
 const SIGN_IN_POLL: Duration = Duration::from_secs(5);
 
-/// Signs in with the sign-in of a browser, or with a pasted Cookie header, as the account
-/// picked among those signed in there. `optional` asks first, for when it comes along with
-/// signing in to another service. Returns whether it is signed in now.
 pub async fn login(paths: &Paths, force: bool, optional: bool) -> Result<bool> {
     let client = YtMusic::new(paths)?;
     if client.signed_in() && !force {
@@ -65,7 +57,6 @@ pub async fn login(paths: &Paths, force: bool, optional: bool) -> Result<bool> {
         println!();
         return Ok(false);
     };
-    // Cookies YouTube turns down aren't kept, and the sign-in before stays.
     if let Err(err) = sign_in.check().await {
         bail!("YouTube Music doesn't take this sign-in, so tunebox didn't keep it: {err:#}");
     }
@@ -74,7 +65,6 @@ pub async fn login(paths: &Paths, force: bool, optional: bool) -> Result<bool> {
     Ok(true)
 }
 
-/// Who the sign-in acts as: the account with its address, else the name YouTube Music shows.
 async fn who(client: &YtMusic) -> Result<Option<String>> {
     if let Some(account) = client.account().await? {
         return Ok(Some(account.label()));
@@ -82,10 +72,6 @@ async fn who(client: &YtMusic) -> Result<Option<String>> {
     Ok(client.me().await?.map(|user| user.name))
 }
 
-/// Asks which of the accounts signed in to the browser to sign in as; `None` when cancelled. A
-/// browser's cookies sign in every Google account signed in to it, so tunebox never just takes
-/// the first: that may be a work account. With cookies from a browser, another account can
-/// sign in there right away.
 async fn choose_account(
     paths: &Paths,
     mut sign_in: auth::SignIn,
@@ -96,7 +82,6 @@ async fn choose_account(
         Ok(_) => bail!("YouTube Music doesn't take this sign-in, so tunebox didn't keep it: it names no account"),
         Err(err) => bail!("YouTube Music doesn't take this sign-in, so tunebox didn't keep it: {err:#}"),
     };
-    // A pasted Cookie header of one account leaves nothing to pick.
     if browser.is_none() && accounts.len() == 1 {
         let account = accounts.remove(0);
         sign_in.choose(&account);
@@ -122,9 +107,6 @@ async fn choose_account(
     }
 }
 
-/// Opens Google's sign-in for another account in `browser`, and waits until its cookies show
-/// an account that wasn't among `known`. Returns the new sign-in, its accounts and where the
-/// new one is among them; `None` when none came in time.
 async fn add_account(
     paths: &Paths,
     browser: &mut auth::Browser,
@@ -138,10 +120,8 @@ async fn add_account(
     println!("  {}", style::dim("Waiting for it… ctrl+c cancels"));
     let waited = tokio::time::timeout(SIGN_IN_TIMEOUT, async {
         loop {
-            // Browsers write new cookies to disk a few seconds after they get them.
             tokio::time::sleep(SIGN_IN_POLL).await;
             let Some(sign_in) = auth::from_browser(paths, browser).await? else { continue };
-            // Signing in to another account may leave the cookies unusable for a moment.
             let Ok(accounts) = sign_in.accounts().await else { continue };
             if let Some(added) = accounts.iter().position(|account| !known.iter().any(|k| k.same_as(account))) {
                 return anyhow::Ok((sign_in, accounts, added));
@@ -158,9 +138,6 @@ async fn add_account(
     }
 }
 
-/// Takes the sign-in of the browser that opens links, and the browser, to read again for
-/// another account. One that isn't signed in to YouTube gets YouTube's sign-in, and tunebox
-/// waits until its cookies show it signed in. `None` when that doesn't happen in time.
 async fn from_default_browser(
     paths: &Paths,
     mut browser: auth::Browser,
@@ -179,7 +156,6 @@ async fn from_default_browser(
     println!("  {}", style::dim("Waiting for the sign-in… ctrl+c cancels"));
     let waited = tokio::time::timeout(SIGN_IN_TIMEOUT, async {
         loop {
-            // Browsers write new cookies to disk a few seconds after they get them.
             tokio::time::sleep(SIGN_IN_POLL).await;
             if let Some(sign_in) = auth::from_browser(paths, &mut browser).await? {
                 return anyhow::Ok(sign_in);
@@ -196,8 +172,6 @@ async fn from_default_browser(
     }
 }
 
-/// Takes the sign-in of a browser picked from a list, with the browser, or a pasted Cookie
-/// header. `None` when cancelled.
 async fn pick_browser(paths: &Paths) -> Result<Option<(auth::SignIn, Option<auth::Browser>)>> {
     let mut browsers = auth::browsers();
     let mut items: Vec<String> = browsers.iter().map(|browser| browser.name.clone()).collect();
@@ -223,12 +197,10 @@ async fn pick_browser(paths: &Paths) -> Result<Option<(auth::SignIn, Option<auth
     auth::from_cookie_header(&header).map(|sign_in| Some((sign_in, None)))
 }
 
-/// Whether a sign-in is saved.
 pub fn signed_in(paths: &Paths) -> Result<bool> {
     Ok(YtMusic::new(paths)?.signed_in())
 }
 
-/// Forgets the sign-in; YouTube Music browses and plays signed out from then on.
 pub fn logout(paths: &Paths) -> Result<()> {
     let signed_in = YtMusic::new(paths)?.signed_in();
     auth::sign_out(paths)?;
@@ -237,8 +209,6 @@ pub fn logout(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-/// What `tunebox doctor` finds for YouTube Music, each section handed to `report` as soon as
-/// it is done.
 pub async fn doctor(paths: &Paths, mut report: impl FnMut(Section)) -> Result<()> {
     let client = YtMusic::new(paths)?;
     report(doctor::programs().await);

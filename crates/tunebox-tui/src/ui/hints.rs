@@ -1,4 +1,3 @@
-//! The bottom line: context hints (clickable), status messages and the playing device.
 
 use crossterm::event::KeyCode;
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, text::Span};
@@ -17,7 +16,6 @@ type Hint = (&'static str, &'static str, Option<HintAction>);
 pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     let p = theme::palette();
     buf.set_style(area, Style::new().bg(p.bg));
-    // Where the service has no other devices, there is nothing to switch to.
     let device = match (app.transferring_to(), &app.now.device, app.is_connected()) {
         _ if !app.supports_devices() => Span::raw(""),
         (Some(name), ..) => {
@@ -48,7 +46,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     }
 
     let mut x = area.x + 2;
-    // Without the commands for what the service lacks, like DJ.
     let offered =
         |action: &Option<HintAction>| !matches!(action, Some(HintAction::Run(command)) if !app.offers(*command));
     let mut hints: Vec<&Hint> = hints(app).iter().filter(|(_, _, action)| offered(action)).collect();
@@ -60,7 +57,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
         if x + len > area.x + width {
             break;
         }
-        // The quietest line on screen: a hint should not compete with the music.
         buf.set_string(x, area.y, *key, Style::new().fg(p.faint).bold());
         buf.set_string(x + key.width() as u16 + 1, area.y, *label, Style::new().fg(p.disabled));
         if let Some(action) = action {
@@ -70,8 +66,6 @@ pub fn draw(buf: &mut Buffer, app: &mut App, area: Rect) {
     }
 }
 
-/// A problem that stays until it's solved: its text, a button that copies the command that
-/// solves it, and a cross that closes it.
 fn draw_pinned(buf: &mut Buffer, app: &mut App, area: Rect, pinned: &Pinned) {
     let p = theme::palette();
     let close = "  ✕".to_owned();
@@ -107,7 +101,6 @@ fn hints(app: &App) -> &'static [Hint] {
             ("a", "add to playlist", Some(Run(AddToPlaylist))),
             ("^K", "commands", Some(Run(Palette))),
         ],
-        // Enter and esc mean something else while typing; a click does the same.
         (Focus::SearchInput, _) => {
             &[("enter", "to results", Some(Key(KeyCode::Enter))), ("esc", "back", Some(Key(KeyCode::Esc)))]
         }
@@ -147,7 +140,6 @@ fn hints(app: &App) -> &'static [Hint] {
             ("^K", "commands", Some(Run(Palette))),
             ("?", "help", Some(Run(Help))),
         ],
-        // A song plays at once.
         (Focus::Content, View::Home(v)) if v.selected().is_some_and(|item| item.is_song()) => &[
             ("enter", "play", Some(Activate)),
             (".", "actions", Some(Run(Menu))),

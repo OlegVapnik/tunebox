@@ -1,5 +1,3 @@
-//! `tunebox play` for YouTube Music: mpv plays, tunebox's queue goes on, and the system's media
-//! controls follow.
 
 use std::time::Duration;
 
@@ -14,10 +12,8 @@ use crate::{
     media::Media,
 };
 
-/// Half, as Spotify's `tunebox play` starts.
 const VOLUME: u16 = u16::MAX / 2;
 
-/// Plays a song with its radio, or a playlist, album or artist, until Ctrl+C or the end.
 pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     let playable = playable(input)?;
     let (events_tx, mut events) = mpsc::unbounded_channel();
@@ -60,7 +56,6 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
                     PlayerEvent::Seeked { position_ms } | PlayerEvent::PositionChanged { position_ms } => {
                         clock.resume(position_ms);
                     }
-                    // Nothing left to play, or nothing would.
                     PlayerEvent::Blocked { reason } => println!("\r\x1b[2K  ✕  {reason}"),
                     PlayerEvent::Stopped if played => break Ok(()),
                     PlayerEvent::Stopped => break Err(anyhow!("YouTube Music can't play {input}")),
@@ -76,7 +71,6 @@ pub async fn play(paths: &Paths, input: &str, shuffle: bool) -> Result<()> {
     result
 }
 
-/// Hands a request from the system's media controls to the player.
 fn control(player: &Player, command: Command, paused: bool) -> Result<()> {
     match command {
         Command::Play if paused => player.toggle(true),

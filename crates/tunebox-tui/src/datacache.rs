@@ -1,5 +1,3 @@
-//! The library, Home and the open track list as the last run left them, kept on disk so the
-//! next start shows them at once while fresh data loads. Each service has files of its own.
 
 use std::{
     fs, io,
@@ -15,9 +13,7 @@ use tunebox_core::{
     service::Service,
 };
 
-/// Raised whenever the format changes; files of another version are ignored.
 const VERSION: u32 = 1;
-/// Older data would mislead more than it helps.
 const MAX_AGE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 #[derive(Serialize, Deserialize)]
@@ -31,10 +27,8 @@ pub struct Library {
     pub home: Option<Home>,
 }
 
-/// The track list that was open.
 #[derive(Serialize, Deserialize)]
 pub struct Tracks {
-    /// Which list it is: Liked Songs, or a playlist or album URI.
     pub key: String,
     pub total: u32,
     pub tracks: Vec<Track>,
@@ -43,7 +37,6 @@ pub struct Tracks {
 #[derive(Serialize, Deserialize)]
 struct File<T> {
     version: u32,
-    /// Unix time in seconds.
     saved_at: u64,
     data: T,
 }
@@ -61,7 +54,6 @@ pub fn tracks_path(cache: &Path, service: Service) -> PathBuf {
     cache.join(file_name("tracks", service))
 }
 
-/// Spotify's files keep the names they had before there was another service.
 fn file_name(name: &str, service: Service) -> String {
     match service {
         Service::Spotify => format!("{name}.json"),
@@ -69,11 +61,8 @@ fn file_name(name: &str, service: Service) -> String {
     }
 }
 
-/// Cached data and how old it is; `None` when missing, unreadable, of another version or
-/// too old.
 pub fn load<T: DeserializeOwned>(path: &Path) -> Option<(T, Duration)> {
     let bytes = fs::read(path).ok()?;
-    // The version decides how to read the rest, so it is checked on its own first.
     let header: Header = serde_json::from_slice(&bytes).ok()?;
     if header.version != VERSION {
         return None;
@@ -85,7 +74,6 @@ pub fn load<T: DeserializeOwned>(path: &Path) -> Option<(T, Duration)> {
 
 pub fn save<T: Serialize>(path: &Path, data: &T) -> io::Result<()> {
     let file = File { version: VERSION, saved_at: now(), data };
-    // Write and rename, so a crash mid-write never leaves a broken file behind.
     let temp = path.with_extension("json.tmp");
     write_private(&temp, &serde_json::to_vec(&file)?)?;
     fs::rename(temp, path)

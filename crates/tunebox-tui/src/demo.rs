@@ -1,6 +1,3 @@
-//! A showcase that needs no Spotify account: `tunebox demo` fills the app with the library, Home
-//! and playing track of a built-in sample made of public Spotify content. Nothing plays, nothing
-//! is saved, and only cover art comes from the network.
 
 use std::collections::HashMap;
 
@@ -13,7 +10,6 @@ use tunebox_core::{
     lyrics::Lyrics,
 };
 
-/// Built by `cargo run --example demo_fixture` from `demo/plan.json`.
 const SAMPLE: &str = include_str!("../demo/sample.json");
 
 #[derive(Serialize, Deserialize)]
@@ -25,25 +21,19 @@ pub struct Demo {
     pub shows: Vec<ShowInfo>,
     pub liked: Vec<Track>,
     pub home: Home,
-    /// Track lists of playlists and albums, by URI. Playlists that only appear on Home are here
-    /// too.
     pub tracks: HashMap<String, Vec<Track>>,
     pub artist_pages: HashMap<String, ArtistPage>,
-    /// Results for the searches the sample was made with; other searches look through it.
     pub searches: HashMap<String, SearchResults>,
     pub lyrics: HashMap<String, Lyrics>,
     pub playing: Playing,
 }
 
-/// The track shown playing.
 #[derive(Serialize, Deserialize)]
 pub struct Playing {
     pub track: Track,
     pub cover_url_large: Option<String>,
-    /// The playlist or album it plays from.
     pub context: Option<String>,
     pub position_ms: u32,
-    /// Songs added to the queue, which play before the rest of the context.
     pub queued: Vec<Track>,
 }
 
@@ -59,20 +49,17 @@ impl Demo {
         self.tracks.get(uri).cloned().unwrap_or_default()
     }
 
-    /// A song of the sample by URI.
     pub fn track(&self, uri: &str) -> Option<&Track> {
         let lists = self.tracks.values().chain([&self.liked, &self.playing.queued]);
         lists.flatten().find(|t| t.uri == uri)
     }
 
-    /// What plays after the playing song: the queued songs, then the rest of its context.
     pub fn upcoming(&self) -> (Vec<Track>, Vec<Track>) {
         let context = self.playing.context.as_deref().map(|uri| self.tracks(uri)).unwrap_or_default();
         let rest = context.iter().skip_while(|t| t.uri != self.playing.track.uri).skip(1).cloned().collect();
         (self.playing.queued.clone(), rest)
     }
 
-    /// The results saved for `query`, else whatever in the sample matches it.
     pub fn search(&self, query: &str) -> SearchResults {
         let query = query.trim().to_lowercase();
         if let Some(results) = self.searches.get(&query) {
@@ -90,7 +77,6 @@ impl Demo {
         }
     }
 
-    /// Whether `uri` is in the sample's library: liked, saved or followed.
     pub fn is_saved(&self, uri: &str) -> bool {
         self.liked.iter().any(|t| t.uri == uri)
             || self.albums.iter().any(|a| a.uri == uri)

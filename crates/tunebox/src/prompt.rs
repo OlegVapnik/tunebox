@@ -1,6 +1,3 @@
-//! Asking in the terminal: one of a list with the arrow keys or its number, yes or no, and a
-//! secret pasted without showing it. Keys are read one by one, so the terminal is in raw mode
-//! while asking, and back to normal afterwards whatever happens.
 
 use std::io::{IsTerminal, Write};
 
@@ -12,12 +9,10 @@ use crossterm::{
 
 use crate::style;
 
-/// Whether there is someone at a terminal to ask.
 pub fn interactive() -> bool {
     std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
 }
 
-/// Raw mode until dropped.
 struct Raw;
 
 impl Raw {
@@ -33,7 +28,6 @@ impl Drop for Raw {
     }
 }
 
-/// A key press, or text pasted at once.
 enum Input {
     Key(KeyEvent),
     Paste(String),
@@ -53,13 +47,10 @@ fn cancels(key: &KeyEvent) -> bool {
     key.code == KeyCode::Esc || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL))
 }
 
-/// Asks `question` with `items` below it; returns the index picked, `None` when cancelled. The
-/// list goes away afterwards, and the question stays with the answer.
 pub fn pick(question: &str, items: &[String]) -> Result<Option<usize>> {
     pick_from(question, items, 0)
 }
 
-/// [`pick`] with the item at `selected` picked to begin with.
 pub fn pick_from(question: &str, items: &[String], selected: usize) -> Result<Option<usize>> {
     let mut out = std::io::stdout();
     let mut selected = selected.min(items.len().saturating_sub(1));
@@ -97,19 +88,16 @@ pub fn pick_from(question: &str, items: &[String], selected: usize) -> Result<Op
             }
             _ => continue,
         }
-        // Back up past the items to the question, to draw the list again.
         write!(out, "\x1b[{}A", items.len() + 1)?;
         draw(&mut out, selected)?;
     };
     drop(raw);
-    // The list and the keys make way for the answer.
     write!(out, "\x1b[{}A\r\x1b[J", items.len() + 1)?;
     let answer = picked.map_or_else(|| style::dim("cancelled"), |index| items[index].clone());
     writeln!(out, "  {} {answer}", style::bold(question))?;
     Ok(picked)
 }
 
-/// Asks a yes-or-no `question`; enter takes `default`, esc says no.
 pub fn confirm(question: &str, default: bool) -> Result<bool> {
     let mut out = std::io::stdout();
     let choices = if default { "Y/n" } else { "y/N" };
@@ -131,8 +119,6 @@ pub fn confirm(question: &str, default: bool) -> Result<bool> {
     Ok(answer)
 }
 
-/// Reads a secret, pasted or typed, until enter, without showing it: only how long it is.
-/// `None` when cancelled.
 pub fn secret(prompt: &str) -> Result<Option<String>> {
     let mut out = std::io::stdout();
     writeln!(out, "  {prompt}")?;
